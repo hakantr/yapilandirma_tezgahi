@@ -31,7 +31,7 @@ use gpui_bilesenleri_galeri::{
 
 fn kur() -> (TestApp, TestAppWindow<GaleriUygulaması>) {
     let mut uygulama = TestApp::new();
-    uygulama.update(|bağlam| bileşen_tuş_bağlarını_kur(bağlam));
+    uygulama.update(bileşen_tuş_bağlarını_kur);
     let pencere = uygulama.open_window(|_, _| GaleriUygulaması::yeni());
     (uygulama, pencere)
 }
@@ -167,4 +167,3 @@ fn tuş_vuruşu_ve_temiz_kare_kolonu_kurmaz() {
         "tuş vuruşlarından sonra önbellek bozulmuş"
     );
 }
-

@@ -258,10 +258,19 @@ kurdu ve ilk işi bir mimari kararı çürütmek oldu.
 ### 6.1 Koşum (`tests/kare_olcumu.rs`)
 
 `TestApp` üzerinde gerçek pencere açar, gerçek metin sistemiyle
-(`CosmicTextSystem` — saf Rust, iki hedefte aynı shaping) koşar ve her
-yinelemede mutasyonu uygulayıp **hemen ardından** gelen `Window::draw`'ı
-zamanlar: "girdi → ilk kare" maliyeti. Varsayılan `cargo test`
-koşumunda atlanır:
+(`CosmicTextSystem` — saf Rust, macOS ve Linux'ta aynı shaping) koşar.
+Ölçüm penceresi **girdiden ekrana kadar geçen bütün CPU işidir**:
+mutasyon, efekt döngüsü (bildirimler, `refresh`, abonelik zincirleri) ve
+o döngünün kirli pencere için yaptığı çizim(ler). Temiz kare senaryosunda
+mutasyon olmadığı için çizim açıkça istenir.
+
+Bu pencere bir düzeltmenin sonucudur: ölçüm bir ara mutasyonun hemen
+ardındaki `draw`'ı zamanlıyordu ve o, `refresh` efekt kuyruğuna girdiği
+için kolonun **kurulmadığı** kareydi — kolon sonraki, ölçülmeyen çizimde
+kuruluyordu. S/T süreleri bu yüzden olduğundan ucuz çıkıyordu. Her
+senaryo artık kolon kurulum sayısını da raporlar (`kolon N/N`) ve sayılar
+ancak o kapı tutarsa yorumlanır. Varsayılan `cargo test` koşumunda
+atlanır:
 
 ```bash
 KARE_OLCUM=1 cargo test --profile akici-dev -p gpui-bilesenleri-galeri \
@@ -280,32 +289,36 @@ kendi geçerlilik kapısını taşıyor (`kolon N/N`).
 
 ### 6.2 Sayılar (macOS, `akici-dev`, 1600×1000, 200 tekrar)
 
+Önbellekli (bugünkü hâl):
+
 | Senaryo | ort | p50 | p95 | en az | kolon kurulumu |
 |---|---|---|---|---|---|
-| D · temiz kare | 1,06 ms | 1,05 ms | 1,11 ms | 1,05 ms | 0/200 |
-| K · tuş vuruşu | 1,16 ms | 1,15 ms | 1,20 ms | 1,14 ms | 0/200 |
-| S · seçici | 1,28 ms | 1,32 ms | 1,41 ms | 1,17 ms | 200/200 |
-| T · tercih | 1,22 ms | 1,23 ms | 1,30 ms | 1,17 ms | 200/200 |
+| D · temiz kare | 1,13 ms | 1,11 ms | 1,33 ms | 1,03 ms | 0/200 |
+| K · tuş vuruşu | 1,24 ms | 1,22 ms | 1,41 ms | 1,15 ms | 0/200 |
+| S · seçici | 2,86 ms | 2,83 ms | 3,27 ms | 2,57 ms | 200/200 |
+| T · tercih | 2,77 ms | 2,69 ms | 3,10 ms | 2,54 ms | 200/200 |
 
-Karşılaştırma — kolon önbelleksizken (aynı koşum, aynı makine):
+Aynı koşum, kolon önbelleği kapalıyken (karşılaştırma tabanı):
 
 | Senaryo | önbelleksiz | önbellekli | kazanç |
 |---|---|---|---|
-| D · temiz kare | 3,03 ms | 1,06 ms | %65 |
-| K · tuş vuruşu | 3,11 ms | 1,16 ms | **%63** |
-| T · tercih | 3,16 ms | 1,22 ms | %61 |
+| D · temiz kare | 3,43 ms | 1,13 ms | %67 |
+| K · tuş vuruşu | 3,50 ms | 1,24 ms | **%65** |
+| S · seçici | 3,47 ms | 2,86 ms | %18 |
+| T · tercih | 3,36 ms | 2,77 ms | %18 |
 
 Okuma:
 
-- **Tuş vuruşu karesi ~1,16 ms** ve o karede sağ kolon hiç kurulmuyor
-  (0/200). İkinci turun hedefi buydu; artık ölçülü.
-- Tercih ve seçici karelerinde kolon her seferinde kuruluyor (200/200) —
-  tazelik korunuyor. Sayı sütunu bu yüzden tabloda: süreler ancak bu
-  kapıyla birlikte anlamlı.
-- 120 FPS bütçesi (8,33 ms) karşısında ~%14, 60 FPS (16,7 ms) karşısında
-  ~%7.
-- Bu sayılar headless CPU'dur ve **gerçek gecikme değildir**; sunum,
-  giriş kuyruğu ve vsync eklenmemiştir.
+- **Tuş vuruşu ~1,24 ms** ve o işin içinde kolon hiç kurulmuyor (0/200).
+  Kazanç burada: %65.
+- S ve T'de kolon her tekrarda kuruluyor (200/200) — tazelik korunuyor ve
+  ölçülen iş kurulumu **içeriyor**. Oradaki %18, kolon dışındaki
+  önbelleklerden (rapor, kod, çözülmüş görünüm) gelir.
+- 120 Hz CPU bütçesi (8,33 ms) karşısında tuş vuruşu ~%15, 60 Hz
+  (16,7 ms) karşısında ~%7.
+- Bu sayılar **headless CPU'dur ve gerçek gecikme değildir**; sunum
+  (present/vsync), giriş kuyruğu ve fiziksel girdi eklenmemiştir. Tek
+  makine, tek pencere boyutu.
 
 ### 6.3 Bulgu: `Entity::cached` sessizce donuyordu
 
@@ -345,9 +358,17 @@ Sayaç yalnız mimariyi değil, ölçümü de denetledi:
   paralel koşan testler birbirinin çizimlerini sayıyor ve sahte
   başarısızlık üretiyordu. `thread_local` yapıldı — bir GPUI uygulaması
   zaten kendi iş parçacığında çizer.
+- **Dar ölçüm penceresi.** Düzeltmenin ardından ölçüm mutasyonun hemen
+  ardındaki `draw`'ı zamanlıyordu; `refresh` efekt kuyruğuna girdiği için
+  o kare kolonun kurulmadığı kareydi ve S/T süreleri olduğundan ucuz
+  çıkıyordu (dış inceleme bulgusu). Pencere, girdiden ekrana kadar geçen
+  bütün CPU işini kapsayacak biçimde genişletildi ve kapı `kolon N/N`
+  olarak sıkılaştırıldı: S/T artık tekrar başına en az bir kurulum
+  içermek zorunda.
 
-Ders: ölçüm aracı da ölçülen sistem kadar şüpheyle karşılanmalı. Her iki
-hata da "beklenmedik sayı" olarak göründü ve kovalandığında araçta çıktı.
+Ders: ölçüm aracı da ölçülen sistem kadar şüpheyle karşılanmalı. Üç hata
+da "beklenmedik sayı" olarak göründü ve kovalandığında araçta çıktı;
+üçüncüsünü bağımsız bir inceleme yakaladı.
 
 ### 6.5 Çözüm: geçersizleme `refresh` ile yapılır
 
@@ -366,9 +387,15 @@ için o kümeye kendi kimliğiyle girmez ve `dirty_views`e hiç ulaşmaz.
 `refresh` ise ayrı bir kanaldır: `refreshing` bayrağı prepaint'teki cache
 koşulunu doğrudan düşürür (`view.rs` · `!window.refreshing`).
 
-Uygulama: kök `GaleriUygulaması::kolonu_geçersizle` ile
-`cx.refresh_windows()` çağırır ve bunu kolonu ilgilendiren **her** kök
-değişiminde yapar — tercih (`tezgahı_değiştir`), tema (`temayı_tazele`),
+Uygulama: kök `GaleriUygulaması::kolonu_geçersizle` ile **yalnız kendi
+penceresini** yeniler (`defer` + `Window::refresh`; tutamaç ilk çizimde
+yakalanır). `refresh_windows()` yalnız tutamaç henüz yokken, yani ilk
+çizimden önce yedek yoldur — bütün pencereleri yenilemek hedefli değildir
+ve ileride açılacak başka pencerelerin önbelleklerini de kırardı.
+`Window::refresh` doğrudan çağrılamaz çünkü buraya bir listener içinden
+gelinir ve pencere o sırada kiralıdır (`App::update_window` pencereyi
+`take` eder). Geçersizleme kolonu ilgilendiren **her** kök değişiminde
+yapılır — tercih (`tezgahı_değiştir`), tema (`temayı_tazele`),
 açık seçici (`seçiciyi_değiştir`), `§16` dış bildirim
 (`tezgah_dış_bildirimi`). Efekt üzerinden çalışması `Window` erişimi
 gerektirmemesini sağlar ve gerçek akışa uyar: listener bildirir, efekt
@@ -394,7 +421,69 @@ Yapısal bekçi de buna bağlandı: `paneller.rs` içinde `.cached(` varsa,
 `lib.rs` içinde `refresh_windows` çağrısı ve en az dört
 `kolonu_geçersizle` kullanımı bulunmalıdır.
 
-## 7. İnceleme düzeltmeleri (24 Ağu 2026, bağımsız salt-okunur inceleme)
+## 7. Sol kolon ve üst şerit: desen neden uygulanmıyor (ölçüldü)
+
+Sağ kolonda işe yarayan ikili — `Entity::cached` + `refresh` ile
+geçersizleme — sol kolona ve üst şeride de uygulanmak istendi. Önce
+payları ölçüldü, sonra uygulanabilirlikleri sınandı. Sonuç: **ikisi de
+uygulanmıyor**, gerekçeler aşağıda. Bu, üçüncü turdaki kararın (§5)
+ölçümle ve yeni mekanik bilgisiyle doğrulanmasıdır.
+
+### 7.1 Payları küçük (ablation, aynı koşum)
+
+Bölgeler geçici olarak boşaltılıp kare süresi yeniden alındı:
+
+| Çıkarılan | D · temiz | K · tuş vuruşu | pay (yaklaşık) |
+|---|---|---|---|
+| — (tam ekran) | 1,13 ms | 1,24 ms | — |
+| Üst şerit | 0,98 ms | 1,21 ms | ~0,15 ms (D'de %13) |
+| Alan gözleyen iki panel | 1,00 ms | 1,01 ms | ~0,24 ms (K'de %19) |
+
+Ölçüm gürültüsü bu ölçekte belirgin (p95–p50 farkı ~0,2 ms), yani
+paylar "birkaç yüzde onda milisaniye" düzeyinde okunmalı.
+
+### 7.2 Üst şerit: `cached` boyut kısıtına takılıyor
+
+`Entity::cached` view'ı **stilden yerleştirir, içerikten ölçmez**
+(`view.rs`). Sağ kolon bu kısıta uyuyordu çünkü `flex_1` bir kaptı. Üst
+şerit ise içerik yüksekliklidir (iki satır, `flex_wrap`), yani `cached`
+sınırına girmesi için sabit yükseklik yazmak gerekir. O sayı tipografiye,
+yoğunluğa ve metin ölçeğine bağlıdır; sabitlemek `%200 ölçekte kabuk
+okunur kalır` kabul ölçütünü (`YÖN-006.ACC-011`) riske atar. ~0,15 ms
+için alınacak risk değil.
+
+### 7.3 Sol kolon: canlı paneller sınırın **içinde**
+
+Sol kolonun kayan bloğu boyut olarak uygundur (`flex_1` + `min_h(0)`,
+sağ kolonla aynı profil). Engel başka: içinde alan gözleyen üç panel
+yaşıyor (`YuvaNotuPaneli`, `AlanDurumPaneli`, `OlayAkışıPaneli`) ve
+tasarımın kart sırası onları tercih kartlarının arasına yerleştiriyor.
+
+Buradaki ayrım sağ kolonun neden işe yaradığını da açıklıyor:
+
+- **Sağ kolon panellerin kardeşidir.** Panel bildirdiğinde
+  `mark_view_dirty` panelin **atalarını** kirletir; kardeş kolon
+  etkilenmez ve önbellekte kalır.
+- **Sol kayan blok panellerin atasıdır.** Aynı mekanizma onu her panel
+  bildiriminde kirletir — yani her tuş vuruşunda. Önbellek doğru çalışır
+  ama hiç isabet etmez: kazanç sıfır.
+
+Panelleri sınırın dışına almak sırayı bozar (kart dizilişi tasarımın
+`§5` şemasıdır); ara grupları tek tek önbelleğe almak ise §7.2'deki boyut
+kısıtına düşer. Bu yüzden sol kolon bugünkü hâlinde kalır.
+
+### 7.4 Kayıt
+
+Kalan ~1,24 ms'lik tuş vuruşu maliyeti şunlardan oluşur: kök kabuğu ve
+üst şerit, sol kolonun şerit/kartları, yaşayan alanın kendi çizimi
+(kanonik `MetinGirişiÖğesi`) ve alan gözleyen üç panel. Bunların hiçbiri
+bugünkü mekaniklerle güvenle daraltılamıyor. Daha ileri gitmek için
+gereken şey yeni bir önbellek katmanı değil, GPUI tarafında `cached`
+sınırının içerik yüksekliğiyle çalışabilmesi ya da bildirim
+taneciliğinin kardeş/ata ayrımından bağımsızlaşmasıdır — ikisi de bu
+deponun işi değil.
+
+## 8. İnceleme düzeltmeleri (24 Ağu 2026, bağımsız salt-okunur inceleme)
 
 Üç turun ardından yapılan dış kaynak incelemesi dört noktayı düzeltti ya
 da kesinleştirdi; kayıt buraya işlenir ki rapor tek başına doğru resmi
@@ -428,14 +517,13 @@ versin:
 "her ekran yenilemesinde" değil, **gerçekleşen her GPUI çiziminde**
 koşar; hiçbir entity kirli değilse çizim de yoktur.
 
-## 8. Sıradaki işler
+## 9. Sıradaki işler
 
-1. **Sol kolon ve üst şerit için aynı desen:** kolonda işe yarayan
-   "önbellek + `refresh` ile geçersizleme" ikilisi oralara da uygulanabilir
-   mi? Engel duruyor (içerik yükseklikli bölgeler, alan gözleyen
-   panellerle serpiştirme — §5) ama artık çalışan bir desen ve ölçen bir
-   koşum var. Beklenen kazanç, kalan ~1,06 ms'lik taban maliyetin bir
-   bölümü.
+1. **Sol kolon ve üst şerit — kapandı (§7).** Desen denendi, payları
+   ölçüldü ve uygulanmadı: üst şerit `cached`in boyut kısıtına takılıyor,
+   sol kolonun kayan bloğu ise canlı panelleri **içerdiği** için her tuş
+   vuruşunda kirlenir. Yeniden açmak için GPUI tarafında bir değişiklik
+   gerekir.
 2. **Linux ölçümü:** aynı koşum kullanıcının Linux düğümünde
    (`CosmicTextSystem` iki hedefte de aynı olduğu için sayılar
    karşılaştırılabilir).
@@ -448,5 +536,9 @@ koşar; hiçbir entity kirli değilse çizim de yoktur.
    sayı gerilememeli.
 
 Kayıtlı sınır: bu depo için **120 FPS ya da "sıfıra yakın gecikme" iddiası
-yoktur**. Ölçülen tek şey headless CPU kare maliyetidir (~3 ms) ve o da
-tek makinede, tek pencere boyutunda alınmıştır.
+yoktur**. Ölçülen tek şey headless CPU işidir — odak sonrası tuş vuruşu
+için ~1,24 ms (120 Hz bütçesinin ~%15'i) — ve o da tek makinede, tek
+pencere boyutunda, sunum/vsync ve fiziksel girdi dışarıda bırakılarak
+alınmıştır. Yapılabilecek en geniş iddia şudur: *1600×1000 headless macOS
+ölçümünde, odak sonrası bir tuş vuruşunun CPU çizim aşaması 120 Hz kare
+bütçesine sığıyor.*

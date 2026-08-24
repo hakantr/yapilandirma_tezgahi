@@ -250,6 +250,14 @@ pub struct GaleriUygulaması {
     /// Değer yalnız temadan türer; tek ölçü için her karede tam bir tema
     /// anlık görüntüsü kurmak kare hızında israftı.
     yarıçap_önbelleği: Option<(u64, f32)>,
+    /// Bu kökün penceresi; hedefli geçersizleme için saklanır.
+    ///
+    /// `refresh_windows()` bütün pencereleri yeniler — tezgâhta tek pencere
+    /// olduğu için bugün sonuç aynıdır, ama niyet "kolonu tazele" iken
+    /// bütün uygulamayı yenilemek hedefli değildir ve ileride açılacak
+    /// başka pencerelerin önbelleklerini de kırardı. Tutamaç ilk çizimde
+    /// yakalanır.
+    pencere_tutamacı: Option<gpui::AnyWindowHandle>,
     galeri_teması: GaleriTeması,
     galeri_kipi: gpui_bilesenleri::TemaKipi,
     sergi_düğme_sayacı: u32,
@@ -321,6 +329,7 @@ impl GaleriUygulaması {
             rapor_önbelleği: None,
             kod_önbelleği: None,
             görünüm_önbelleği: None,
+            pencere_tutamacı: None,
             yarıçap_önbelleği: None,
             galeri_teması: match hedef {
                 GaleriHedefi::Masaüstü => GaleriTeması::Kağıt,
@@ -951,7 +960,21 @@ impl GaleriUygulaması {
     /// Kolonu ilgilendiren **her** kök değişimi bunu çağırmalıdır; kapı
     /// `tests/kolon_tazeligi.rs`.
     fn kolonu_geçersizle(&self, bağlam: &mut Context<Self>) {
-        bağlam.refresh_windows();
+        // Yalnız bu pencere yenilenir. `refresh` doğrudan çağrılamaz:
+        // buraya bir listener'ın içinden gelinir ve pencere o sırada
+        // kiralıdır (`App::update_window` pencereyi `take` eder, iç içe
+        // çağrı boş döner). `defer` kirayı bırakıldıktan sonra koşar ve
+        // gerçek akışa da uyar: listener bildirir, efekt döngüsü bayrağı
+        // kurar, sıradaki kare kolonu yeniden kurar.
+        match self.pencere_tutamacı {
+            Some(tutamaç) => bağlam.defer(move |bağlam| {
+                tutamaç
+                    .update(bağlam, |_, pencere, _| pencere.refresh())
+                    .ok();
+            }),
+            // Henüz çizilmediyse tutamaç yok; ilk çizim zaten her şeyi kurar.
+            None => bağlam.refresh_windows(),
+        }
     }
 
     /// Tezgâhın yürürlükteki tercihleri; paneller çizimde buradan okur.
@@ -1123,6 +1146,8 @@ impl Render for GaleriUygulaması {
         // görünüm kendi fallback'leriyle ayakta kaldı ama açık seçici
         // fallback'siz olduğu için hiçbir liste açılmıyordu.
         self.kare_dikişlerini_kur();
+        // Hedefli geçersizlemenin adresi; ilk çizimde yakalanır.
+        self.pencere_tutamacı = Some(pencere.window_handle());
 
         // Uygulama tezgâh ekranıyla açılır. Tezgâh, galeri bilgi mimarisinin
         // içine gömülü bir aile sayfası **değildir**: tasarımın `§5`/`§6`

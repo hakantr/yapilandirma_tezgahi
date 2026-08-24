@@ -12,13 +12,13 @@
 //! Her senaryo, kolonun o karede gerçekten kurulduğunu da sayar ve
 //! sayılar ancak o kapı geçilirse yorumlanır (`kolon N/N`).
 //!
-//! Ölçülen şey **CPU kare maliyeti**dir: element ağacının kurulumu,
-//! yerleşim, prepaint ve paint'in sahneye yazımı — yani üç turun
-//! değiştirdiği bütün iş. GPU sunumu (present/vsync) headless koşumda
+//! Ölçülen şey **CPU işidir**: element ağacının kurulumu, yerleşim,
+//! prepaint ve paint'in sahneye yazımı, artı mutasyonlu senaryolarda
+//! bildirim/efekt zinciri. GPU sunumu (present/vsync) headless koşumda
 //! yoktur; gerçek input-to-present bu sayının üstüne platform sunum
-//! süresini ekler. macOS'ta gerçek CoreText shaping (`MacTextSystem`),
-//! Linux'ta Cosmic shaping kullanılır; Noop metin sistemi kullanılmaz
-//! çünkü kare maliyetinin metin payını sıfır gösterirdi.
+//! süresini ekler. Shaping her hedefte `CosmicTextSystem` ile gerçektir
+//! (saf Rust, macOS ve Linux'ta aynı sonuç); Noop metin sistemi
+//! kullanılmaz çünkü kare maliyetinin metin payını sıfır gösterirdi.
 //!
 //! Senaryolar:
 //! - **D · temiz kare**: mutasyon yok; önbellekli kolon yeniden kullanılır.
@@ -57,6 +57,26 @@ fn uygulama_kur() -> TestApp {
     )
 }
 
+/// Değişiklik yokken tek bir karenin maliyeti.
+///
+/// Mutasyon olmadığı için efekt döngüsü çizim yapmaz; kare açıkça
+/// istenir. Bu, ekranın taban çizim maliyetidir.
+fn temiz_kare_süresi(uygulama: &mut TestApp, pencere: AnyWindowHandle) -> (f64, u64) {
+    let önce = bölüm_çizim_sayısı();
+    let başlangıç = Instant::now();
+    uygulama.update(|bağlam| {
+        pencere
+            .update(bağlam, |_, pencere, bağlam| {
+                pencere.draw(bağlam).clear(bağlam);
+            })
+            .expect("pencere açık");
+    });
+    (
+        başlangıç.elapsed().as_secs_f64() * 1000.0,
+        bölüm_çizim_sayısı() - önce,
+    )
+}
+
 /// Bir senaryonun ölçüm çıktısı.
 struct Sonuç {
     süreler: Vec<f64>,
@@ -70,15 +90,21 @@ struct Sonuç {
     kolon_çizimi: u64,
 }
 
-/// Bir senaryoyu koşturur: her yinelemede mutasyonu uygular ve **hemen
-/// ardından** gelen çizimi zamanlar — yani "girdi → ilk kare" maliyetini.
+/// Bir senaryoyu koşturur: her yinelemede mutasyonu uygular ve girdiden
+/// ekrana kadar geçen **bütün CPU işini** zamanlar.
 ///
-/// Mutasyon ile `draw` bilerek aynı `update` bloğundadır. Blok kapanınca
-/// efekt döngüsü koşar ve kirli pencereyi kendiliğinden bir kez daha çizer
-/// (`app.rs`, test kipi); o ikinci çizim ölçülmez. Ayrı bloklara bölünen
-/// bir sıra — bir ara denendi — mutasyon sonrası **ikinci** kareyi ölçer
-/// ve girdi maliyetini gizler. Kolon kökün durumundan okuduğu için
-/// mutasyon, aynı blokta yapılan çizimde zaten görünür.
+/// Ölçüm penceresi bilerek `update` bloğunun tamamıdır: mutasyonun
+/// kendisi, efekt döngüsü (bildirimler, `refresh`, abonelik zincirleri) ve
+/// o döngünün kirli pencere için yaptığı çizim(ler). Blok içine yerleştirilen
+/// bir `draw`'ı ölçmek — bir ara öyleydi — yanlış kareyi ölçüyordu:
+/// `refresh` efekt kuyruğuna girdiği için o çizim kolonun **kurulmadığı**
+/// kareydi, kolon ise sonraki, ölçülmeyen çizimde kuruluyordu. Kolon
+/// sayacı (`kolon N/N`) ölçülen işin gerçekten neyi içerdiğini söyler.
+///
+/// D senaryosunda mutasyon yoktur, yani pencere kirlenmez ve efekt
+/// döngüsü çizim yapmaz; orada ölçüm açık bir `draw` ile alınır
+/// ([`temiz_kare_süresi`]) ve "değişiklik yokken bir karenin maliyeti"
+/// anlamına gelir.
 fn senaryo(
     uygulama: &mut TestApp,
     pencere: AnyWindowHandle,
@@ -90,7 +116,8 @@ fn senaryo(
         if sıra == ISINMA {
             kolon_başlangıcı = bölüm_çizim_sayısı();
         }
-        let süre_ms = uygulama.update(|bağlam| {
+        let başlangıç = Instant::now();
+        uygulama.update(|bağlam| {
             pencere
                 .update(bağlam, |kök, pencere, bağlam| {
                     let görsel = kök
@@ -99,12 +126,10 @@ fn senaryo(
                     görsel.update(bağlam, |uygulama, bağlam| {
                         mutasyon(uygulama, pencere, bağlam);
                     });
-                    let başlangıç = Instant::now();
-                    pencere.draw(bağlam).clear(bağlam);
-                    başlangıç.elapsed().as_secs_f64() * 1000.0
                 })
-                .expect("pencere açık")
+                .expect("pencere açık");
         });
+        let süre_ms = başlangıç.elapsed().as_secs_f64() * 1000.0;
         if sıra >= ISINMA {
             süreler.push(süre_ms);
         }
@@ -159,8 +184,22 @@ fn kare_maliyeti() {
     );
     let tutamaç: AnyWindowHandle = pencere.handle().into();
 
-    // D · temiz kare — mutasyon yok.
-    let mut d = senaryo(&mut uygulama, tutamaç, &mut |_, _, _| {});
+    // D · temiz kare — mutasyon yok; kare açıkça istenir.
+    let mut d = {
+        let mut süreler = Vec::with_capacity(TEKRAR);
+        let mut kolon = 0;
+        for sıra in 0..(ISINMA + TEKRAR) {
+            let (süre, kurulum) = temiz_kare_süresi(&mut uygulama, tutamaç);
+            if sıra >= ISINMA {
+                süreler.push(süre);
+                kolon += kurulum;
+            }
+        }
+        Sonuç {
+            süreler,
+            kolon_çizimi: kolon,
+        }
+    };
 
     // K · tuş vuruşu — metin gerçek giriş yolundan değişir; iki içerik
     // arasında gidip gelinir ki uzunluk kaymasın ve her kare gerçekten
@@ -202,8 +241,14 @@ fn kare_maliyeti() {
         k.kolon_çizimi, 0,
         "tuş vuruşunda kolon kuruluyor: alan bildirimi kolona sızıyor"
     );
-    assert!(
-        t.kolon_çizimi > 0,
-        "tercih değişiminde kolon kurulmuyor: yüzey bayat kalır"
-    );
+    // S ve T ölçülen işin **içinde** kolonu kurar: geçersizleme efekt
+    // döngüsünde koşar ve o döngü ölçüm penceresinin içindedir. Tekrar
+    // başına en az bir kurulum yoksa süreler yanlış kareyi ölçüyordur.
+    for (ad, sonuç) in [("S", &s), ("T", &t)] {
+        assert!(
+            sonuç.kolon_çizimi >= TEKRAR as u64,
+            "{ad}: kolon {}/{TEKRAR} — ölçülen iş kolon kurulumunu içermiyor",
+            sonuç.kolon_çizimi
+        );
+    }
 }
