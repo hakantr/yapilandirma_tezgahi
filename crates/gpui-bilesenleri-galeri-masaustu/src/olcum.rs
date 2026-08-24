@@ -25,6 +25,13 @@
 //!   metin shaping'i vardır; sağ kolon önbelleği tam da o aşamaların
 //!   aralıklarını (`reuse_prepaint` / `reuse_paint`) yeniden kullanır.
 //! - `mid_draw_events_dropped` büyükse gecikme rakamı eksik okunmalıdır.
+//!
+//! **İki kip.** `--olcum <sn>` mutlak sayıları verir (gecikme, kare
+//! maliyeti, aşama ayrımı). `--olcum-ab <sn>` ise sağ kolon önbelleğinin
+//! kazancını ölçer: önbelleği koşum içinde beşer saniyelik ABBA fazlarıyla
+//! açıp kapatır ve iki kova tutar. İkinci kip, iki ayrı binary'yi arka
+//! arkaya koşturmanın işe yaramamasından doğdu — koşumlar arası gürültü
+//! (~4,4 ms) aranan etkiden (~0,9 ms) büyüktü.
 
 use std::time::Duration;
 
@@ -64,19 +71,42 @@ fn pencere_payı(son: &Histogram<u64>, baş: &Histogram<u64>) -> (Histogram<u64>
     }
 }
 
-/// `--olcum <saniye>` verildiyse ölçümü kurar.
+/// `--olcum <saniye>` ya da `--olcum-ab <saniye>` verildiyse ölçümü kurar.
 ///
 /// Argüman ayrıştırma da burada: sarmalayıcı (`main.rs`) yalnız platform
 /// kurulumu taşır ve bir bekçi onu 80 satırın altında tutar.
 pub fn ölçümü_kur<T: 'static>(pencere: &WindowHandle<T>, bağlam: &mut App) {
-    let Some(saniye) = std::env::args()
-        .skip_while(|argüman| argüman != "--olcum")
+    if let Some(saniye) = argüman_saniyesi("--olcum-ab") {
+        dönüşümlü_ölçümü_planla((*pencere).into(), saniye, bağlam);
+        return;
+    }
+    if let Some(saniye) = argüman_saniyesi("--olcum") {
+        ölçümü_planla((*pencere).into(), saniye, bağlam);
+    }
+}
+
+fn argüman_saniyesi(ad: &str) -> Option<u64> {
+    std::env::args()
+        .skip_while(|argüman| argüman != ad)
         .nth(1)
         .and_then(|değer| değer.parse().ok())
-    else {
-        return;
-    };
-    ölçümü_planla((*pencere).into(), saniye, bağlam);
+}
+
+/// Ölçüm kapısı: ilk gerçek metin düzenlemesi.
+///
+/// Fare tıklaması da platformun girdi histogramını doldurur; ölçülmek
+/// istenen ise yazma evresidir. En çok iki dakika beklenir, sonra ölçüm
+/// yine de başlar ve rapor kendi uyarısını basar.
+async fn kapıyı_bekle(bağlam: &mut gpui::AsyncApp) {
+    for _ in 0..600 {
+        if gpui_bilesenleri_galeri::düzenleme_sayısı() > 0 {
+            return;
+        }
+        bağlam
+            .background_executor()
+            .timer(Duration::from_millis(200))
+            .await;
+    }
 }
 
 /// Ölçüm penceresi dolunca raporu basar ve uygulamadan çıkar.
@@ -87,18 +117,7 @@ fn ölçümü_planla(pencere: gpui::AnyWindowHandle, saniye: u64, bağlam: &mut 
     );
     bağlam
         .spawn(async move |bağlam| {
-            // Kapı: ilk gerçek düzenleme (fare tıklaması değil).
-            // En çok iki dakika beklenir; sonra ölçüm yine de başlar ve
-            // rapor kendi uyarısını basar.
-            for _ in 0..600 {
-                if gpui_bilesenleri_galeri::düzenleme_sayısı() > 0 {
-                    break;
-                }
-                bağlam
-                    .background_executor()
-                    .timer(Duration::from_millis(200))
-                    .await;
-            }
+            kapıyı_bekle(bağlam).await;
             // Pencere başlangıcı: histogramların tam anlık görüntüsü.
             let başlangıç = bağlam
                 .update_window(pencere, |_, pencere, _| {
@@ -121,6 +140,174 @@ fn ölçümü_planla(pencere: gpui::AnyWindowHandle, saniye: u64, bağlam: &mut 
             bağlam.update(|bağlam| bağlam.quit());
         })
         .detach();
+}
+
+/// Bir fazın uzunluğu.
+///
+/// Beş saniye, tipik yazma temposunda faz başına birkaç yüz kare demek.
+/// Daha kısa fazlarda geçiş karesinin payı büyür; daha uzunda makine
+/// durumu fazın içinde kayar ve dönüşümlü tasarımın bütün amacı budur.
+const FAZ_SN: u64 = 5;
+/// Bayrak değiştikten sonra ölçüme başlamadan beklenen süre.
+///
+/// Önbellek açılıp kapandığında ağaç yeniden kurulur ve o kare zorunlu
+/// ıskadır; hiçbir kovaya girmemelidir.
+const OTURMA_MS: u64 = 300;
+
+/// Aynı koşum içinde önbellekli/önbelleksiz fazları sırayla ölçer.
+///
+/// İki ayrı binary'yi arka arkaya koşturmak işe yaramadı: aynı binary'nin
+/// iki koşumu arasındaki fark (~4,4 ms), aranan etkiden (~0,9 ms) beş kat
+/// büyük çıktı. Baskın değişken derleme değil, koşum — termal durum, arka
+/// plan yükü ve elle yazma temposu. Fazları tek süreç içinde dönüşümlü
+/// koşturmak bu üçünü de iki kovaya eşit dağıtır.
+fn dönüşümlü_ölçümü_planla(pencere: gpui::AnyWindowHandle, saniye: u64, bağlam: &mut App) {
+    let faz_sayısı = (saniye / FAZ_SN).max(4);
+    eprintln!(
+        "dönüşümlü ölçüm: alana tıklayıp **durmadan yazın** — sayaç ilk metin \
+         düzenlemesiyle başlar, {faz_sayısı} faz × {FAZ_SN} sn sürer (ABBA sırası). \
+         Önbellek koşum içinde açılıp kapanır; tempoyu sabit tutmaya çalışın."
+    );
+    bağlam
+        .spawn(async move |bağlam| {
+            kapıyı_bekle(bağlam).await;
+            let mut kova: [Option<Histogram<u64>>; 2] = [None, None];
+            let mut render_ns = [0u64; 2];
+            let mut eksik_faz = false;
+            for sıra in 0..faz_sayısı {
+                // ABBA: doğrusal kayma (ısınma, termal kısma, arka plan
+                // yükü) iki kovaya da eşit dağılsın diye. Düz AB sırası
+                // kaymanın tamamını ikinci hâle yükler.
+                let önbellekli = matches!(sıra % 4, 0 | 3);
+                let indis = usize::from(!önbellekli);
+                match faz_ölç(bağlam, pencere, önbellekli).await {
+                    Some((fark, ns)) => {
+                        render_ns[indis] = render_ns[indis].saturating_add(ns);
+                        match &mut kova[indis] {
+                            Some(birikim) => {
+                                if birikim.add(&fark).is_err() {
+                                    eksik_faz = true;
+                                }
+                            }
+                            None => kova[indis] = Some(fark),
+                        }
+                    }
+                    None => eksik_faz = true,
+                }
+            }
+            bağlam
+                .update_window(pencere, |_, pencere, _| {
+                    dönüşümlü_raporla(pencere, faz_sayısı, &kova, &render_ns, eksik_faz);
+                })
+                .ok();
+            bağlam.update(|bağlam| bağlam.quit());
+        })
+        .detach();
+}
+
+/// Tek fazı ölçer: bayrağı kur, otur, histogram farkını al.
+///
+/// `None` dönmesi fazın **sayılmadığı** anlamına gelir; çağıran bunu
+/// rapora uyarı olarak yazar. Sessizce eksik kova üretmek, eksik olduğunu
+/// söylemekten kötüdür.
+async fn faz_ölç(
+    bağlam: &mut gpui::AsyncApp,
+    pencere: gpui::AnyWindowHandle,
+    önbellekli: bool,
+) -> Option<(Histogram<u64>, u64)> {
+    bağlam
+        .update_window(pencere, |_, pencere, _| {
+            gpui_bilesenleri_galeri::önbelleği_ayarla(önbellekli);
+            pencere.refresh();
+        })
+        .ok()?;
+    bağlam
+        .background_executor()
+        .timer(Duration::from_millis(OTURMA_MS))
+        .await;
+    let baş = bağlam
+        .update_window(pencere, |_, pencere, _| {
+            gpui_bilesenleri_galeri::render_sıfırla();
+            pencere.frame_duration_snapshot().draw_duration_histogram
+        })
+        .ok()?;
+    bağlam
+        .background_executor()
+        .timer(Duration::from_secs(FAZ_SN))
+        .await;
+    let (son, ns) = bağlam
+        .update_window(pencere, |_, pencere, _| {
+            (
+                pencere.frame_duration_snapshot().draw_duration_histogram,
+                gpui_bilesenleri_galeri::render_toplam_ns(),
+            )
+        })
+        .ok()?;
+    let (fark, tam) = pencere_payı(&son, &baş);
+    tam.then_some((fark, ns))
+}
+
+fn dönüşümlü_raporla(
+    pencere: &gpui::Window,
+    faz_sayısı: u64,
+    kova: &[Option<Histogram<u64>>; 2],
+    render_ns: &[u64; 2],
+    eksik_faz: bool,
+) {
+    const MS: f64 = 1_000_000.;
+    println!("\n— dönüşümlü A/B ölçümü · {faz_sayısı} faz × {FAZ_SN} sn · sıra ABBA —");
+    println!(
+        "ortam                    {:.0}×{:.0} px · ölçek {:.1}× · \
+         erişilebilirlik {} · derleme {}",
+        f32::from(pencere.viewport_size().width),
+        f32::from(pencere.viewport_size().height),
+        pencere.scale_factor(),
+        if pencere.is_a11y_active() {
+            "etkin"
+        } else {
+            "kapalı"
+        },
+        if cfg!(debug_assertions) {
+            "hata ayıklama"
+        } else {
+            "optimize"
+        },
+    );
+
+    let adlar = ["A önbellekli", "B taban"];
+    let mut ortalama = [None; 2];
+    for (indis, ad) in adlar.iter().enumerate() {
+        match &kova[indis] {
+            Some(histogram) if !histogram.is_empty() => {
+                println!("{}", özet(ad, histogram, MS, "ms"));
+                let render = render_ns[indis] as f64 / histogram.len() as f64 / MS;
+                println!(
+                    "{:<24} render gövdeleri {render:6.3} ms · render sonrası {:6.3} ms",
+                    "",
+                    (histogram.mean() / MS - render).max(0.),
+                );
+                ortalama[indis] = Some((histogram.mean() / MS, render));
+            }
+            _ => println!("{ad:<24} örnek yok"),
+        }
+    }
+
+    if let (Some((a_draw, a_render)), Some((b_draw, b_render))) = (ortalama[0], ortalama[1]) {
+        println!(
+            "fark (A−B, ortalama)     toplam draw {:+.3} ms (%{:+.1}) · \
+             render gövdeleri {:+.3} ms · render sonrası {:+.3} ms",
+            a_draw - b_draw,
+            (a_draw - b_draw) / b_draw * 100.,
+            a_render - b_render,
+            (a_draw - a_render) - (b_draw - b_render),
+        );
+    }
+    if eksik_faz {
+        eprintln!(
+            "uyarı: en az bir faz sayılamadı; kovalar eşit sayıda faz \
+             taşımıyor olabilir ve karşılaştırma bu payla okunmalıdır."
+        );
+    }
 }
 
 type Başlangıç = (

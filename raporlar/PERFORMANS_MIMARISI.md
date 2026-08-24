@@ -618,45 +618,105 @@ uygulamasının yayımlanmış "8,4 ms" gibi bir kare süresi büyük olasılık
 `release`tir ve bizim 21,7 ms'lik `akici-dev` sayımızla **doğrudan
 kıyaslanamaz**.
 
-### 8.3 Üç turluk optimizasyonun gerçek penceredeki etkisi — ÖLÇÜLMEDİ
+### 8.3 Üç turluk optimizasyonun gerçek penceredeki etkisi
 
-Bu bölüm bir tahmin ("toplam gecikmeye yansıması ~%5") taşıyordu; §8.2.1
-geri çekilince o tahminin dayanağı da kalmadı ve **geri çekildi**.
+Bu bölüm önce bir tahmin ("toplam gecikmeye yansıması ~%5") taşıyordu;
+§8.2.1 geri çekilince dayanağı kalmadı ve geri çekildi. Yerine iki ayrı
+binary'nin A/B–B/A koşumu kondu. **O deney de sonuç vermedi** — ama
+verdiği bilgi kendi başına değerli, o yüzden kaydı duruyor.
 
-Etkiyi ölçmenin tek doğru yolu duruyor: aynı koşumun önbellekli ve
-önbelleksiz iki kez yapılması. İlk deneme başarısız oldu (taban koşumunda
-pencereye yazılmadı, `girdi→kare: örnek yok`). Doğru deney şöyle
-kurulmalı:
+#### 8.3.1 Ayrı binary'lerle A/B–B/A — GEÇERSİZ (gürültü etkiden büyük)
 
-- Ölçüm penceresi düzeltildikten sonra koşulmalı (§8.2.1'deki dört madde).
-- İki binary **A/B ve B/A sırasıyla**, birkaç çift koşumda çalıştırılmalı
-  — tek sıra ısınma ve termal etkileri ikinci koşuma yükler.
-- Her koşumda benzer tempoda yazılmalı; `n` değerleri yakın değilse
-  karşılaştırma o farkla birlikte okunmalı.
+Dört koşum, release, 1600×1000, her biri 25 sn gerçek yazma. Sıra ABBA;
+koşumlar arası 10 sn ara.
+
+| Koşum | Hâl | n (girdi) | n (kare) | çizim p50 | çizim ort | render gövdeleri | render sonrası |
+|---|---|---|---|---|---|---|---|
+| 1 | A önbellekli | 51 | 92 | 18,4 ms | 18,8 ms | 1,35 ms | 17,5 ms |
+| 2 | B taban | 354 | 369 | 17,6 ms | 18,4 ms | 3,25 ms | 15,1 ms |
+| 3 | B taban | 52 | 56 | 23,6 ms | 22,8 ms | 4,96 ms | 17,8 ms |
+| 4 | A önbellekli | **1** | 142 | 18,5 ms | 17,6 ms | 0,35 ms | 17,3 ms |
+
+Kare sayısıyla ağırlıklandırılmış hâli: A 18,10 ms, B 18,96 ms.
+
+Karşılaştırma bu veriyle **kurulamaz**, üç nedenle:
+
+1. **Gürültü tabanı, aranan etkiden büyük.** Aynı binary'nin (B) iki
+   koşumu arasındaki `çizim` ortalaması farkı **4,42 ms**. A ile B
+   arasındaki fark ise **0,86 ms**. Baskın değişken derleme değil,
+   koşumun kendisi — termal durum, arka plan yükü, pencere konumu.
+2. **Örneklem sayıları uyuşmuyor.** Girdi sayısı 51 / 354 / 52 / 1. Elle
+   yazma temposu koşumdan koşuma beş kat değişmiş; bu, önbelleğin ıska
+   veren kareleriyle isabet eden kareleri arasındaki karışımı da
+   değiştirir. 4. koşumun gecikme satırı (n=1) hiçbir şey söylemez.
+3. **Rapor edilen `n`ler zaten uyarıyordu.** Araç bunları basıyor; sayıyı
+   yok sayıp ortalamaları yarıştırmak §8.2.1'deki hatanın aynısı olurdu.
+
+Yine de veride **tutarlı tek bir sinyal** var: `render gövdeleri` dilimi
+dört koşumda hiç örtüşmüyor.
+
+| Hâl | render gövdeleri (koşum başına) |
+|---|---|
+| A önbellekli | 1,35 ms · 0,35 ms |
+| B taban | 3,25 ms · 4,96 ms |
+
+Bu, önbelleğin **beklendiği yerde iş kestiğini** gösteriyor: kolon
+render edilmediğinde `render` gövdelerinin kare başına maliyeti ~2,7 ms
+düşüyor. Aynı tasarrufun `toplam draw`da görünmemesinin nedeni etkinin
+yok olması değil, gürültünün beş kat büyük olması.
+
+`render sonrası draw aşamaları` için ise veri **hiçbir yön göstermiyor**:
+A 17,3–17,5 ms, B 15,1–17,8 ms — aralıklar iç içe. §9'daki 3. maddenin
+(önbellek `reuse_prepaint`/`reuse_paint` ile render dışındaki işi de
+keser) bu ölçümde ne doğrulaması ne de yalanlaması var.
+
+#### 8.3.2 Doğru düzenek: tek süreç içinde dönüşümlü fazlar
+
+Ayrı koşumlar baskın gürültüyü ölçüme sokuyorsa, çözüm koşum sayısını
+artırmak değil, değişkeni ortadan kaldırmaktır. Önbellek anahtarı
+derleme zamanı `cfg`'den **çalışma zamanı bayrağına** taşındı
+(`önbelleği_ayarla`, `paneller.rs`); `olcum-onbelleksiz` özelliği artık
+yalnız bu bayrağın **varsayılanını** ters çeviriyor, yani durağan taban
+derlemesi ve mevcut bekçiler olduğu gibi duruyor.
+
+Bunun üstüne ikinci bir ölçüm kipi kuruldu: `--olcum-ab <saniye>`.
+
+- Koşum beşer saniyelik fazlara bölünür, sıra **ABBA** (doğrusal kayma —
+  ısınma, termal kısma — iki kovaya eşit dağılsın diye).
+- Her faz başında bayrak çevrilir, `refresh` edilir ve **300 ms
+  oturulur**: geçiş karesi zorunlu ıskadır, hiçbir kovaya girmez.
+- Sonra `draw` histogramının ve `render` toplamının anlık görüntüsü
+  alınır; faz sonunda fark hesaplanıp ilgili kovaya eklenir.
+- Termal durum, arka plan yükü ve yazma temposu artık iki kovaya da eşit
+  dağılır — çünkü aynı dakikanın içindedirler.
 
 ```bash
-# önbellekli
-cargo run --profile akici-dev --features olcum \
-    -p gpui-bilesenleri-galeri-masaustu -- --geniş --olcum 40
-# taban
-cargo run --profile akici-dev \
-    --features olcum,gpui-bilesenleri-galeri/olcum-onbelleksiz \
-    -p gpui-bilesenleri-galeri-masaustu -- --geniş --olcum 40
+cargo run --release --features olcum \
+    -p gpui-bilesenleri-galeri-masaustu -- --geniş --olcum-ab 80
 ```
+
+Mutlak sayılar (gecikme, kare maliyeti, aşama ayrımı) için `--olcum <sn>`
+kipi olduğu gibi duruyor; iki kip iki ayrı soruya bakar ve birbirinin
+yerine geçmez.
 
 ### 8.4 Kayıtlı sonuç
 
 Bu ölçümden sonra depo için geçerli tek cümle şudur:
 
-> 1600×1000 pencerede, 60 Hz ekranlı bir macOS makinesinde,
-> `debug_assertions` açık bir derlemede, bir metin girdisinden platformun
-> `draw` çağrısının tamamlanmasına kadar geçen süre p50 ~29–32 ms
-> ölçüldü. Bu bir **uyarı işareti**dir ve düzeltilmiş ölçüm penceresiyle
-> doğrulanmadan mühürlenmemelidir. Sürenin `draw` içi dağılımı (hangi
-> aşama ne kadar) şu an **bilinmiyor** — ilk ayrıştırma denemesi kusurlu
-> çıktı ve geri çekildi (§8.2.1).
+> 1600×1000 pencerede, 60 Hz ekranlı bir macOS makinesinde, **optimize**
+> derlemede, bir metin düzenlemesinden o düzenlemenin yol açtığı `draw`
+> çağrısının tamamlanmasına kadar geçen süre **p50 17,2 ms** ölçüldü
+> (n=478, düzeltilmiş ölçüm penceresi). Bu, ekrandaki pikselin değiştiği
+> an değildir; sunum kuyruğu ve panel gecikmesi bunun dışındadır.
+> Sürenin `draw` içi **aşama** dağılımı ortalamada 2,21 ms render
+> gövdeleri / 14,63 ms render sonrası aşamalar — ama bu bir **sahiplik**
+> ayrımı değildir (§8.2.1, madde 3).
 
-120 FPS iddiası kapanmadı; ölçüm onu **çürüttü**.
+`debug_assertions` açıkken ölçülen eski 29–32 ms'lik rakam ürünü temsil
+etmiyordu; farkın yaklaşık yarısı doğrulama maliyetiymiş (§8.2.2).
+
+120 FPS iddiası kapanmadı; ölçüm onu **çürüttü**. 60 Hz bütçesine
+(16,7 ms) göre p50 sınırda, 120 Hz bütçesine (8,33 ms) göre ~2 kat.
 
 ## 9. İnceleme düzeltmeleri (24 Ağu 2026, bağımsız salt-okunur inceleme)
 
@@ -698,16 +758,19 @@ Gerçek pencere ölçümü (§8) sırayı değiştirdi: artık en değerli iş, 
 ms'lik `draw`ın içini ayrıştırmak. Platformlar arası tekrar ondan sonra
 gelir — yanlış katmanı optimize etmemek için.
 
-1. **Optimizasyonun gerçek penceredeki etkisi** (§8.3): önbellekli/
-   önbelleksiz çift koşum. İlk denemede taban boş çıktı; ölçüm modu
-   düzeltildi (sayaç ilk tuş vuruşuyla başlıyor) ve koşum tekrar edilebilir
-   durumda. Ucuz ve doğrudan cevap verir.
-2. **`draw`ın %89'luk diliminin içi.** Ayrıştırma (§8.2.1) ağırlığın
-   GPUI + platform katmanında olduğunu gösterdi ama o katmanın içini
-   (shaping / rasterizasyon / sahne kodlama) ayırmadı. **Bu, tezgâhın
-   değil kardeş depoların işidir** (`gpui`, `gpui_apple`); tezgâh yalnız
-   kendi %11'ini daraltabilir ve o iş üç turda yapıldı. Kardeş depoda
-   çalışılacaksa araç hazır: GPUI'nin `profiler` izleri ve Instruments.
+1. **Optimizasyonun gerçek penceredeki etkisi** (§8.3): ayrı binary'lerle
+   A/B–B/A denendi ve **geçersiz çıktı** — koşumlar arası gürültü (4,42 ms)
+   aranan etkiden (0,86 ms) beş kat büyüktü. Düzenek değiştirildi: önbellek
+   artık çalışma zamanı bayrağı ve `--olcum-ab` kipi iki hâli tek süreç
+   içinde dönüşümlü ölçüyor (§8.3.2). Koşum bekliyor.
+2. **`draw`ın render sonrası diliminin içi.** Ağırlığın orada olduğu
+   ölçüldü (§8.1: ort 14,63 ms / 16,84 ms) ama o dilimin içi
+   (yerleşim / prepaint / paint / shaping / rasterizasyon / sahne kodlama)
+   ayrılmadı. Dilim **sahiplik değil aşamadır**: içinde hem GPUI'nin hem
+   tezgâhın ürettiği ağacın işi var. Tezgâhın oradaki payına dokunan tek
+   kaldıraç önbellektir (`reuse_prepaint`/`reuse_paint`) ve etkisi
+   1. maddede ölçülüyor. Geri kalanı kardeş depoların işi (`gpui`,
+   `gpui_apple`); araç hazır: GPUI'nin `profiler` izleri ve Instruments.
 3. **Linux'ta aynı ölçüm** — hem headless hem gerçek pencere. İki kural
    yürürlükte: mutlak süreler platformlar arası yarıştırılmaz;
    karşılaştırma aynı makinede çift koşumla yapılır

@@ -346,6 +346,34 @@ pub fn render_sıfırla() {
     RENDER_NS.with(|toplam| toplam.set(0));
 }
 
+thread_local! {
+    /// Bölüm kolonunun önbelleği açık mı.
+    ///
+    /// Varsayılan `olcum-onbelleksiz` özelliğiyle ters çevrilir — durağan
+    /// taban derlemesi hâlâ tek bayrakla kurulur. Ayrıca çalışma zamanında
+    /// da değiştirilebilir: gerçek pencerede iki hâli **aynı koşum içinde**
+    /// sırayla denemek, iki ayrı koşumu karşılaştırmaktan çok daha temiz bir
+    /// deneydir. Makine durumu, termal ve yazma temposu böylece iki kovaya
+    /// da eşit dağılır; ayrı koşumlarda bunlar farkı gömecek kadar büyür.
+    static ÖNBELLEK_AÇIK: std::cell::Cell<bool> =
+        const { std::cell::Cell::new(!cfg!(feature = "olcum-onbelleksiz")) };
+}
+
+/// Bölüm kolonu önbelleğinin şu an açık olup olmadığını söyler.
+pub fn önbellek_açık() -> bool {
+    ÖNBELLEK_AÇIK.with(std::cell::Cell::get)
+}
+
+/// Bölüm kolonu önbelleğini açar ya da kapatır.
+///
+/// Ana iş parçacığından çağrılmalıdır: bayrak thread-local'dır ve çizim
+/// orada koşar. Çağrının ardından `Window::refresh` gerekir — ağaç ancak o
+/// zaman yeni hâliyle kurulur — ve geçişin kendi karesi zorunlu ıskadır,
+/// yani ölçüme katılmamalıdır.
+pub fn önbelleği_ayarla(açık: bool) {
+    ÖNBELLEK_AÇIK.with(|bayrak| bayrak.set(açık));
+}
+
 /// Bir `render` gövdesini ölçer.
 ///
 /// `Instant` çifti kare başına birkaç kez koşar (~25 ns), yani ölçtüğü
@@ -373,10 +401,9 @@ impl BölümlerPaneli {
     /// çapraz ekseninden çözülür — kolon kaydıran bir kap olduğu için bu
     /// kısıt sorun değildir.
     pub(crate) fn öğe(panel: &Entity<Self>) -> AnyElement {
-        #[cfg(feature = "olcum-onbelleksiz")]
-        {
+        if !önbellek_açık() {
             // Ölçüm tabanı: aynı ağaç, önbelleksiz. Karşılaştırmanın elle
-            // düzenlemeye değil bayrağa dayanması için (`Cargo.toml`).
+            // düzenlemeye değil bayrağa dayanması için.
             return div()
                 .flex_1()
                 .min_w(px(0.))
@@ -384,7 +411,6 @@ impl BölümlerPaneli {
                 .child(panel.clone())
                 .into_any_element();
         }
-        #[cfg(not(feature = "olcum-onbelleksiz"))]
         panel
             .clone()
             .cached(gpui::StyleRefinement::default().flex_1().min_w(px(0.)).min_h(px(0.)))
