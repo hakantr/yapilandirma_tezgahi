@@ -100,49 +100,103 @@ için: `cargo run --profile akici-dev -p gpui-bilesenleri-galeri-masaustu`.
   bağlanması; "Temizle"; dış hata bildiriminde kenarlık + gösterge + port
   rozeti. (`python3 tools/wasm_galeri_hazirla.py` + sunucu.)
 
-## 3. Bu turun kazancı — dürüst değerlendirme
+## 3. Birinci turun kazancı — dürüst değerlendirme
 
-GPUI kökten çizdiği için tuş vuruşu başına ağaç kuruluşu **henüz**
-küçülmedi; kazançlar şunlardır:
+GPUI kökten çizdiği için tuş vuruşu başına ağaç kuruluşu birinci turda
+**henüz** küçülmedi; kazançlar şunlardı:
 
 1. Tuş vuruşu başına `doğrula()` + kod üretimi + olay vektörü klonu ve
    kimlik fabrikası tüketimi kalktı (ölçülebilir, kesin).
 2. Çift köprünün gereksiz gözlemci çağrıları kalktı.
 3. Alan okuyan her kart artık gözleyen bir entity'de — ikinci turun
-   (`cached` bölgeler) doğruluk ön koşulu hazır.
+   (`cached` bölgeler) doğruluk ön koşulu hazırlandı.
 
-## 4. İkinci tur: sağ kolon bölüm entity'leri (sıradaki iş)
+## 4. İkinci tur: sağ kolon bölüm paneli — TAMAMLANDI (24 Ağu 2026)
 
-Hedef: tuş vuruşunda yalnız alan + iki panel çizilsin; tercih değişiminde
-yalnız etkilenen bölgeler kurulsun.
+Hedef gerçekleşti: tuş vuruşu karesinde sağ kolonun element ağacı **hiç
+kurulmuyor** — prepaint/paint aralıkları önceki kareden yeniden
+kullanılıyor.
 
-- Sağ kolon bölümlerini (ve üst şeridi) `Entity::cached(style)` sınırına
-  almak. Kısıt: önbellekli view `style`tan yerleşir, içerikten ölçülmez —
-  kaydıran kolon (`overflow_y_scroll`, `flex_1`) doğal aday; sarmalayıcı
-  stiller `KolonMetriği`nden türetilmeli.
-- Bölüm kartlarındaki 16 `tezgahı_değiştir` listener'ı köke zayıf
-  tutamaçla bağlanmalı (bu turdaki `panel_tercih_düğmesi` deseni).
-- **`yuva_görünürlük_notu` taşınmalı**: kök çiziminde kalan tek alan
-  okuması budur (`sergiler.rs`, `alan.read` — kutu boş mu?). Bugün
-  doğru çalışır çünkü kök her karede çizilir; sol kolon `cached`
-  olduğu gün bayatlar. Not ya `AlanDurumPaneli`ne ya kendi küçük gözleyen
-  entity'sine gitmeli.
-- `profil.rs` thread-local görünüm/palet kanalı kökte her karede kurulur;
-  önbellekli bölgeler çizim atladığında bu kanal onlara işlemez — tema
-  değişimi zaten kökten `notify` ile geldiğinden bugün sorun değil, ama
-  `cached` bölgeler tema sürümünü kendi girdisi olarak taşımalı
-  (`TezgahTeması::sürüm` alanları hazır).
+### 4.1 `BölümlerPaneli` (`src/paneller.rs`)
 
-## 5. Kabul hedefleri ve ölçüm
+- Sağ kolonun tamamı tek önbellekli entity:
+  `Entity::cached(StyleRefinement …flex_1().min_w(0).min_h(0))` sınırında
+  gövdeye girer (`Tezgahİçeriği.yapılandırma: AnyElement`). Kolon kaydıran
+  bir kap olduğu için boyutu içerikten bağımsızdır — `cached`ın "stilden
+  yerleşir, içerikten ölçülmez" kısıtına doğal uyar. Bölüm **kartları**
+  içerik yükseklikli olduğundan kart başına önbellek kurulamaz; sınır
+  kolon düzeyindedir.
+- Panel **kökü gözler** (`observe(kök) → notify`): tercih, tema, açık
+  seçici ve dış bildirim kökten `notify` ile aktığı için önbellek tam
+  gerektiğinde patlar. Alanı gözlemez — tuş vuruşları kolona işlemez.
+- **Listener'lar yeniden yazılmadı.** Panelin çizimi kökü `update` ile
+  açar ve bölümleri kökün kendi bağlamında üretir
+  (`GaleriUygulaması::tezgah_bölümleri` → profilin `bölümler()`i);
+  karttaki 16 `tezgahı_değiştir` dinleyicisi köke bağlı kalır. Çizim
+  sırasında kök kiralı değildir (GPUI, kök render'ı bitip element ağacı
+  yerleşirken alt view'ları çizer), bu yüzden `update` güvenlidir.
+- Bölüm listesinin tek kaynağı `tezgah_bölümleri`: ekrandaki panel de
+  `tezgah_profil.rs` tür süzgeci testleri de oradan okur.
+
+### 4.2 Kaynak okumasıyla doğrulanan üç önbellek mekaniği
+
+- **Kaydırma:** GPUI, kaydırma ofsetini değiştirirken kaydıran öğenin
+  view'ını bildirir (`div.rs paint_scroll_listener → cx.notify(current_view)`)
+  — kolonu kaydırmak önbelleği kendiliğinden patlatır.
+- **İç entity'ler:** kolona gömülü tercih kutuları (desen, ön ek, son ek)
+  bildirim yayımlayınca GPUI ataları da kirletir (`mark_view_dirty`) —
+  onlara yazmak kolonu tazeler.
+- **Açık listeler:** `deferred` çizimler ve fare dinleyicileri
+  `reuse_prepaint`/`reuse_paint` ile taşınır — kolondaki açık bir seçici,
+  önbellekten gelen karelerde de ekranda kalır ve tıklanabilir.
+
+### 4.3 `YuvaNotuPaneli`
+
+Kökün çizim yolundaki **son alan okuması** (`yuva_görünürlük_notu`,
+"kutu boş mu?") kendi gözleyen entity'sine taşındı; kabuk yuvaları kartı
+notu panel olarak gömer. Kökün çizim yolunda artık alan okuması yoktur —
+sol kolon bir gün önbelleğe alındığında da bayatlayacak bir şey kalmadı.
+
+### 4.4 Kabuk sınırındaki değişiklik
+
+`Tezgahİçeriği.bölümler: Vec<TezgahBölümü>` kalktı; yerinde
+`yapılandırma: AnyElement` var. Akış ayrıştırma `arayuz.rs`'te serbest
+fonksiyona indi; kolon gövdesi `govde.rs`'te
+(`yapılandırma_kolonu_gövdesi`, kabuk tarafı) durur ve panel onu çağırır.
+Kabuk yine hiçbir bileşen tipini tanımaz.
+
+### 4.5 Doğrulama
+
+- 208 test yeşil (206 + 2 yeni bekçi: kolon önbellekli **ve** kökü gözler;
+  yuva notu panel bağlamında).
+- WASM'de elle: yazarken paneller canlı, kolon dokunulmadan duruyor; tür
+  ve biçim değişimi kolonu tazeliyor; **açık biçim listesi, alana
+  yazılan karelerde açık kaldı ve öğesi tıklanabilir kaldı** (deferred +
+  listener taşınması); kolon içi ön ek kutusuna yazma çalışıyor; kaydırma
+  akıcı; koyu kip bütün kolona işliyor.
+
+## 5. Üçüncü tur adayları (sıradaki işler)
+
+- **Üst şerit ve sol kolonun tercih şeritleri** hâlâ kök çiziminde her
+  karede kurulur. Üst şerit `flex_wrap` ile içerik yükseklikli olduğu için
+  bugünkü hâliyle `cached` sınırına giremez; ya sabit yüksekliğe
+  bağlanmalı ya da kendi kaydıran/kırpan kabına alınmalı. Sol sabit blok
+  (köşe/hizalama/yardımcı eylem şeritleri) tercih-türevlidir ve
+  `BölümlerPaneli` deseniyle (kökü gözleyen `cached` bölge) taşınabilir.
+- Ölçüm sağ kolonun maliyet payını küçük gösterirse durmak da meşru:
+  kalan bölgeler küçüktür.
+
+## 6. Kabul hedefleri ve ölçüm
 
 Önceki turun sayısal hedefleri devirde kaybolduğu için hedefler yeniden,
 ölçüm yoluyla birlikte konur:
 
 1. **Tuş vuruşu gecikmesi (uçtan uca):** `akici-dev` profilli masaüstü
    koşumunda GPUI profiler'ı (`gpui` `profiler` özelliği /
-   `debug_frame_overlay`) ile kare süresi; hedef ikinci tur sonunda
-   tuş vuruşu karesinde **sağ kolonun hiç render edilmemesi**
-   (`dirty_views` yalnız alan + paneller).
+   `debug_frame_overlay`) ile kare süresi. İkinci turun yapısal hedefi —
+   tuş vuruşu karesinde sağ kolonun render edilmemesi (`dirty_views`
+   yalnız alan + paneller) — koda bağlandı; sayısal karşılığı henüz
+   ölçülmedi.
 2. **`ORT-018 bil-010.input.commit`:** tezgâhtaki yerleşik ölçüm
    (`ölçüm_toplu_ms`) iki hedefte de koşturulabilir; kabul motoru bu
    turdan etkilenmedi, sayı gerilememeli.

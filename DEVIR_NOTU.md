@@ -74,15 +74,19 @@ Taşınma uyarlamaları:
 
 ## 5. Sıradaki işler (yeni sohbetin gündemi)
 
-1. **Performans mimarisi turu** — kullanıcı onaylı plan. **Birinci tur
-   tamamlandı (24 Ağu 2026):** kök `observe(&alan)`/`subscribe` köprüleri
-   kaldırılıp gözlem `AlanDurumPaneli` + `OlayAkışıPaneli` entity'lerine
-   taşındı; `§29` raporu ve kod paneli tercih sürümüne bağlandı;
-   `akici-dev` profili eklendi. Mekanik, kazançlar, ikinci turun işleri
-   (sağ kolon bölüm entity'leri + `cached` bölgeler + `yuva_görünürlük_notu`
-   taşınması) ve ölçüm hedefleri: `raporlar/PERFORMANS_MIMARISI.md`.
-   (Önceki devirde anılan "TEZGAH_DEVIR_NOTU sonundaki performans raporu"
-   hiç yazılmamıştı; o boşluğu bu belge doldurur.) Linux ölçümü bekliyor.
+1. **Performans mimarisi turu** — kullanıcı onaylı plan. **Birinci ve
+   ikinci tur tamamlandı (24 Ağu 2026):** kök `observe(&alan)`/`subscribe`
+   köprüleri `AlanDurumPaneli` + `OlayAkışıPaneli` entity'lerine taşındı;
+   `§29` raporu ve kod paneli tercih sürümüne bağlandı; `akici-dev`
+   profili eklendi; sağ kolon `BölümlerPaneli` olarak `Entity::cached`
+   sınırına alındı (kökü gözler, tuş vuruşunda hiç kurulmaz) ve
+   `yuva_görünürlük_notu` kendi gözleyen paneline taşındı — kökün çizim
+   yolunda alan okuması kalmadı. Mekanik, kazançlar, üçüncü tur adayları
+   (üst şerit + sol tercih şeritleri) ve ölçüm hedefleri:
+   `raporlar/PERFORMANS_MIMARISI.md`. (Önceki devirde anılan
+   "TEZGAH_DEVIR_NOTU sonundaki performans raporu" hiç yazılmamıştı; o
+   boşluğu bu belge doldurur.) Linux ölçümü ve sayısal kare ölçümü
+   bekliyor.
 2. Crate/paket adlarının yeniden adlandırılması (kullanıcı kararı).
 3. Bu depoya CI kurmak (kaynak depodaki `uygulama-iskeleti` işinin
    uyarlaması; kardeş `gpui` **ve** `gpui_bilesenleri` checkout'ları gerekir).
