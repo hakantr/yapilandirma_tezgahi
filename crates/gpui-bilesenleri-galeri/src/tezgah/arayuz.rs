@@ -58,33 +58,35 @@ pub struct Tezgahİçeriği {
     pub başlık: YerelleştirmeAnahtarı,
     /// Sol kolonun erişilebilir bölge adı.
     pub önizleme_başlığı: YerelleştirmeAnahtarı,
-    /// Sağ kolonun erişilebilir bölge adı.
-    pub yapılandırma_başlığı: YerelleştirmeAnahtarı,
     /// Sol kolonun üst bloğu: kabuk denetimleri ve yaşayan önizleme.
     pub önizleme: Vec<AnyElement>,
     /// Sol kolonun alt blokları: türetilmiş durumlar, gözlem panelleri.
     pub sol_ek: Vec<AnyElement>,
     /// "Karşılığı olan kod" paneli; sol kolonun en altında durur.
     pub kod: Option<AnyElement>,
-    /// Sağ kolonun bölümleri; profil tarafından süzülmüş hâlde gelir.
-    pub bölümler: Vec<TezgahBölümü>,
+    /// Sağ kolonun hazır çizimi.
+    ///
+    /// Profil bunu önbellekli bir bölüm paneli entity'si olarak verir:
+    /// kolonun bölümleri kabukta değil, panelin kendi çiziminde kurulur
+    /// ve kök bildirmedikçe (tuş vuruşlarında) yeniden kurulmaz. Kabuk
+    /// yalnız yerleştirir; erişilebilir bölge adı da kolonun kendi
+    /// çizimindedir.
+    pub yapılandırma: AnyElement,
 }
 
-impl Tezgahİçeriği {
-    /// Bir akışa düşen bölümleri sırasını bozmadan ayırır.
-    pub fn akış_bölümleri(&mut self, akış: Akış) -> Vec<TezgahBölümü> {
-        let mut kalan = Vec::with_capacity(self.bölümler.len());
-        let mut seçilen = Vec::new();
-        for bölüm in std::mem::take(&mut self.bölümler) {
-            if bölüm.akış == akış {
-                seçilen.push(bölüm);
-            } else {
-                kalan.push(bölüm);
-            }
+/// Bir akışa düşen bölümleri sırasını bozmadan ayırır.
+pub fn akış_bölümleri(bölümler: &mut Vec<TezgahBölümü>, akış: Akış) -> Vec<TezgahBölümü> {
+    let mut kalan = Vec::with_capacity(bölümler.len());
+    let mut seçilen = Vec::new();
+    for bölüm in std::mem::take(bölümler) {
+        if bölüm.akış == akış {
+            seçilen.push(bölüm);
+        } else {
+            kalan.push(bölüm);
         }
-        self.bölümler = kalan;
-        seçilen
     }
+    *bölümler = kalan;
+    seçilen
 }
 
 #[cfg(test)]
@@ -109,45 +111,29 @@ mod testler {
 
     #[test]
     fn akış_bölümleri_sırayı_korur() {
-        let mut içerik = Tezgahİçeriği {
-            başlık: anahtar("tezgah"),
-            önizleme_başlığı: anahtar("onizleme"),
-            yapılandırma_başlığı: anahtar("yapilandirma"),
-            önizleme: Vec::new(),
-            sol_ek: Vec::new(),
-            kod: None,
-            bölümler: vec![
-                bölüm("s7", Akış::TamGenişlik),
-                bölüm("s6", Akış::A),
-                bölüm("s10", Akış::B),
-                bölüm("s6ek", Akış::A),
-            ],
-        };
+        let mut bölümler = vec![
+            bölüm("s7", Akış::TamGenişlik),
+            bölüm("s6", Akış::A),
+            bölüm("s10", Akış::B),
+            bölüm("s6ek", Akış::A),
+        ];
 
-        let a = içerik.akış_bölümleri(Akış::A);
+        let a = akış_bölümleri(&mut bölümler, Akış::A);
         assert_eq!(
             a.iter().map(|b| b.kimlik).collect::<Vec<_>>(),
             vec!["s6", "s6ek"]
         );
         // Ayrılan bölümler listeden düşer, kalanların sırası bozulmaz.
         assert_eq!(
-            içerik.bölümler.iter().map(|b| b.kimlik).collect::<Vec<_>>(),
+            bölümler.iter().map(|b| b.kimlik).collect::<Vec<_>>(),
             vec!["s7", "s10"]
         );
     }
 
     #[test]
     fn boş_akış_boş_liste_verir() {
-        let mut içerik = Tezgahİçeriği {
-            başlık: anahtar("tezgah"),
-            önizleme_başlığı: anahtar("onizleme"),
-            yapılandırma_başlığı: anahtar("yapilandirma"),
-            önizleme: Vec::new(),
-            sol_ek: Vec::new(),
-            kod: None,
-            bölümler: vec![bölüm("s7", Akış::TamGenişlik)],
-        };
-        assert!(içerik.akış_bölümleri(Akış::C).is_empty());
-        assert_eq!(içerik.bölümler.len(), 1);
+        let mut bölümler = vec![bölüm("s7", Akış::TamGenişlik)];
+        assert!(akış_bölümleri(&mut bölümler, Akış::C).is_empty());
+        assert_eq!(bölümler.len(), 1);
     }
 }

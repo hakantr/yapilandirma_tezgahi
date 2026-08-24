@@ -813,18 +813,24 @@ impl GaleriUygulaması {
         // ancak okuma gözleyen panelde durursa doğru kalır.
         match self.tezgah_panelleri.clone() {
             Some(paneller) => {
-                // Tür değişiminde alan yeniden kuruldu; paneller yaşamaya
-                // devam eder, yalnız yeni alana bağlanır.
+                // Tür değişiminde alan yeniden kuruldu; alan gözleyen
+                // paneller yaşamaya devam eder, yalnız yeni alana bağlanır.
+                // Bölüm paneli alanı gözlemediği için bağlanacak bir şeyi
+                // yok; kolonun tazelenmesini kökün bildirimi sağlar.
                 paneller.alan_durumu.update(bağlam, |panel, bağlam| {
                     panel.alanı_bağla(alan.clone(), bağlam);
                 });
                 paneller.olay_akışı.update(bağlam, |panel, bağlam| {
                     panel.alanı_bağla(alan.clone(), bağlam);
                 });
+                paneller.yuva_notu.update(bağlam, |panel, bağlam| {
+                    panel.alanı_bağla(alan.clone(), bağlam);
+                });
             }
             None => {
                 let kök = bağlam.weak_entity();
                 let alan_durumu = {
+                    let kök = kök.clone();
                     let alan = alan.clone();
                     bağlam.new(move |bağlam| AlanDurumPaneli::yeni(kök, alan, bağlam))
                 };
@@ -832,9 +838,19 @@ impl GaleriUygulaması {
                     let alan = alan.clone();
                     bağlam.new(move |bağlam| OlayAkışıPaneli::yeni(alan, bağlam))
                 };
+                let yuva_notu = {
+                    let alan = alan.clone();
+                    bağlam.new(move |bağlam| YuvaNotuPaneli::yeni(kök, alan, bağlam))
+                };
+                let bölümler = {
+                    let kök = bağlam.entity();
+                    bağlam.new(move |bağlam| BölümlerPaneli::yeni(&kök, bağlam))
+                };
                 self.tezgah_panelleri = Some(TezgahPanelleri {
                     alan_durumu,
                     olay_akışı,
+                    yuva_notu,
+                    bölümler,
                 });
             }
         }
@@ -885,26 +901,15 @@ impl GaleriUygulaması {
         pencere: &mut Window,
         bağlam: &mut Context<Self>,
     ) -> Tezgahİçeriği {
-        let alanlar = match self.sergi_girişleri.clone() {
-            Some(alanlar) => alanlar,
-            None => {
-                let alanlar = MetinGirişiAlanları::kur(&self.kimlik_fabrikası, pencere, bağlam);
-                self.sergi_girişleri = Some(alanlar.clone());
-                alanlar
-            }
-        };
         let alan = self.tezgah_alanını_al(pencere, bağlam);
         let paneller = self
             .tezgah_panelleri
             .clone()
             .expect("paneller alanla birlikte kurulur");
         let tercih = self.tezgah.clone();
-        let saat_dilimi = self.çözülmüş_saat_dilimi();
-        let doldurma_var = self.otomatik_doldurma_kullanılabilir(bağlam);
-        let portlar = self.port_durumu(bağlam);
-        // `§29` rapor ve kod paneli metni tercih sürümüne bağlıdır: kart
-        // sonucu okur, yeniden hesaplamaz.
-        let rapor = self.tezgah_raporu();
+        // Kod paneli metni tercih sürümüne bağlıdır: kart sonucu okur,
+        // yeniden hesaplamaz. `§29` raporu da öyledir ama artık bu yolun
+        // değil, bölüm panelinin girdisidir (`tezgah_bölümleri`).
         let kod = self.tezgah_kodu();
         // `ORT-003 §2` yarıçap kısa kenarın yarısını aşamaz; tek satırlı
         // alanda kısıtlayan kenar kutu yüksekliğidir.
@@ -913,16 +918,50 @@ impl GaleriUygulaması {
         metin_girisi_profili::tezgah_içeriği(
             metin_girisi_profili::MetinGirişiProfilGirdisi {
                 tercih: &tercih,
-                alanlar: &alanlar,
                 alan,
                 paneller: &paneller,
-                saat_dilimi: &saat_dilimi,
-                doldurma_var,
-                portlar,
-                rapor: &rapor,
                 kod,
                 en_fazla_yarıçap,
                 köşe_izi: self.köşe_izi.clone(),
+            },
+            bağlam,
+        )
+    }
+
+    /// Sağ kolonun bölüm listesi; profilin `§9` tür süzgecinden geçmiş.
+    ///
+    /// Çizimde bölüm paneli, testlerde tür süzgeci kanıtları buradan okur —
+    /// iki tüketici de aynı kurulumu görür. Bölümlerin girdisi kökün
+    /// durumudur; alan entity'si **okunmaz** (port kapısı yalnız portun
+    /// varlığına bakar), bu yüzden panelin çizimi alanı kirletmez.
+    pub fn tezgah_bölümleri(
+        &mut self,
+        pencere: &mut Window,
+        bağlam: &mut Context<Self>,
+    ) -> Vec<TezgahBölümü> {
+        let alanlar = match self.sergi_girişleri.clone() {
+            Some(alanlar) => alanlar,
+            None => {
+                let alanlar = MetinGirişiAlanları::kur(&self.kimlik_fabrikası, pencere, bağlam);
+                self.sergi_girişleri = Some(alanlar.clone());
+                alanlar
+            }
+        };
+        let tercih = self.tezgah.clone();
+        let saat_dilimi = self.çözülmüş_saat_dilimi();
+        let doldurma_var = self.otomatik_doldurma_kullanılabilir(bağlam);
+        let portlar = self.port_durumu(bağlam);
+        // `§29` raporu tercih sürümüne bağlıdır: kart sonucu okur.
+        let rapor = self.tezgah_raporu();
+        metin_girisi_profili::bölümler(
+            metin_girisi_profili::BölümGirdisi {
+                tercih: &tercih,
+                alanlar: &alanlar,
+                saat_dilimi: &saat_dilimi,
+                doldurma_var,
+                portlar,
+                sayısal: tercih.sayısal_mı(),
+                rapor: &rapor,
             },
             bağlam,
         )

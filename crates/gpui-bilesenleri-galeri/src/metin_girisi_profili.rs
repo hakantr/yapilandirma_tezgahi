@@ -27,26 +27,15 @@ use crate::{
 ///
 pub struct MetinGirişiProfilGirdisi<'a> {
     pub tercih: &'a TezgahTercihleri,
-    pub alanlar: &'a crate::MetinGirişiAlanları,
     pub alan: Entity<GirişKutusu>,
-    /// Alanı gözleyen panel entity'leri: `C` türetilmiş durumlar, `§13/§19`
-    /// değer üçlüsü ve `§26` olay akışı.
+    /// Tezgâhın panel entity'leri: alan gözleyen üç panel ve önbellekli
+    /// bölüm kolonu.
     ///
-    /// Profil bu kartları kendisi çizmez; paneller alanın bildirimini kendi
-    /// dinler ve alan değiştiğinde yalnız kendileri kirlenir.
+    /// Profil bu kartları kendisi çizmez; alan gözleyen paneller alanın
+    /// bildirimiyle, bölüm kolonu kökün bildirimiyle tazelenir. Sağ kolonun
+    /// girdileri (alanlar, portlar, rapor, saat dilimi) artık bu yapının
+    /// değil, bölüm panelinin çizim yolunun işidir (`tezgah_bölümleri`).
     pub paneller: &'a crate::TezgahPanelleri,
-    pub saat_dilimi: &'a ÇözülmüşSaatDilimi,
-    pub doldurma_var: bool,
-    /// `B` bölümü port kapıları. Her port ayrı bağlanır ve ayrı raporlanır:
-    /// "portlar hazır" diye toplu bir bayrak, hangi yolun kapalı olduğunu
-    /// gizlerdi.
-    pub portlar: PortDurumu,
-    /// `§29` kanonik doğrulama raporu.
-    ///
-    /// Kart raporu **kurmaz**, hazır alır: yapılandırmayı ikinci kez kurmak
-    /// ekranda gösterilenle uygulanan arasında sessiz bir fark açardı.
-    /// Rapor tercih sürümüne bağlıdır; kök yalnız tercih değişince kurar.
-    pub rapor: &'a gpui_bilesenleri::GirişYapılandırmaRaporu,
     /// Kod panelinin metni; tercih sürümüne bağlı, kökten hazır gelir.
     pub kod: gpui::SharedString,
     pub en_fazla_yarıçap: f32,
@@ -95,7 +84,6 @@ fn önizleme_kabuğu(alan: &Entity<GirişKutusu>) -> gpui::Div {
 /// eksenlerle aynı görsel ağırlığı taşır ve seçilebilir sanılırlardı.
 fn sol_kartlar(
     tercih: &TezgahTercihleri,
-    alan: &Entity<GirişKutusu>,
     paneller: &crate::TezgahPanelleri,
     bağlam: &mut Context<GaleriUygulaması>,
 ) -> Vec<gpui::AnyElement> {
@@ -111,13 +99,11 @@ fn sol_kartlar(
             yazı_biçimi_şeridi(tercih, bağlam),
         )
         .into_any_element(),
-        {
-            let kart = kabuk_yuvaları(tercih, bağlam);
-            match crate::sergiler::yuva_görünürlük_notu(tercih, alan, bağlam) {
-                Some(not) => kart.child(not).into_any_element(),
-                None => kart.into_any_element(),
-            }
-        },
+        // Kartın alan okuyan notu kendi gözleyen panelindedir; kökün çizim
+        // yolunda alan okuması kalmaz.
+        kabuk_yuvaları(tercih, bağlam)
+            .child(paneller.yuva_notu.clone())
+            .into_any_element(),
         // `ORT-004 §20.1` imleç tercihi de kayan bölümde: sabit blokta
         // yalnız şekil, hizalama ve yaşayan alan kalır.
         crate::sergiler::imleç_satırı(tercih, bağlam).into_any_element(),
@@ -135,15 +121,21 @@ fn sol_kartlar(
 ///
 /// Dokuz ayrı parametre çağrı yerinde sırayı ezberlemeyi gerektiriyordu ve
 /// aynı türden iki `&[String]`/`bool` yan yana geldiğinde derleyici de
-/// karışıklığı yakalayamazdı.
-struct BölümGirdisi<'a> {
-    tercih: &'a TezgahTercihleri,
-    alanlar: &'a crate::MetinGirişiAlanları,
-    saat_dilimi: &'a ÇözülmüşSaatDilimi,
-    doldurma_var: bool,
-    portlar: PortDurumu,
-    sayısal: bool,
-    rapor: &'a gpui_bilesenleri::GirişYapılandırmaRaporu,
+/// karışıklığı yakalayamazdı. Kurulumu kökün `tezgah_bölümleri` yolu yapar;
+/// bölüm paneli çizimde, testler tür süzgeci kanıtlarında oradan okur.
+pub(crate) struct BölümGirdisi<'a> {
+    pub tercih: &'a TezgahTercihleri,
+    pub alanlar: &'a crate::MetinGirişiAlanları,
+    pub saat_dilimi: &'a ÇözülmüşSaatDilimi,
+    pub doldurma_var: bool,
+    pub portlar: PortDurumu,
+    pub sayısal: bool,
+    /// `§29` kanonik doğrulama raporu.
+    ///
+    /// Kart raporu **kurmaz**, hazır alır: yapılandırmayı ikinci kez kurmak
+    /// ekranda gösterilenle uygulanan arasında sessiz bir fark açardı.
+    /// Rapor tercih sürümüne bağlıdır; kök yalnız tercih değişince kurar.
+    pub rapor: &'a gpui_bilesenleri::GirişYapılandırmaRaporu,
 }
 
 /// `B` bölümünün port kapıları.
@@ -175,13 +167,8 @@ pub fn tezgah_içeriği(
 ) -> Tezgahİçeriği {
     let MetinGirişiProfilGirdisi {
         tercih,
-        alanlar,
         alan,
         paneller,
-        saat_dilimi,
-        doldurma_var,
-        portlar,
-        rapor,
         kod,
         en_fazla_yarıçap,
         köşe_izi,
@@ -191,26 +178,16 @@ pub fn tezgah_içeriği(
     Tezgahİçeriği {
         başlık: anahtar("galeri.tezgah.başlık"),
         önizleme_başlığı: anahtar("galeri.tezgah.önizleme"),
-        yapılandırma_başlığı: anahtar("galeri.tezgah.yapılandırma"),
         önizleme: önizleme_blokları(tercih, &alan, en_fazla_yarıçap, köşe_izi, sayısal, bağlam),
         // Tasarımın `§5` şeması sol kolona `önizleme → C türetilmiş
         // durumlar → kod paneli` sırasını veriyor. `D` aile kataloğu da
         // önizleme bağlamıdır ve aynı kolonda durur; ikisi de sağ kolonun
         // yapılandırma eksenleri arasına karışmaz.
-        sol_ek: sol_kartlar(tercih, &alan, paneller, bağlam),
+        sol_ek: sol_kartlar(tercih, paneller, bağlam),
         kod: Some(crate::sergiler::kod_paneli(kod).into_any_element()),
-        bölümler: bölümler(
-            BölümGirdisi {
-                tercih,
-                alanlar,
-                saat_dilimi,
-                doldurma_var,
-                portlar,
-                sayısal,
-                rapor,
-            },
-            bağlam,
-        ),
+        // Sağ kolon önbellekli bölüm paneli: bölümler orada, kökün
+        // bağlamında kurulur ve kök bildirmedikçe yeniden kurulmaz.
+        yapılandırma: crate::BölümlerPaneli::öğe(&paneller.bölümler),
     }
 }
 
@@ -256,7 +233,7 @@ fn önizleme_blokları(
 }
 
 /// Sağ kolonun bölümleri; seçili türde kurulamayan eksen listeye girmez.
-fn bölümler(
+pub(crate) fn bölümler(
     girdi: BölümGirdisi<'_>,
     bağlam: &mut Context<GaleriUygulaması>,
 ) -> Vec<TezgahBölümü> {

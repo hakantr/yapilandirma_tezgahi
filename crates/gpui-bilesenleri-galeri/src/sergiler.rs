@@ -1739,7 +1739,7 @@ pub(crate) fn yardımcı_eylem_şeridi(
 pub(crate) fn yuva_görünürlük_notu(
     tercih: &crate::TezgahTercihleri,
     alan: &Entity<GirişKutusu>,
-    bağlam: &mut Context<GaleriUygulaması>,
+    bağlam: &mut Context<crate::YuvaNotuPaneli>,
 ) -> Option<Div> {
     use gpui_bilesenleri::YardımcıEylemGörünürlüğü as G;
 

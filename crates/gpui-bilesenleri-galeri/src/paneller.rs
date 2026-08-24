@@ -15,17 +15,24 @@
 //! (`tezgah_gosterge.rs`, `tezgah_f4.rs`, `tezgah_kabul.rs`) o dosyayı
 //! `include_str!` ile okur.
 
-use gpui::{Context, Entity, IntoElement, Render, WeakEntity, Window, div, prelude::*};
+use gpui::{
+    AnyElement, Context, Entity, IntoElement, Render, StyleRefinement, WeakEntity, Window, div,
+    prelude::*, px,
+};
 use gpui_bilesenleri::GirişKutusu;
 
 use crate::{GaleriUygulaması, TezgahOlayı, OLAY_AKIŞI_SINIRI};
 
-/// Tezgâhın alan gözleyen panel entity'leri; profil girdisinde birlikte
-/// taşınır.
+/// Tezgâhın panel entity'leri; profil girdisinde birlikte taşınır.
+///
+/// İlk üçü alanı gözler; `bölümler` ise **kökü** gözleyen önbellekli sağ
+/// kolondur.
 #[derive(Clone)]
 pub struct TezgahPanelleri {
     pub alan_durumu: Entity<AlanDurumPaneli>,
     pub olay_akışı: Entity<OlayAkışıPaneli>,
+    pub yuva_notu: Entity<YuvaNotuPaneli>,
+    pub bölümler: Entity<BölümlerPaneli>,
 }
 
 /// `C` türetilmiş durumlar ve `§13`/`§19` değer üçlüsü: alan durumunun
@@ -185,6 +192,123 @@ impl Render for OlayAkışıPaneli {
     }
 }
 
+/// `§23`/`§22` yuva görünürlük notu: kabuk yuvaları kartının alan okuyan
+/// tek satırları.
+///
+/// Kartın kendisi tercih eksenidir ve kökte çizilir; not ise "kutu şu an
+/// boş mu"ya bakar. Kökün çizim yolunda alan okuması bırakmamak için not
+/// kendi gözleyen entity'sinde yaşar — sol kolon bir gün önbelleğe
+/// alındığında da bayatlamaz.
+pub struct YuvaNotuPaneli {
+    kök: WeakEntity<GaleriUygulaması>,
+    alan: Entity<GirişKutusu>,
+    _abonelik: gpui::Subscription,
+}
+
+impl YuvaNotuPaneli {
+    pub(crate) fn yeni(
+        kök: WeakEntity<GaleriUygulaması>,
+        alan: Entity<GirişKutusu>,
+        bağlam: &mut Context<Self>,
+    ) -> Self {
+        let abonelik = Self::gözle(&alan, bağlam);
+        Self {
+            kök,
+            alan,
+            _abonelik: abonelik,
+        }
+    }
+
+    /// Tür değişince yeniden kurulan alana bağlanır.
+    pub(crate) fn alanı_bağla(&mut self, alan: Entity<GirişKutusu>, bağlam: &mut Context<Self>) {
+        self._abonelik = Self::gözle(&alan, bağlam);
+        self.alan = alan;
+        bağlam.notify();
+    }
+
+    fn gözle(alan: &Entity<GirişKutusu>, bağlam: &mut Context<Self>) -> gpui::Subscription {
+        bağlam.observe(alan, |_, _, bağlam| bağlam.notify())
+    }
+}
+
+impl Render for YuvaNotuPaneli {
+    fn render(&mut self, _pencere: &mut Window, bağlam: &mut Context<Self>) -> impl IntoElement {
+        let Ok(tercih) = self
+            .kök
+            .read_with(bağlam, |kök, _| kök.tezgah_tercihleri().clone())
+        else {
+            return div();
+        };
+        let alan = self.alan.clone();
+        // Not yokken boş `div` kalır: kart kendi aralarını kenar
+        // boşluklarıyla kurduğu için boş çocuk görünür iz bırakmaz.
+        crate::sergiler::yuva_görünürlük_notu(&tercih, &alan, bağlam).unwrap_or_else(div)
+    }
+}
+
+/// Sağ kolon: yapılandırma bölümlerinin **önbellekli** paneli.
+///
+/// Panel kökü gözler, alanı gözlemez. Çizimi `Entity::cached` sınırında
+/// yaşar: kök bildirmedikçe (tercih, tema, açık seçici, dış bildirim)
+/// bölümlerin element ağacı yeniden kurulmaz — tuş vuruşu karelerinde
+/// kolonun prepaint/paint aralıkları olduğu gibi yeniden kullanılır.
+///
+/// Bölüm kartlarının içindeki tıklama dinleyicileri köke bağlı kalır:
+/// çizim, kökü `update` ile açıp bölümleri kökün kendi bağlamında üretir.
+/// Kolonun içine gömülü tercih kutuları (desen, ön ek, son ek) kendi
+/// bildirimlerini yayımlar; GPUI bildirilen view'ın atalarını da
+/// kirlettiği için onlara yazmak bu panelin önbelleğini kendiliğinden
+/// patlatır. Kaydırma da aynı yoldan geçer: GPUI kaydırma ofsetini
+/// değiştirirken kaydıran öğenin view'ını bildirir.
+pub struct BölümlerPaneli {
+    kök: WeakEntity<GaleriUygulaması>,
+    _abonelik: gpui::Subscription,
+}
+
+impl BölümlerPaneli {
+    pub(crate) fn yeni(kök: &Entity<GaleriUygulaması>, bağlam: &mut Context<Self>) -> Self {
+        // Kökün her bildirimi önbelleği patlatır: panel kökün durumundan
+        // (tercih, rapor, portlar, açık seçici, tema) çizer ve o durum
+        // yalnız kök bildirdiğinde değişir. Alan bildirimleri kökü artık
+        // bildirmediği için tuş vuruşları buraya işlemez.
+        let abonelik = bağlam.observe(kök, |_, _, bağlam| bağlam.notify());
+        Self {
+            kök: kök.downgrade(),
+            _abonelik: abonelik,
+        }
+    }
+
+    /// Panelin gövdeye giren önbellekli elementi.
+    ///
+    /// Sarmalayıcı stil, kolonun eski flex sızasını birebir taşır: kalan
+    /// genişliği alır, sıkışabilir. Önbellekli view içerikten ölçülmez;
+    /// boyut bu stilden ve satırın çapraz ekseninden (stretch) çözülür.
+    pub(crate) fn öğe(panel: &Entity<Self>) -> AnyElement {
+        panel
+            .clone()
+            .cached(StyleRefinement::default().flex_1().min_w(px(0.)).min_h(px(0.)))
+            .into_any_element()
+    }
+}
+
+impl Render for BölümlerPaneli {
+    fn render(&mut self, pencere: &mut Window, bağlam: &mut Context<Self>) -> impl IntoElement {
+        // Bölümler kökün bağlamında üretilir: kart içeriklerindeki bütün
+        // dinleyiciler `tezgahı_değiştir` ve akrabalarına, yani köke bağlı.
+        let Ok(bölümler) = self
+            .kök
+            .update(bağlam, |kök, bağlam| kök.tezgah_bölümleri(pencere, bağlam))
+        else {
+            return div().into_any_element();
+        };
+        let g = crate::görünüm();
+        let t = crate::TezgahTokenları::paletten(crate::palet());
+        let ad = crate::tezgah_bölüm_adı(&crate::anahtar("galeri.tezgah.yapılandırma"));
+        crate::yapılandırma_kolonu_gövdesi(bölümler, &g, &t, ad, crate::tezgah_bölüm_adı)
+            .into_any_element()
+    }
+}
+
 #[cfg(test)]
 mod testler {
     /// Kök alanın bildirimini dinlemez; gözlem panellerin işidir.
@@ -232,5 +356,59 @@ mod testler {
         let paneller = include_str!("paneller.rs");
         assert!(paneller.contains("bağlam.observe(alan"));
         assert!(paneller.contains("bağlam.subscribe(alan"));
+    }
+
+    /// Sağ kolon önbelleklidir ve kökü gözler.
+    ///
+    /// İkisi birbirinin ön koşuludur: `cached` sınırı olmadan kolon her
+    /// karede yeniden kurulur; kök gözlemi olmadan da önbellek tercih ve
+    /// tema değişiminde bayat kalır. Bekçi ikisini birlikte tutar.
+    #[test]
+    fn bölüm_kolonu_önbellekli_ve_kökü_gözler() {
+        let paneller = include_str!("paneller.rs");
+        // Testin kendi gövdesi aramaya girmesin: tarama panel tanımından
+        // test modülüne kadar sürer.
+        let gövde = paneller
+            .split_once("pub struct BölümlerPaneli")
+            .expect("bölüm paneli tanımlı")
+            .1
+            .split_once("#[cfg(test)]")
+            .expect("test modülü panel tanımından sonra gelir")
+            .0;
+        assert!(
+            gövde.contains(".cached(StyleRefinement"),
+            "sağ kolon önbellekli sarmalayıcıdan geçmiyor"
+        );
+        assert!(
+            gövde.contains("bağlam.observe(kök"),
+            "bölüm paneli kökü gözlemiyor: tercih değişimi kolona işlemez"
+        );
+        // Kolon alanı gözlemez: tuş vuruşu önbelleği patlatmamalı.
+        assert!(
+            !gövde.contains("observe(alan") && !gövde.contains("subscribe(alan"),
+            "bölüm paneli alana bağlanmış: tuş vuruşu kolonu kirletir"
+        );
+    }
+
+    /// Kökün çizim yolunda alan okuması kalmadı.
+    ///
+    /// `yuva_görünürlük_notu` kökte çizilen son alan okuyucusuydu; artık
+    /// kendi gözleyen panelinde yaşar. Kök her karede çizildiği için bugün
+    /// bayatlamazdı, ama sol kolon bir gün önbelleğe alındığında
+    /// bayatlardı — bekçi imzayı panel bağlamına sabitler.
+    #[test]
+    fn yuva_notu_panel_bağlamındadır() {
+        let sergiler = include_str!("sergiler.rs");
+        let imza = sergiler
+            .split_once("pub(crate) fn yuva_görünürlük_notu(")
+            .expect("not fonksiyonu tanımlı")
+            .1
+            .split_once(") ->")
+            .expect("imza kapanır")
+            .0;
+        assert!(
+            imza.contains("Context<crate::YuvaNotuPaneli>"),
+            "yuva notu kök bağlamına dönmüş: alan okuması köke sızar"
+        );
     }
 }

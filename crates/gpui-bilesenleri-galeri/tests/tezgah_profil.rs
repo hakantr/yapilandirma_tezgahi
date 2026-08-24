@@ -12,6 +12,10 @@ use gpui_bilesenleri_galeri::TezgahDeğerKipi;
 use gpui_bilesenleri_galeri::{Akış, GaleriUygulaması, bileşen_tuş_bağlarını_kur};
 
 /// Verilen değer türünde profilin ürettiği bölüm kimlikleri ve akışları.
+///
+/// Bölüm listesi artık `Tezgahİçeriği`nde taşınmaz: sağ kolon önbellekli
+/// bölüm panelinin çizimidir ve o çizim de bu API'den okur — test ile
+/// ekran aynı kurulumu görür.
 fn bölümler(
     bağlam: &mut TestAppContext, tür: TezgahDeğerKipi
 ) -> Vec<(&'static str, Akış)> {
@@ -23,8 +27,7 @@ fn bölümler(
         });
         uygulama.update(bağlam, |uygulama, bağlam| {
             uygulama
-                .tezgah_profil_içeriği(pencere, bağlam)
-                .bölümler
+                .tezgah_bölümleri(pencere, bağlam)
                 .iter()
                 .map(|b| (b.kimlik, b.akış))
                 .collect()

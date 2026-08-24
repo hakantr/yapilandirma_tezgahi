@@ -16,7 +16,8 @@ use gpui::{AnyElement, Role, SharedString, div, prelude::*, px};
 use gpui_bilesenleri_kabuk::YerelleştirmeAnahtarı;
 
 use super::{
-    Akış, KolonMetriği, TezgahBölümü, TezgahTokenları, Tezgahİçeriği, ÇözülmüşTezgahGörünümü,
+    Akış, KolonMetriği, TezgahBölümü, TezgahTokenları, Tezgahİçeriği, akış_bölümleri,
+    ÇözülmüşTezgahGörünümü,
 };
 
 /// Tezgâh gövdesini çizer.
@@ -30,27 +31,9 @@ pub fn tezgah_gövdesi(
     metin_ölçeği: f32,
     çöz: impl Fn(&YerelleştirmeAnahtarı) -> SharedString,
 ) -> impl IntoElement {
+    let _ = &t;
     let tezgah_adı = çöz(&içerik.başlık);
     let önizleme_adı = çöz(&içerik.önizleme_başlığı);
-    let yapılandırma_adı = çöz(&içerik.yapılandırma_başlığı);
-
-    // Bölümler kartlara sarılır. Sıra profilin verdiği sıradır; kabuk onu
-    // değiştirmez.
-    let tam_genişlik: Vec<AnyElement> = içerik
-        .akış_bölümleri(Akış::TamGenişlik)
-        .into_iter()
-        .map(|bölüm| bölüm_kartı(bölüm, &g, &t, &çöz))
-        .collect();
-    let akışlar: Vec<Vec<AnyElement>> = Akış::AKIŞLAR
-        .into_iter()
-        .map(|akış| {
-            içerik
-                .akış_bölümleri(akış)
-                .into_iter()
-                .map(|bölüm| bölüm_kartı(bölüm, &g, &t, &çöz))
-                .collect()
-        })
-        .collect();
 
     // Önizleme blokları sabit, ek kartlar ve kod paneli kayar.
     let sabit_bloklar = std::mem::take(&mut içerik.önizleme);
@@ -72,7 +55,9 @@ pub fn tezgah_gövdesi(
     // pencerede birbirine sıkıştırıyor, taslağın hizasını bozuyordu.
     // Asgari genişlik garanti olduğu için gövde her zaman iki kolondur.
     let _ = metin_ölçeği;
-    let sağ = yapılandırma_kolonu(tam_genişlik, akışlar, &g.kolonlar, yapılandırma_adı.clone());
+    // Sağ kolon hazır gelir: bölümlerin kurulumu önbellekli panelin kendi
+    // çizimindedir, kabuk yalnız yerleştirir.
+    let sağ = içerik.yapılandırma;
 
     let gövde = div()
         .flex()
@@ -147,13 +132,33 @@ fn önizleme_kolonu(
         )
 }
 
-/// Sağ kolon: tam genişlik bölümleri ve üç akış.
-fn yapılandırma_kolonu(
-    tam_genişlik: Vec<AnyElement>,
-    akışlar: Vec<Vec<AnyElement>>,
-    metrik: &KolonMetriği,
+/// Sağ kolonun tam gövdesi: bölümleri kartlara sarar, akışlara dizer.
+///
+/// Önbellekli bölüm paneli çizimde bunu çağırır; kolonun dış boyutu
+/// panelin sarmalayıcı stilinden gelir (`size_full` o sınırları doldurur).
+/// Sıra profilin verdiği sıradır; kabuk onu değiştirmez.
+pub(crate) fn yapılandırma_kolonu_gövdesi(
+    mut bölümler: Vec<TezgahBölümü>,
+    g: &ÇözülmüşTezgahGörünümü,
+    t: &TezgahTokenları,
     ad: SharedString,
+    çöz: impl Fn(&YerelleştirmeAnahtarı) -> SharedString,
 ) -> impl IntoElement {
+    let tam_genişlik: Vec<AnyElement> = akış_bölümleri(&mut bölümler, Akış::TamGenişlik)
+        .into_iter()
+        .map(|bölüm| bölüm_kartı(bölüm, g, t, &çöz))
+        .collect();
+    let akışlar: Vec<Vec<AnyElement>> = Akış::AKIŞLAR
+        .into_iter()
+        .map(|akış| {
+            akış_bölümleri(&mut bölümler, akış)
+                .into_iter()
+                .map(|bölüm| bölüm_kartı(bölüm, g, t, &çöz))
+                .collect()
+        })
+        .collect();
+    let metrik = &g.kolonlar;
+
     let mut kolon = div()
         .id("tezgah-yapilandirma")
         .role(Role::Region)
@@ -170,8 +175,7 @@ fn yapılandırma_kolonu(
         .on_scroll_wheel(|_, _, bağlam| bağlam.stop_propagation())
         .flex()
         .flex_col()
-        .flex_1()
-        .min_w(px(0.))
+        .size_full()
         .gap(metrik.kart_aralığı)
         .children(tam_genişlik);
 
