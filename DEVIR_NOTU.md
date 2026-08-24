@@ -140,9 +140,15 @@ sahipliğinde — bu depoda iş yok.
    katmanı (headless koşumda CoreText de Metal atlası da hiç çalışmıyor).
    Sunum aralığı örneksiz çünkü tezgâh boşta çizmez — "FPS" bu uygulamada
    ölçülebilir bir büyüklük değil, doğru metrik girdi→kare gecikmesi.
-   **Sıradaki iş** `draw`ın içini ayrıştırmak (shaping / rasterizasyon /
-   sahne kodlama) ve optimizasyonun gerçek penceredeki etkisini
-   önbellekli/önbelleksiz çift koşumla ölçmek; (b) Linux'ta headless CPU koşumunun
+   `draw` **ayrıştırıldı** (§8.2.1): ısınmış koşumda tezgâhın
+   kendi render işi 2,29 ms (%11), GPUI + platform katmanı 19,4 ms (%89).
+   Yani headless ölçüm yanlış değil **eksik**ti — ölçtüğü katman gerçek
+   maliyetin onda biri; üç tur da o %11'lik dilimde çalıştı ve toplam
+   gecikmeye yansıması ~%5 mertebesinde. Kalan %89 kardeş depoların
+   (`gpui`, `gpui_apple`) işi. **Sıradaki iş** optimizasyonun gerçek
+   penceredeki etkisini önbellekli/önbelleksiz çift koşumla ölçmek (ilk
+   denemede taban koşumunda yazılmadığı için boş çıktı; ölçüm modu
+   düzeltildi, sayaç artık ilk tuş vuruşuyla başlıyor); (b) Linux'ta headless CPU koşumunun
    tekrarı (mutlak süreler platformlar arası yarıştırılmaz, aynı makinede
    çift koşum); (c) Linux ürün hedefiyse orada da gerçek pencere ölçümü. **Bu depo için 120 FPS / "sıfıra yakın gecikme"
    iddiası yoktur ve gerçek ölçüm bu iddiayı çürütmüştür.** Elde iki ayrı

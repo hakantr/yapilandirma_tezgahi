@@ -63,11 +63,34 @@ pub fn ölçümü_kur<T: 'static>(pencere: &WindowHandle<T>, bağlam: &mut App) 
 /// Ölçüm penceresi dolunca raporu basar ve uygulamadan çıkar.
 fn ölçümü_planla(pencere: gpui::AnyWindowHandle, saniye: u64, bağlam: &mut App) {
     eprintln!(
-        "ölçüm modu: {saniye} sn boyunca pencerede **gerçekten yazın** \
-         (tıklayıp alana metin girin); süre dolunca rapor basılır."
+        "ölçüm modu: alana tıklayıp yazmaya başlayın — sayaç **ilk tuş \
+         vuruşuyla** başlar ve {saniye} sn sürer, sonra rapor basılır."
     );
     bağlam
         .spawn(async move |bağlam| {
+            // Sayaç **ilk tuş vuruşuyla** başlar, pencere açılışıyla
+            // değil. Ardışık iki koşum yapılırken ikincisi kaçırılıp boş
+            // rapor üretmişti; kullanıcının pencereyi bulup odaklanması
+            // için geçen süre ölçümü yemiyor artık. En çok iki dakika
+            // beklenir, sonra ölçüm yine de başlar (rapor kendi uyarısını
+            // basar).
+            for _ in 0..600 {
+                let girdi_var = bağlam
+                    .update_window(pencere, |_, pencere, _| {
+                        !pencere
+                            .input_latency_snapshot()
+                            .latency_histogram
+                            .is_empty()
+                    })
+                    .unwrap_or(false);
+                if girdi_var {
+                    break;
+                }
+                bağlam
+                    .background_executor()
+                    .timer(Duration::from_millis(200))
+                    .await;
+            }
             // Ölçüm penceresi açılış karelerini dışarıda bırakır: ilk
             // kareler font yükler ve bütün ağacı ilk kez kurar, yani
             // sürekli kullanımı temsil etmez. Pencere başındaki kare

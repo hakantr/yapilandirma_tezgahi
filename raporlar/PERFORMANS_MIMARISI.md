@@ -547,38 +547,51 @@ Teşhis satırı ölçüm moduna eklendi ve iki olağan şüpheli **elendi**:
 | `draw` içinde sunum/vsync beklemesi | **Elenmedi ama zayıf** — `Window::draw` present çağırmıyor (`needs_present` işaretliyor); yine de 20,8 ms, 60 Hz aralığına (16,7 ms) şüpheli yakın |
 | Platform metin ve GPU katmanı | **Kalan ana aday** — headless koşumda CoreText de Metal atlası da hiç çalışmıyor |
 
-### 8.2.1 Ayrıştırma: `draw`ın çoğu tezgâhın kendi işi
+### 8.2.1 Ayrıştırma: `draw`ın %89'u GPUI ve platform katmanında
 
-Ölçüm moduna bir ayrıştırma satırı eklendi. Tezgâhın kendi `render`
-gövdeleri (kök + dört panel) sarmalanıp süreleri toplanıyor; `draw`
-toplamından çıkarılınca kalan, GPUI'nin yerleşim/prepaint/paint işi ile
-platform katmanının (shaping, rasterizasyon, sahne kodlama) payıdır.
+Ölçüm moduna ayrıştırma satırı eklendi: tezgâhın kendi `render` gövdeleri
+(kök + dört panel) sarmalanıp süreleri toplanıyor; `draw` toplamından
+çıkarılınca kalan, GPUI'nin yerleşim/prepaint/paint işi ile platform
+katmanının (shaping, rasterizasyon, sahne kodlama) payı oluyor.
 
-İlk koşum (girdisiz, açılış kareleri): **tezgâh render `draw`ın %74'ü.**
+Isınmış koşum (40 sn gerçek yazma, 58 kare):
 
-Yani §8.2'nin "kalan ana aday platform katmanı" tahmini **yanlış çıktı**:
-ağırlık tezgâhın kendi element ağacı kurulumunda. Bu, üç turluk
-optimizasyonun doğru katmanda çalıştığı anlamına gelir — ama aynı zamanda
-o katmanın gerçek pencerede headless'takinden çok daha pahalı olduğunu
-gösterir (headless p50 ~1,75 ms; burada kare başına onlarca ms).
+| Pay | Süre | Oran |
+|---|---|---|
+| Tezgâhın kendi `render` işi | 2,29 ms | **%11** |
+| GPUI + platform katmanı | 19,4 ms | **%89** |
+| Toplam `draw` (p50) | 21,7 ms | %100 |
 
-Aradaki farkın en olası açıklaması **metin sistemi**: headless koşum
-`CosmicTextSystem`, gerçek pencere `MacTextSystem` (CoreText) kullanır ve
-`render` gövdelerinin içinde ölçüm/shaping çağrıları vardır. Bu, bir
-sonraki adımın hedefini de belirler (§10.1).
+İki sonuç çıkıyor:
 
-**Uyarı — bu sayı ısınmamıştır.** İlk koşum yalnız açılış karelerini
-gördü (n=3) ve orada font yükleme ile ilk ağaç kurulumu ortalamayı
-domine eder. Ayrıştırma bu yüzden ölçüm penceresine sınırlandı: pencere
-başında sayaç sıfırlanıyor ve yalnız o penceredeki kareler sayılıyor.
-Sürekli kullanımı temsil eden sayı, gerçek yazma koşumundan gelecek.
+1. **§8.2'nin tahmini doğruydu:** ağırlık platform/GPUI katmanında.
+2. **Headless ölçüm, tezgâhın kendi işini doğru ölçüyor.** Headless `draw`
+   p50 1,75 ms idi; gerçek penceredeki tezgâh render'ı 2,29 ms — aynı
+   büyüklük. Yani headless koşum yanlış bir sayı üretmiyordu, **eksik**
+   bir sayı üretiyordu: ölçtüğü katman gerçek maliyetin onda biri.
+
+> **Ara bulgu düzeltmesi.** Bu ayrıştırmanın ilk koşumu girdisizdi (n=3,
+> yalnız açılış kareleri) ve "tezgâh payı %74" demişti. O sayı bir
+> yanılsamaydı: açılış karelerinde font yükleme ve ilk ağaç kurulumu
+> tezgâh tarafında toplanır. Isınmış ölçüm oranı %74'ten %11'e indirdi.
+> Ders, §6.4'ün tekrarı: ısınmamış örneklem yön bile yanıltır.
 
 ### 8.3 Üç turluk optimizasyon bu tabloda nerede duruyor?
 
-Dürüst cevap: **bilinmiyor.** Headless ölçüm sağ kolon önbelleğinin o
-katmandaki işi %53 azalttığını gösterdi, ama gerçek `draw`ın çoğunluğu
-o katmanda değil. Optimizasyonun gerçek penceredeki etkisi ancak aynı
-koşumun önbellekli/önbelleksiz iki kez yapılmasıyla ölçülür:
+Ayrıştırma (§8.2.1) sınırı çiziyor: üç tur, `draw`ın **%11'lik diliminde**
+çalıştı. O dilimde headless ölçüm %53 kazanç gösterdi; toplam gecikmeye
+yansıması bu yüzden kabaca %5 mertebesindedir.
+
+Bu bir başarısızlık değil, **kapsam gerçeği**: tezgâh kendi kurduğu ağacı
+daraltabilir, GPUI'nin yerleşim/paint işini ve platformun metin/GPU
+katmanını daraltamaz. O katman kardeş depoların (`gpui`, `gpui_apple`)
+malıdır.
+
+**Doğrudan ölçüm henüz alınamadı.** Önbellekli/önbelleksiz çift koşum
+denendi; ikinci koşumda pencereye yazılmadığı için taban boş çıktı
+(`girdi→kare: örnek yok`). Ölçüm modu buna göre düzeltildi: sayaç artık
+pencere açılışıyla değil **ilk tuş vuruşuyla** başlıyor, yani kaçırılan
+saniyeler ölçümü yemiyor. Koşum tekrarlanabilir:
 
 ```bash
 # önbellekli (bugünkü hâl)
@@ -590,17 +603,18 @@ cargo run --profile akici-dev \
     -p gpui-bilesenleri-galeri-masaustu -- --geniş --olcum 40
 ```
 
-İki koşumda da aynı süre boyunca benzer tempoda yazmak gerekir; sayılar
-p50 üzerinden karşılaştırılır.
+İki koşumda benzer tempoda yazmak gerekir; `girdi→kare` satırındaki `n`
+değerleri yakın değilse karşılaştırma o farkla birlikte okunmalıdır.
 
 ### 8.4 Kayıtlı sonuç
 
 Bu ölçümden sonra depo için geçerli tek cümle şudur:
 
 > 1600×1000 pencerede, 60 Hz ekranlı bir macOS makinesinde, odak sonrası
-> bir tuş vuruşunun ekrana yansıması p50 ~32 ms sürüyor; bu sürenin
-> yaklaşık üçte ikisi `Window::draw` içinde geçiyor ve o işin baskın
-> kısmı platform metin/GPU katmanında.
+> bir tuş vuruşunun ekrana yansıması p50 ~29–32 ms sürüyor. Bu sürenin
+> yaklaşık üçte ikisi `Window::draw` içinde geçiyor (p50 ~21,7 ms) ve o
+> işin **%89'u GPUI ile platform katmanına**, %11'i tezgâhın kendi
+> element ağacı kurulumuna ait.
 
 120 FPS iddiası kapanmadı; ölçüm onu **çürüttü**.
 
@@ -644,14 +658,16 @@ Gerçek pencere ölçümü (§8) sırayı değiştirdi: artık en değerli iş, 
 ms'lik `draw`ın içini ayrıştırmak. Platformlar arası tekrar ondan sonra
 gelir — yanlış katmanı optimize etmemek için.
 
-1. **`draw` içindeki payların dökümü.** Shaping / glif rasterizasyonu /
-   Metal sahne kodlama / element ağacı: hangisi kaç ms? GPUI'nin
-   `profiler` izleri (`journal`, `debug_frame_overlay`) ve Instruments
-   bunun için var. **Bu döküm olmadan hiçbir sonraki optimizasyon hedefi
-   seçilemez** — üç turluk çalışma headless'ta %53 kazandırdı ama gerçek
-   `draw`ın çoğunluğu ölçülmemiş bir katmanda.
-2. **Optimizasyonun gerçek penceredeki etkisi** (§8.3): aynı koşumun
-   önbellekli/önbelleksiz iki kez yapılması. Ucuz ve doğrudan cevap verir.
+1. **Optimizasyonun gerçek penceredeki etkisi** (§8.3): önbellekli/
+   önbelleksiz çift koşum. İlk denemede taban boş çıktı; ölçüm modu
+   düzeltildi (sayaç ilk tuş vuruşuyla başlıyor) ve koşum tekrar edilebilir
+   durumda. Ucuz ve doğrudan cevap verir.
+2. **`draw`ın %89'luk diliminin içi.** Ayrıştırma (§8.2.1) ağırlığın
+   GPUI + platform katmanında olduğunu gösterdi ama o katmanın içini
+   (shaping / rasterizasyon / sahne kodlama) ayırmadı. **Bu, tezgâhın
+   değil kardeş depoların işidir** (`gpui`, `gpui_apple`); tezgâh yalnız
+   kendi %11'ini daraltabilir ve o iş üç turda yapıldı. Kardeş depoda
+   çalışılacaksa araç hazır: GPUI'nin `profiler` izleri ve Instruments.
 3. **Linux'ta aynı ölçüm** — hem headless hem gerçek pencere. İki kural
    yürürlükte: mutlak süreler platformlar arası yarıştırılmaz;
    karşılaştırma aynı makinede çift koşumla yapılır
