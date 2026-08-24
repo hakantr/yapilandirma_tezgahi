@@ -113,14 +113,23 @@ sahipliğinde — bu depoda iş yok.
    `invalidate_view` çağırır; önbellekten dönen view o kümeye girmez),
    **`refresh` patlatır**. Kök artık `kolonu_geçersizle` →
    `refresh_windows` ile tercih/tema/seçici/dış bildirim değişimlerinde
-   kolonu tazeliyor. Ölçülen kazanç: tuş vuruşu **3,11 → 1,16 ms (%63)**,
-   temiz kare 3,03 → 1,06 ms; kolon tuş vuruşunda 0/200, tercihte 200/200
-   kurulur. Kapı: `tests/kolon_tazeligi.rs` (tazelik **ve** kazanç).
-   Mekanik, sayılar ve sıradaki işler:
-   `raporlar/PERFORMANS_MIMARISI.md`. (Önceki devirde anılan
+   kolonu tazeliyor. Bir dış inceleme ölçüm penceresinin
+   yanlış kareyi ölçtüğünü yakaladı (S/T'de kolon kurulumu ölçüm dışında
+   kalıyordu); pencere girdiden ekrana kadar geçen bütün CPU işini
+   kapsayacak biçimde düzeltildi ve geçersizleme hedefli hâle getirildi
+   (`defer` + `Window::refresh`, yalnız kendi penceresi). Düzeltilmiş
+   kazanç: tuş vuruşu **3,50 → 1,24 ms (%65)**, temiz kare 3,43 → 1,13 ms,
+   seçici/tercih %18; kolon tuş vuruşunda 0/200, seçici ve tercihte
+   200/200. Kapı: `tests/kolon_tazeligi.rs` (tazelik **ve** kazanç).
+   **Sol kolon ve üst şerit için aynı desen denendi, ölçüldü ve
+   uygulanmadı** (raporun §7'si): üst şerit `cached`in boyut kısıtına
+   takılıyor (payı ~0,15 ms), sol kolonun kayan bloğu ise alan gözleyen
+   panelleri *içerdiği* için her tuş vuruşunda kirlenir — sağ kolon
+   çalışıyor çünkü o panellerin kardeşi, atası değil. Mekanik, sayılar ve
+   sıradaki işler: `raporlar/PERFORMANS_MIMARISI.md`. (Önceki devirde anılan
    "TEZGAH_DEVIR_NOTU sonundaki performans raporu" hiç yazılmamıştı; o
-   boşluğu bu belge doldurur.) **Açık:** aynı desenin sol kolon/üst şeride
-   uygulanması, Linux ölçümü, gerçek input-to-present. **Bu depo için
+   boşluğu bu belge doldurur.) **Açık:** Linux ölçümü ve gerçek
+   input-to-present (sunum/vsync/fiziksel girdi). **Bu depo için
    120 FPS / "sıfıra yakın gecikme" iddiası yoktur.**
 2. Crate/paket adlarının yeniden adlandırılması (kullanıcı kararı).
 3. Bu depoya CI kurmak (kaynak depodaki `uygulama-iskeleti` işinin
