@@ -501,7 +501,88 @@ sınırının içerik yüksekliğiyle çalışabilmesi ya da bildirim
 taneciliğinin kardeş/ata ayrımından bağımsızlaşmasıdır — ikisi de bu
 deponun işi değil.
 
-## 8. İnceleme düzeltmeleri (24 Ağu 2026, bağımsız salt-okunur inceleme)
+## 8. Gerçek pencere ölçümü (24 Ağu 2026) — iddia kapanmadı, tersine döndü
+
+Ölçüm modu kullanıcı tarafından gerçek klavyeyle koşuldu. Sonuç, headless
+tablonun ürün gerçekliğini **temsil etmediğini** gösteriyor.
+
+### 8.1 Sayılar (macOS, `akici-dev`, 1600×1000, 40 sn, gerçek yazma)
+
+```
+ortam        1600×1000 px · ölçek 1,0× · erişilebilirlik kapalı
+girdi→kare   n=56   p50 32,44 ms · p95 44,93 ms · p99 71,37 ms
+çizim süresi n=114  p50 20,81 ms · p95 33,15 ms · en çok 268,70 ms
+sunum aralığı       örnek yok
+kare başına olay    n=56, hepsi 1,0 (birleştirme yok)
+çizim ortasında düşen olay: 0
+```
+
+Okuma:
+
+- **Girdi→kare p50 32,4 ms.** 60 Hz ekranda bu ~2 kare; 120 Hz bütçesinin
+  (8,33 ms) yaklaşık **4 katı**, 60 Hz bütçesinin ~2 katı. Yani *"tuş
+  vuruşu 120 Hz bütçesine sığıyor"* iddiası gerçek pencerede **geçerli
+  değil**.
+- **Çizim p50 20,8 ms — headless ölçümün (~1,75 ms) 12 katı.** İki sayı
+  aynı şeyi ölçmüyor: headless `draw` yalnız element ağacı + yerleşim +
+  sahne üretimini içerir; gerçek `draw` bunlara platform katmanını
+  (CoreText shaping, glif rasterizasyonu, Metal atlas/sprite hazırlığı)
+  ekler ve o katman baskın çıktı.
+- **`mid_draw_events_dropped: 0` ve kare başına 1 olay:** gecikme rakamı
+  eksik değil ve olaylar birleştirilmemiş — sayılar okunabilir.
+- **Sunum aralığı örneksiz.** GPUI bu histogramı yalnız pencere
+  *animasyon* yaparken doldurur; tezgâh girdi başına kare üretir, boşta
+  çizmez. Bu davranışın kendisi doğrudur — ama "FPS" bu uygulamada
+  ölçülebilir bir büyüklük değil; doğru metrik girdi→kare gecikmesidir.
+
+### 8.2 Farkın kaynağı: elenenler ve kalan
+
+Teşhis satırı ölçüm moduna eklendi ve iki olağan şüpheli **elendi**:
+
+| Hipotez | Sonuç |
+|---|---|
+| Retina (2× ölçek → 4× piksel) | **Elendi** — ölçek 1,0× |
+| Erişilebilirlik ağacı her karede | **Elendi** — a11y kapalı |
+| Derleme profili (hata ayıklama) | **Elendi** — `release` koşumu da p50 ~20,1 ms verdi |
+| `draw` içinde sunum/vsync beklemesi | **Elenmedi ama zayıf** — `Window::draw` present çağırmıyor (`needs_present` işaretliyor); yine de 20,8 ms, 60 Hz aralığına (16,7 ms) şüpheli yakın |
+| Platform metin ve GPU katmanı | **Kalan ana aday** — headless koşumda CoreText de Metal atlası da hiç çalışmıyor |
+
+Ayrıştırma yapılmadı: `draw` içindeki payların (shaping / rasterizasyon /
+sahne kodlama) dökümü GPUI'nin kendi profil izlerini gerektirir ve bu
+deponun işi değildir.
+
+### 8.3 Üç turluk optimizasyon bu tabloda nerede duruyor?
+
+Dürüst cevap: **bilinmiyor.** Headless ölçüm sağ kolon önbelleğinin o
+katmandaki işi %53 azalttığını gösterdi, ama gerçek `draw`ın çoğunluğu
+o katmanda değil. Optimizasyonun gerçek penceredeki etkisi ancak aynı
+koşumun önbellekli/önbelleksiz iki kez yapılmasıyla ölçülür:
+
+```bash
+# önbellekli (bugünkü hâl)
+cargo run --profile akici-dev --features olcum \
+    -p gpui-bilesenleri-galeri-masaustu -- --geniş --olcum 40
+# taban
+cargo run --profile akici-dev \
+    --features olcum,gpui-bilesenleri-galeri/olcum-onbelleksiz \
+    -p gpui-bilesenleri-galeri-masaustu -- --geniş --olcum 40
+```
+
+İki koşumda da aynı süre boyunca benzer tempoda yazmak gerekir; sayılar
+p50 üzerinden karşılaştırılır.
+
+### 8.4 Kayıtlı sonuç
+
+Bu ölçümden sonra depo için geçerli tek cümle şudur:
+
+> 1600×1000 pencerede, 60 Hz ekranlı bir macOS makinesinde, odak sonrası
+> bir tuş vuruşunun ekrana yansıması p50 ~32 ms sürüyor; bu sürenin
+> yaklaşık üçte ikisi `Window::draw` içinde geçiyor ve o işin baskın
+> kısmı platform metin/GPU katmanında.
+
+120 FPS iddiası kapanmadı; ölçüm onu **çürüttü**.
+
+## 9. İnceleme düzeltmeleri (24 Ağu 2026, bağımsız salt-okunur inceleme)
 
 Üç turun ardından yapılan dış kaynak incelemesi dört noktayı düzeltti ya
 da kesinleştirdi; kayıt buraya işlenir ki rapor tek başına doğru resmi
@@ -535,69 +616,32 @@ versin:
 "her ekran yenilemesinde" değil, **gerçekleşen her GPUI çiziminde**
 koşar; hiçbir entity kirli değilse çizim de yoktur.
 
-## 9. Sıradaki işler (öncelik sırasıyla)
+## 10. Sıradaki işler (öncelik sırasıyla)
 
-Sıra bilinçli: **headless CPU ölçümünü başka bir platformda tekrarlamak
-aynı soruyu ikinci kez yanıtlar**; 120 FPS ve gecikme iddiasını
-kapatmaz. Onu kapatacak olan gerçek pencere ölçümüdür.
+Gerçek pencere ölçümü (§8) sırayı değiştirdi: artık en değerli iş, 20,8
+ms'lik `draw`ın içini ayrıştırmak. Platformlar arası tekrar ondan sonra
+gelir — yanlış katmanı optimize etmemek için.
 
-1. **macOS'ta gerçek pencere ölçümü — `input-to-present`. Araç hazır,
-   ölçüm kullanıcıdan bekleniyor.**
+1. **`draw` içindeki payların dökümü.** Shaping / glif rasterizasyonu /
+   Metal sahne kodlama / element ağacı: hangisi kaç ms? GPUI'nin
+   `profiler` izleri (`journal`, `debug_frame_overlay`) ve Instruments
+   bunun için var. **Bu döküm olmadan hiçbir sonraki optimizasyon hedefi
+   seçilemez** — üç turluk çalışma headless'ta %53 kazandırdı ama gerçek
+   `draw`ın çoğunluğu ölçülmemiş bir katmanda.
+2. **Optimizasyonun gerçek penceredeki etkisi** (§8.3): aynı koşumun
+   önbellekli/önbelleksiz iki kez yapılması. Ucuz ve doğrudan cevap verir.
+3. **Linux'ta aynı ölçüm** — hem headless hem gerçek pencere. İki kural
+   yürürlükte: mutlak süreler platformlar arası yarıştırılmaz;
+   karşılaştırma aynı makinede çift koşumla yapılır
+   (`olcum-onbelleksiz`).
+4. **`ORT-018 bil-010.input.commit`:** kabul motorunu ölçer; bu turlardan
+   etkilenmedi, sayı gerilememeli.
+5. **Headless koşumdaki p95 kuyruğu** (§6.2): p50'nin ~2 katı, kaynağı
+   ayrıştırılmadı. Gerçek pencere ölçümünde `çizim süresi` p95'i (33,1 ms)
+   de benzer bir kuyruk gösteriyor — ikisi aynı olgu olabilir.
 
-   Masaüstü koşucusuna ölçüm modu eklendi (`--olcum <saniye>`, `olcum`
-   özelliği). Koşum penceresi dolunca GPUI'nin kendi pencere profilcisinden
-   dört histogram basılır ve uygulama kapanır:
-
-   - **girdi→kare** (`input_latency_snapshot`): platform olayının geldiği
-     andan o olayın yol açtığı karenin çizildiği ana kadar.
-   - **çizim süresi**: headless koşumun ölçtüğü işin gerçek penceredeki
-     karşılığı — iki ölçüm ancak bu sütun üzerinden karşılaştırılabilir.
-   - **sunum aralığı** (`present_interval_histogram`): FPS ve düşen kare.
-   - **kare başına olay** ve **çizim ortasında düşen olay**: ikincisi
-     büyükse gecikme rakamı eksik okunmalıdır.
-
-   ```bash
-   cargo run --profile akici-dev --features olcum \
-       -p gpui-bilesenleri-galeri-masaustu -- --geniş --olcum 40
-   ```
-
-   `--geniş` bilinçli: pencere 1600×1000 açılır, yani headless koşumla
-   **aynı boyut**. Süre boyunca pencerede gerçekten yazmak gerekir; alana
-   tıklayıp metin girilmezse rapor "örnek yok" der ve kendi uyarısını
-   basar.
-
-   **Neden otomatikleştirilmedi:** araç bu depodan koşturuldu ve rapor
-   ürettiği doğrulandı, ama **girdi örneği toplanamadı**. Bu ortamdan
-   pencereye hedefli girdi gönderilemiyor: uygulama erişilebilirlik
-   ağacında pencere göstermiyor (`count windows` → 0), öne getirilemiyor
-   ve sisteme gönderilen tuşlar öndeki başka uygulamaya gidiyor.
-   Otomatikleştirmek zaten amacı zayıflatırdı — ölçülmek istenen tam
-   olarak fiziksel giriş yoludur; sentetik olay o yolun bir bölümünü
-   atlar. Bu yüzden adım, koşumu elle yapacak kişiye bırakıldı.
-
-   Araç doğrulaması (girdisiz koşum, 8–40 sn): rapor basılıyor, uygulama
-   temiz çıkıyor, `çizim süresi` n=2 (yalnız açılış kareleri) ve girdiye
-   bağlı histogramlar boş — beklenen davranış.
-
-2. **Linux'ta headless CPU koşumunun tekrarı.** Amaç mimarinin başka bir
-   işletim sistemi ve makinede de bütçe içinde kalıp kalmadığı. İki
-   kural: (a) macOS ve Linux **mutlak süreleri doğrudan yarıştırılmaz**,
-   donanım farkı sonucu kirletir; (b) karşılaştırma aynı Linux
-   makinesinde önbellekli/önbelleksiz **çift koşumla** yapılır —
-   `--features olcum-onbelleksiz` bunun için var.
-3. **Linux ürün hedefiyse, Linux'ta gerçek pencere/present ölçümü.**
-   Adım 1'in Linux karşılığı.
-4. **`ORT-018 bil-010.input.commit`:** tezgâhtaki yerleşik ölçüm
-   (`ölçüm_toplu_ms`) kabul motorunu ölçer; bu turlardan etkilenmedi,
-   sayı gerilememeli.
-5. **Önbellekli koşumdaki p95 kuyruğu** (§6.2): p50'nin ~2 katı ve
-   kaynağı ayrıştırılmadı. Gerçek pencere ölçümünde takip edilmeli —
-   düşen kare olarak görünüyorsa önemlidir.
-
-Kayıtlı sınır: bu depo için **120 FPS ya da "sıfıra yakın gecikme"
-iddiası yoktur**. Ölçülen tek şey headless CPU işidir — odak sonrası tuş
-vuruşu için p50 ~1,75 ms, p95 ~3,44 ms (120 Hz bütçesinin ~%21 ve ~%41'i)
-— ve o da tek makinede, tek pencere boyutunda, sunum/vsync ve fiziksel
-girdi dışarıda bırakılarak alınmıştır. Yapılabilecek en geniş iddia
-şudur: *1600×1000 headless macOS ölçümünde, odak sonrası bir tuş
-vuruşunun CPU çizim aşaması 120 Hz kare bütçesine sığıyor.*
+Kayıtlı sınır: bu depo için **120 FPS ya da "sıfıra yakın gecikme" iddiası
+yoktur ve ölçüm bu iddiayı çürütmüştür** (§8). Elde olan iki ayrı sayıdır:
+headless CPU işi (odak sonrası tuş vuruşu p50 ~1,75 ms — yalnız element
+ağacı katmanı) ve gerçek pencerede girdi→kare gecikmesi (p50 ~32 ms, 60 Hz
+ekran). İkisi aynı şeyi ölçmez ve biri diğerinin yerine kullanılamaz.

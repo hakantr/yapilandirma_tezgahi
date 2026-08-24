@@ -77,7 +77,21 @@ fn ölçümü_planla(pencere: gpui::AnyWindowHandle, saniye: u64, bağlam: &mut 
                 let kare = pencere.frame_duration_snapshot();
                 // Nanosaniyeden milisaniyeye; sunum aralığı da ms.
                 const MS: f64 = 1_000_000.;
+                // Teşhis: headless koşumla arasındaki farkı ayrıştırmak
+                // için ortam. Ölçek çarpanı 2 ise piksel işi dört katıdır;
+                // erişilebilirlik ağacı etkinse her kare bir de AX
+                // güncellemesi taşır ve ikisi de headless koşumda yoktur.
+                let boyut = pencere.viewport_size();
                 println!("\n— gerçek pencere ölçümü · {saniye} sn —");
+                println!(
+                    "ortam                  {:.0}×{:.0} px · ölçek {:.1}× · \
+                     erişilebilirlik {} · derleme {}",
+                    f32::from(boyut.width),
+                    f32::from(boyut.height),
+                    pencere.scale_factor(),
+                    if pencere.is_a11y_active() { "etkin" } else { "kapalı" },
+                    if cfg!(debug_assertions) { "hata ayıklama" } else { "optimize" },
+                );
                 println!("{}", özet("girdi→kare", &girdi.latency_histogram, MS, "ms"));
                 println!(
                     "{}",

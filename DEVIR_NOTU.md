@@ -131,16 +131,23 @@ sahipliğinde — bu depoda iş yok.
    "TEZGAH_DEVIR_NOTU sonundaki performans raporu" hiç yazılmamıştı; o
    boşluğu bu belge doldurur.) **Açık (bu sırayla):** (a) macOS'ta gerçek pencerede
    `input-to-present` / present interval / düşen kare — FPS ve gecikme
-   iddiasını ancak bu kapatır. **Araç hazır:** masaüstü koşucusunda
-   `--olcum <saniye>` modu (`--features olcum`) GPUI profilcisinden dört
-   histogram basıyor; `cargo run --profile akici-dev --features olcum -p
-   gpui-bilesenleri-galeri-masaustu -- --geniş --olcum 40` ile koşulur ve
-   **süre boyunca pencerede gerçekten yazmak gerekir**. Bu ortamdan
-   hedefli girdi gönderilemediği için sayılar elle koşumu bekliyor
-   (gerekçe raporun §9.1'inde); (b) Linux'ta headless CPU koşumunun
+   iddiasını ancak bu kapatır. **Ölçüldü ve iddia çürüdü
+   (raporun §8'i):** masaüstü koşucusuna `--olcum <saniye>` modu eklendi
+   (`--features olcum`); gerçek klavyeyle 40 sn koşumda **girdi→kare p50
+   32,4 ms** (60 Hz ekranda ~2 kare, 120 Hz bütçesinin ~4 katı) ve
+   **çizim p50 20,8 ms** — headless ölçümün 12 katı. Retina, a11y ve
+   derleme profili hipotezleri elendi; kalan ana aday platform metin/GPU
+   katmanı (headless koşumda CoreText de Metal atlası da hiç çalışmıyor).
+   Sunum aralığı örneksiz çünkü tezgâh boşta çizmez — "FPS" bu uygulamada
+   ölçülebilir bir büyüklük değil, doğru metrik girdi→kare gecikmesi.
+   **Sıradaki iş** `draw`ın içini ayrıştırmak (shaping / rasterizasyon /
+   sahne kodlama) ve optimizasyonun gerçek penceredeki etkisini
+   önbellekli/önbelleksiz çift koşumla ölçmek; (b) Linux'ta headless CPU koşumunun
    tekrarı (mutlak süreler platformlar arası yarıştırılmaz, aynı makinede
-   çift koşum); (c) Linux ürün hedefiyse orada da gerçek pencere ölçümü. **Bu depo için
-   120 FPS / "sıfıra yakın gecikme" iddiası yoktur.**
+   çift koşum); (c) Linux ürün hedefiyse orada da gerçek pencere ölçümü. **Bu depo için 120 FPS / "sıfıra yakın gecikme"
+   iddiası yoktur ve gerçek ölçüm bu iddiayı çürütmüştür.** Elde iki ayrı
+   sayı var: headless CPU işi (p50 ~1,75 ms, yalnız element ağacı katmanı)
+   ve gerçek pencerede girdi→kare (p50 ~32 ms); ikisi aynı şeyi ölçmez.
 2. Crate/paket adlarının yeniden adlandırılması (kullanıcı kararı).
 3. Bu depoya CI kurmak (kaynak depodaki `uygulama-iskeleti` işinin
    uyarlaması; kardeş `gpui` **ve** `gpui_bilesenleri` checkout'ları gerekir).
