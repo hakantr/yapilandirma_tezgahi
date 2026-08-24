@@ -72,7 +72,30 @@ Taşınma uyarlamaları:
 - Bilinen borç (kaynak depo): `sozlesme_api_faz*` test hedefleri HEAD'de
   derlenmiyor; taşınmadan bağımsız, kayıtlı.
 
-## 5. Sıradaki işler (yeni sohbetin gündemi)
+## 5. Kardeş eşitleme sicili
+
+### 24 Ağu 2026 — gpui `bbc4a9b1da` / wgpu `d4359d749`
+
+Kardeş `gpui`, Zed `1b86941c` + kardeş wgpu `d4359d74` senkronunu ve
+`cargo-shear` bağımlılık temizliğini aldı (kendi etki analizi:
+`../gpui/ZED_WGPU_2026_08_24_ETKI_ANALIZI.md`). Public API değişikliği
+yok; bu depoda uygulananlar:
+
+- Kilit yenilendi (`ba58bfe`): temizlikle düşen paketler silindi, 71
+  satır silme.
+- wasm-bindgen `=0.2.127` pinine hizalandı (`b6d37c2`): taşınmadan beri
+  betik CLI'dan 0.2.126 bekliyordu; CLI 0.2.127'ye yükseltildi,
+  `tools/wasm_galeri_hazirla.py` beklentileri güncellendi, paket yeniden
+  üretildi.
+- Tarayıcı önizlemesi için `.claude/launch.json` eklendi (`ee8dbd7`).
+
+Doğrulama: `cargo test` 16 hedef / 211 test yeşil; wasm32 cross-check
+temiz; masaüstü smoke (8 sn ayakta) geçti; tarayıcıda yeni paket
+(`build.json` sha eşleşmesi) hatasız render edildi. Bilinen uyarılar
+(`block 0.1.6` future-incompat, wgpu-core `expect(unused)`) gpui/upstream
+sahipliğinde — bu depoda iş yok.
+
+## 6. Sıradaki işler (yeni sohbetin gündemi)
 
 1. **Performans mimarisi turu** — kullanıcı onaylı plan. **Üç tur da
    tamamlandı (24 Ağu 2026):** (1) kök `observe(&alan)`/`subscribe`
@@ -100,7 +123,7 @@ Yürürlükteki kullanıcı kararları ve tezgâh kapsam ilkesi ("tezgâh yalnı
 bileşenin kendi sözleşme uyumunu ölçer; ödünç bileşen kusurları kendi
 turlarına") `raporlar/TEZGAH_DEVIR_NOTU.md`'dedir ve geçerliliğini korur.
 
-## 6. Çalıştırma
+## 7. Çalıştırma
 
 ```bash
 cargo run -p gpui-bilesenleri-galeri-masaustu          # masaüstü
