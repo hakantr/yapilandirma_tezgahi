@@ -1,0 +1,17 @@
+[package]
+name = "gpui-bilesenleri-galeri-masaustu"
+version.workspace = true
+edition.workspace = true
+license.workspace = true
+publish.workspace = true
+
+[lints]
+workspace = true
+
+[dependencies]
+gpui.workspace = true
+# `wayland`/`x11` Linux pencere arka uçlarıdır; onlarsız Linux'ta galeri
+# açılmıyor (kullanıcı kararı, Ağu 2026). macOS/Windows'ta hedef kapılı
+# oldukları için etkisizdirler.
+gpui_platform = { workspace = true, features = ["font-kit", "wayland", "x11"] }
+gpui-bilesenleri-galeri.workspace = true

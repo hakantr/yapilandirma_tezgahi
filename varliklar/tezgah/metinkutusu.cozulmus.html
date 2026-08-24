@@ -1,0 +1,558 @@
+<!DOCTYPE html>
+<html><head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin="">
+<style>/* cyrillic-ext */
+@font-face {
+  font-family: 'IBM Plex Mono';
+  font-style: normal;
+  font-weight: 400;
+  font-display: swap;
+  src: url("metinkutusu_varliklar/3c6e836d-62e8-4a13-a496-1937ca03e619.woff2") format('woff2');
+  unicode-range: U+0460-052F, U+1C80-1C8A, U+20B4, U+2DE0-2DFF, U+A640-A69F, U+FE2E-FE2F;
+}
+/* cyrillic */
+@font-face {
+  font-family: 'IBM Plex Mono';
+  font-style: normal;
+  font-weight: 400;
+  font-display: swap;
+  src: url("metinkutusu_varliklar/feadd206-c048-4c7b-adc6-d32fd1d0348e.woff2") format('woff2');
+  unicode-range: U+0301, U+0400-045F, U+0490-0491, U+04B0-04B1, U+2116;
+}
+/* vietnamese */
+@font-face {
+  font-family: 'IBM Plex Mono';
+  font-style: normal;
+  font-weight: 400;
+  font-display: swap;
+  src: url("metinkutusu_varliklar/fca808ea-b39c-48bc-a228-5ac2e9ade4f2.woff2") format('woff2');
+  unicode-range: U+0102-0103, U+0110-0111, U+0128-0129, U+0168-0169, U+01A0-01A1, U+01AF-01B0, U+0300-0301, U+0303-0304, U+0308-0309, U+0323, U+0329, U+1EA0-1EF9, U+20AB;
+}
+/* latin-ext */
+@font-face {
+  font-family: 'IBM Plex Mono';
+  font-style: normal;
+  font-weight: 400;
+  font-display: swap;
+  src: url("metinkutusu_varliklar/9db7f597-72b6-408f-b132-7916362f38f5.woff2") format('woff2');
+  unicode-range: U+0100-02BA, U+02BD-02C5, U+02C7-02CC, U+02CE-02D7, U+02DD-02FF, U+0304, U+0308, U+0329, U+1D00-1DBF, U+1E00-1E9F, U+1EF2-1EFF, U+2020, U+20A0-20AB, U+20AD-20C0, U+2113, U+2C60-2C7F, U+A720-A7FF;
+}
+/* latin */
+@font-face {
+  font-family: 'IBM Plex Mono';
+  font-style: normal;
+  font-weight: 400;
+  font-display: swap;
+  src: url("metinkutusu_varliklar/75a6c6f0-c610-4750-894f-c2f53fa7b2ca.woff2") format('woff2');
+  unicode-range: U+0000-00FF, U+0131, U+0152-0153, U+02BB-02BC, U+02C6, U+02DA, U+02DC, U+0304, U+0308, U+0329, U+2000-206F, U+20AC, U+2122, U+2191, U+2193, U+2212, U+2215, U+FEFF, U+FFFD;
+}
+/* cyrillic-ext */
+@font-face {
+  font-family: 'IBM Plex Mono';
+  font-style: normal;
+  font-weight: 500;
+  font-display: swap;
+  src: url("metinkutusu_varliklar/095710b3-dbf8-48ff-af02-760d8d94aaba.woff2") format('woff2');
+  unicode-range: U+0460-052F, U+1C80-1C8A, U+20B4, U+2DE0-2DFF, U+A640-A69F, U+FE2E-FE2F;
+}
+/* cyrillic */
+@font-face {
+  font-family: 'IBM Plex Mono';
+  font-style: normal;
+  font-weight: 500;
+  font-display: swap;
+  src: url("metinkutusu_varliklar/199cceb5-ee8d-4a39-a349-87981f126eca.woff2") format('woff2');
+  unicode-range: U+0301, U+0400-045F, U+0490-0491, U+04B0-04B1, U+2116;
+}
+/* vietnamese */
+@font-face {
+  font-family: 'IBM Plex Mono';
+  font-style: normal;
+  font-weight: 500;
+  font-display: swap;
+  src: url("metinkutusu_varliklar/c5dc0d68-f4ca-4bc9-9c81-6ba4b50af6d5.woff2") format('woff2');
+  unicode-range: U+0102-0103, U+0110-0111, U+0128-0129, U+0168-0169, U+01A0-01A1, U+01AF-01B0, U+0300-0301, U+0303-0304, U+0308-0309, U+0323, U+0329, U+1EA0-1EF9, U+20AB;
+}
+/* latin-ext */
+@font-face {
+  font-family: 'IBM Plex Mono';
+  font-style: normal;
+  font-weight: 500;
+  font-display: swap;
+  src: url("metinkutusu_varliklar/086b0821-bfaa-4ce4-8b45-9626c3002cd5.woff2") format('woff2');
+  unicode-range: U+0100-02BA, U+02BD-02C5, U+02C7-02CC, U+02CE-02D7, U+02DD-02FF, U+0304, U+0308, U+0329, U+1D00-1DBF, U+1E00-1E9F, U+1EF2-1EFF, U+2020, U+20A0-20AB, U+20AD-20C0, U+2113, U+2C60-2C7F, U+A720-A7FF;
+}
+/* latin */
+@font-face {
+  font-family: 'IBM Plex Mono';
+  font-style: normal;
+  font-weight: 500;
+  font-display: swap;
+  src: url("metinkutusu_varliklar/2fbc9f86-0e87-4835-98ab-4b6a4e1ca522.woff2") format('woff2');
+  unicode-range: U+0000-00FF, U+0131, U+0152-0153, U+02BB-02BC, U+02C6, U+02DA, U+02DC, U+0304, U+0308, U+0329, U+2000-206F, U+20AC, U+2122, U+2191, U+2193, U+2212, U+2215, U+FEFF, U+FFFD;
+}
+/* cyrillic-ext */
+@font-face {
+  font-family: 'IBM Plex Sans';
+  font-style: normal;
+  font-weight: 400;
+  font-stretch: 100%;
+  font-display: swap;
+  src: url("metinkutusu_varliklar/9941d260-0c84-4aa5-accd-5803c82df039.woff2") format('woff2');
+  unicode-range: U+0460-052F, U+1C80-1C8A, U+20B4, U+2DE0-2DFF, U+A640-A69F, U+FE2E-FE2F;
+}
+/* cyrillic */
+@font-face {
+  font-family: 'IBM Plex Sans';
+  font-style: normal;
+  font-weight: 400;
+  font-stretch: 100%;
+  font-display: swap;
+  src: url("metinkutusu_varliklar/4992415c-f2c7-4921-b785-f5e28ee02099.woff2") format('woff2');
+  unicode-range: U+0301, U+0400-045F, U+0490-0491, U+04B0-04B1, U+2116;
+}
+/* greek */
+@font-face {
+  font-family: 'IBM Plex Sans';
+  font-style: normal;
+  font-weight: 400;
+  font-stretch: 100%;
+  font-display: swap;
+  src: url("metinkutusu_varliklar/5017285d-e41d-4a8b-be70-3dfd43440025.woff2") format('woff2');
+  unicode-range: U+0370-0377, U+037A-037F, U+0384-038A, U+038C, U+038E-03A1, U+03A3-03FF;
+}
+/* vietnamese */
+@font-face {
+  font-family: 'IBM Plex Sans';
+  font-style: normal;
+  font-weight: 400;
+  font-stretch: 100%;
+  font-display: swap;
+  src: url("metinkutusu_varliklar/cf6e68ad-7bba-4f50-afc4-5bdb64f644d8.woff2") format('woff2');
+  unicode-range: U+0102-0103, U+0110-0111, U+0128-0129, U+0168-0169, U+01A0-01A1, U+01AF-01B0, U+0300-0301, U+0303-0304, U+0308-0309, U+0323, U+0329, U+1EA0-1EF9, U+20AB;
+}
+/* latin-ext */
+@font-face {
+  font-family: 'IBM Plex Sans';
+  font-style: normal;
+  font-weight: 400;
+  font-stretch: 100%;
+  font-display: swap;
+  src: url("metinkutusu_varliklar/9eca0ad6-cbc2-4bff-8287-7eb75c2c0227.woff2") format('woff2');
+  unicode-range: U+0100-02BA, U+02BD-02C5, U+02C7-02CC, U+02CE-02D7, U+02DD-02FF, U+0304, U+0308, U+0329, U+1D00-1DBF, U+1E00-1E9F, U+1EF2-1EFF, U+2020, U+20A0-20AB, U+20AD-20C0, U+2113, U+2C60-2C7F, U+A720-A7FF;
+}
+/* latin */
+@font-face {
+  font-family: 'IBM Plex Sans';
+  font-style: normal;
+  font-weight: 400;
+  font-stretch: 100%;
+  font-display: swap;
+  src: url("metinkutusu_varliklar/a879a0fe-2d18-44d9-9aa1-b7161576f7bc.woff2") format('woff2');
+  unicode-range: U+0000-00FF, U+0131, U+0152-0153, U+02BB-02BC, U+02C6, U+02DA, U+02DC, U+0304, U+0308, U+0329, U+2000-206F, U+20AC, U+2122, U+2191, U+2193, U+2212, U+2215, U+FEFF, U+FFFD;
+}
+/* cyrillic-ext */
+@font-face {
+  font-family: 'IBM Plex Sans';
+  font-style: normal;
+  font-weight: 500;
+  font-stretch: 100%;
+  font-display: swap;
+  src: url("metinkutusu_varliklar/9941d260-0c84-4aa5-accd-5803c82df039.woff2") format('woff2');
+  unicode-range: U+0460-052F, U+1C80-1C8A, U+20B4, U+2DE0-2DFF, U+A640-A69F, U+FE2E-FE2F;
+}
+/* cyrillic */
+@font-face {
+  font-family: 'IBM Plex Sans';
+  font-style: normal;
+  font-weight: 500;
+  font-stretch: 100%;
+  font-display: swap;
+  src: url("metinkutusu_varliklar/4992415c-f2c7-4921-b785-f5e28ee02099.woff2") format('woff2');
+  unicode-range: U+0301, U+0400-045F, U+0490-0491, U+04B0-04B1, U+2116;
+}
+/* greek */
+@font-face {
+  font-family: 'IBM Plex Sans';
+  font-style: normal;
+  font-weight: 500;
+  font-stretch: 100%;
+  font-display: swap;
+  src: url("metinkutusu_varliklar/5017285d-e41d-4a8b-be70-3dfd43440025.woff2") format('woff2');
+  unicode-range: U+0370-0377, U+037A-037F, U+0384-038A, U+038C, U+038E-03A1, U+03A3-03FF;
+}
+/* vietnamese */
+@font-face {
+  font-family: 'IBM Plex Sans';
+  font-style: normal;
+  font-weight: 500;
+  font-stretch: 100%;
+  font-display: swap;
+  src: url("metinkutusu_varliklar/cf6e68ad-7bba-4f50-afc4-5bdb64f644d8.woff2") format('woff2');
+  unicode-range: U+0102-0103, U+0110-0111, U+0128-0129, U+0168-0169, U+01A0-01A1, U+01AF-01B0, U+0300-0301, U+0303-0304, U+0308-0309, U+0323, U+0329, U+1EA0-1EF9, U+20AB;
+}
+/* latin-ext */
+@font-face {
+  font-family: 'IBM Plex Sans';
+  font-style: normal;
+  font-weight: 500;
+  font-stretch: 100%;
+  font-display: swap;
+  src: url("metinkutusu_varliklar/9eca0ad6-cbc2-4bff-8287-7eb75c2c0227.woff2") format('woff2');
+  unicode-range: U+0100-02BA, U+02BD-02C5, U+02C7-02CC, U+02CE-02D7, U+02DD-02FF, U+0304, U+0308, U+0329, U+1D00-1DBF, U+1E00-1E9F, U+1EF2-1EFF, U+2020, U+20A0-20AB, U+20AD-20C0, U+2113, U+2C60-2C7F, U+A720-A7FF;
+}
+/* latin */
+@font-face {
+  font-family: 'IBM Plex Sans';
+  font-style: normal;
+  font-weight: 500;
+  font-stretch: 100%;
+  font-display: swap;
+  src: url("metinkutusu_varliklar/a879a0fe-2d18-44d9-9aa1-b7161576f7bc.woff2") format('woff2');
+  unicode-range: U+0000-00FF, U+0131, U+0152-0153, U+02BB-02BC, U+02C6, U+02DA, U+02DC, U+0304, U+0308, U+0329, U+2000-206F, U+20AC, U+2122, U+2191, U+2193, U+2212, U+2215, U+FEFF, U+FFFD;
+}
+/* cyrillic-ext */
+@font-face {
+  font-family: 'IBM Plex Sans';
+  font-style: normal;
+  font-weight: 600;
+  font-stretch: 100%;
+  font-display: swap;
+  src: url("metinkutusu_varliklar/9941d260-0c84-4aa5-accd-5803c82df039.woff2") format('woff2');
+  unicode-range: U+0460-052F, U+1C80-1C8A, U+20B4, U+2DE0-2DFF, U+A640-A69F, U+FE2E-FE2F;
+}
+/* cyrillic */
+@font-face {
+  font-family: 'IBM Plex Sans';
+  font-style: normal;
+  font-weight: 600;
+  font-stretch: 100%;
+  font-display: swap;
+  src: url("metinkutusu_varliklar/4992415c-f2c7-4921-b785-f5e28ee02099.woff2") format('woff2');
+  unicode-range: U+0301, U+0400-045F, U+0490-0491, U+04B0-04B1, U+2116;
+}
+/* greek */
+@font-face {
+  font-family: 'IBM Plex Sans';
+  font-style: normal;
+  font-weight: 600;
+  font-stretch: 100%;
+  font-display: swap;
+  src: url("metinkutusu_varliklar/5017285d-e41d-4a8b-be70-3dfd43440025.woff2") format('woff2');
+  unicode-range: U+0370-0377, U+037A-037F, U+0384-038A, U+038C, U+038E-03A1, U+03A3-03FF;
+}
+/* vietnamese */
+@font-face {
+  font-family: 'IBM Plex Sans';
+  font-style: normal;
+  font-weight: 600;
+  font-stretch: 100%;
+  font-display: swap;
+  src: url("metinkutusu_varliklar/cf6e68ad-7bba-4f50-afc4-5bdb64f644d8.woff2") format('woff2');
+  unicode-range: U+0102-0103, U+0110-0111, U+0128-0129, U+0168-0169, U+01A0-01A1, U+01AF-01B0, U+0300-0301, U+0303-0304, U+0308-0309, U+0323, U+0329, U+1EA0-1EF9, U+20AB;
+}
+/* latin-ext */
+@font-face {
+  font-family: 'IBM Plex Sans';
+  font-style: normal;
+  font-weight: 600;
+  font-stretch: 100%;
+  font-display: swap;
+  src: url("metinkutusu_varliklar/9eca0ad6-cbc2-4bff-8287-7eb75c2c0227.woff2") format('woff2');
+  unicode-range: U+0100-02BA, U+02BD-02C5, U+02C7-02CC, U+02CE-02D7, U+02DD-02FF, U+0304, U+0308, U+0329, U+1D00-1DBF, U+1E00-1E9F, U+1EF2-1EFF, U+2020, U+20A0-20AB, U+20AD-20C0, U+2113, U+2C60-2C7F, U+A720-A7FF;
+}
+/* latin */
+@font-face {
+  font-family: 'IBM Plex Sans';
+  font-style: normal;
+  font-weight: 600;
+  font-stretch: 100%;
+  font-display: swap;
+  src: url("metinkutusu_varliklar/a879a0fe-2d18-44d9-9aa1-b7161576f7bc.woff2") format('woff2');
+  unicode-range: U+0000-00FF, U+0131, U+0152-0153, U+02BB-02BC, U+02C6, U+02DA, U+02DC, U+0304, U+0308, U+0329, U+2000-206F, U+20AC, U+2122, U+2191, U+2193, U+2212, U+2215, U+FEFF, U+FFFD;
+}
+</style>
+<style>
+  :root {
+    --vurgu: #a8452a;
+    --vurgu-zemin: #f4e7e1;
+    --kagit: #f2efe9;
+    --yuzey: #fbfaf7;
+    --kenarlik: #ddd7cc;
+    --ince: #e7e2d9;
+    --ana-metin: #1d1a16;
+    --ikincil-metin: #6d6659;
+    --soluk: #a49c8e;
+  }
+  * { box-sizing: border-box; }
+  body {
+    margin: 0;
+    background: var(--kagit);
+    color: var(--ana-metin);
+    font: 400 14px/1.5 "IBM Plex Sans", system-ui, sans-serif;
+    -webkit-font-smoothing: antialiased;
+  }
+  a { color: var(--vurgu); text-decoration: none; }
+  a:hover { color: var(--ana-metin); }
+</style>
+
+</head>
+<body>
+
+
+
+
+<div style="min-height: 100vh; padding: 40px 32px 64px; display: flex; justify-content: center;">
+  <div style="width: 100%; max-width: 1120px;">
+
+    <header style="display: flex; align-items: baseline; gap: 16px; flex-wrap: wrap; padding-bottom: 20px; border-bottom: 1px solid var(--kenarlik);">
+      <h1 style="margin: 0; font-size: 26px; font-weight: 600; letter-spacing: -0.02em;">Yapılandırma Tezgâhı</h1>
+      <p style="margin: 0; font-size: 13px; color: var(--ikincil-metin);">Kod üzerinden yapılabilen her tanımın tasarım karşılığı</p>
+      <span style="margin-left: auto; font: 500 11px/1 'IBM Plex Mono', monospace; letter-spacing: 0.08em; color: var(--vurgu); border: 1px solid var(--vurgu); padding: 5px 8px; border-radius: 3px;">Metin Kutusu</span>
+    </header>
+
+    <div style="display: flex; justify-content: center; margin-top: 28px;">
+
+      <div style="width: 400px; display: flex; flex-direction: column; gap: 20px;">
+        <div>
+          <div style="display: flex; align-items: center; justify-content: flex-end; gap: 6px; margin: 0 0 8px;">
+            <div title="Köşe · yalnız önizleme kutusunun köşe biçimini değiştirir" style="display: flex; align-items: center; gap: 2px; padding: 2px; background: var(--yuzey); border: 1px solid var(--ince); border-radius: 4px;">
+            <button type="button" title="Dik köşeli · yalnız önizleme kutusunun köşelerini keskinleştirir" style="display: inline-flex; align-items: center; justify-content: center; width: 24px; height: 24px; padding: 0; border: none; border-radius: 3px; cursor: pointer; color: var(--ikincil-metin); background: transparent;"><span style="width: 13px; height: 13px; border: 1.5px solid currentColor; border-radius: 0px;"></span></button>
+            <button type="button" title="Köşeli · yalnız önizleme kutusuna küçük bir köşe yarıçapı verir" style="display: inline-flex; align-items: center; justify-content: center; width: 24px; height: 24px; padding: 0; border: none; border-radius: 3px; cursor: pointer; color: var(--ikincil-metin); background: transparent;"><span style="width: 13px; height: 13px; border: 1.5px solid currentColor; border-radius: 2px;"></span></button>
+            <button type="button" title="Yuvarlatılmış · yalnız önizleme kutusunu yuvarlatır" style="display: inline-flex; align-items: center; justify-content: center; width: 24px; height: 24px; padding: 0; border: none; border-radius: 3px; cursor: pointer; color: var(--vurgu); background: var(--vurgu-zemin);"><span style="width: 13px; height: 13px; border: 1.5px solid currentColor; border-radius: 4px;"></span></button>
+            <button type="button" title="Hap · yalnız önizleme kutusunu tam yuvarlak uçlu yapar" style="display: inline-flex; align-items: center; justify-content: center; width: 24px; height: 24px; padding: 0; border: none; border-radius: 3px; cursor: pointer; color: var(--ikincil-metin); background: transparent;"><span style="width: 13px; height: 13px; border: 1.5px solid currentColor; border-radius: 999px;"></span></button>
+              <details style="position: relative;">
+                <summary title="Özel köşe yarıçapı · yalnız önizleme kutusuna uygulanır; diğer köşe düğmeleri gibi davranmaz. En çok önizleme kutusu yüksekliğinin yarısı kadar olabilir (0–29 px)." style="display: inline-flex; align-items: center; justify-content: center; width: 24px; height: 24px; border-radius: 3px; cursor: pointer; color: var(--ikincil-metin); list-style: none;">
+                  <svg width="15" height="15" viewBox="0 0 16 16" fill="none" stroke="currentColor" stroke-width="1.5" stroke-linecap="round"><path d="M2.5 13.5V7A4.5 4.5 0 0 1 7 2.5h6.5"></path><circle cx="5.7" cy="5.7" r="1.6" fill="var(--yuzey)"></circle></svg>
+                </summary>
+                <div style="position: absolute; top: 30px; right: 0; z-index: 5; width: 216px; padding: 12px; background: var(--yuzey); border: 1px solid var(--kenarlik); border-radius: 4px; box-shadow: 0 6px 18px rgba(29,26,22,0.10);">
+                  <div style="display: flex; align-items: baseline; justify-content: space-between; gap: 8px; font: 400 11px/1 'IBM Plex Mono', monospace; color: var(--ikincil-metin);">
+                    <span>Özel yarıçap</span>
+                    <span style="color: var(--vurgu);">8 px</span>
+                  </div>
+                  <input type="range" min="0" max="29" value="8" style="width: 100%; margin: 10px 0 6px; accent-color: var(--vurgu); cursor: pointer;">
+                  <div style="display: flex; justify-content: space-between; font: 400 10px/1 'IBM Plex Mono', monospace; color: var(--soluk);">
+                    <span>0</span>
+                    <span>29 · kutu yüksekliğinin yarısı</span>
+                  </div>
+                </div>
+              </details>
+            </div>
+          </div>
+          <div style="display: flex; align-items: center; justify-content: space-between; gap: 6px; margin: 0 0 6px;">
+            <div title="Yazı tipi ve boyutu · yalnız önizleme kutusundaki değerin görünümünü değiştirir. Listede işletim sisteminde kurulu sistem yazı tipleri listelenecek." style="flex: 1 1 auto; min-width: 0; display: flex; align-items: center; gap: 2px; padding: 2px; background: var(--yuzey); border: 1px solid var(--ince); border-radius: 4px;">
+              <select title="Yazı tipi · işletim sisteminde kurulu sistem yazı tipleri listelenecek" style="height: 24px; width: 118px; min-width: 0; padding: 0 4px; font: 400 11px/1 'IBM Plex Mono', monospace; color: var(--ana-metin); background: transparent; border: none; cursor: pointer;">
+                <option>IBM Plex Sans</option>
+                <option>IBM Plex Mono</option>
+                <option>Helvetica</option>
+                <option>Georgia</option>
+                <option>Sistem yazı tipi</option>
+              </select>
+              <span style="width: 1px; height: 16px; background: var(--kenarlik);"></span>
+              <select title="Yazı boyutu · px" style="height: 24px; max-width: 100%; padding: 0 4px; font: 400 11px/1 'IBM Plex Mono', monospace; color: var(--ana-metin); background: transparent; border: none; cursor: pointer;">
+                <option>12</option>
+                <option>13</option>
+                <option selected="selected">14</option>
+                <option>16</option>
+                <option>18</option>
+                <option>20</option>
+              </select>
+            </div>
+            <div title="Yazı biçimi · yalnız önizleme kutusundaki değere uygulanır" style="flex: 0 0 auto; display: flex; align-items: center; gap: 2px; padding: 2px; background: var(--yuzey); border: 1px solid var(--ince); border-radius: 4px;">
+              <button type="button" title="Koyu" style="display: inline-flex; align-items: center; justify-content: center; width: 24px; height: 24px; padding: 0; border: none; border-radius: 3px; cursor: pointer; color: var(--ikincil-metin); background: transparent;"><svg width="15" height="15" viewBox="0 0 16 16" fill="none" stroke="currentColor" stroke-width="1.9" stroke-linecap="round" stroke-linejoin="round"><path d="M5 3h4a2.5 2.5 0 0 1 0 5H5zM5 8h4.5a2.5 2.5 0 0 1 0 5H5z"></path></svg></button>
+              <button type="button" title="İnce · açık ton" style="display: inline-flex; align-items: center; justify-content: center; width: 24px; height: 24px; padding: 0; border: none; border-radius: 3px; cursor: pointer; color: var(--ikincil-metin); background: transparent;"><svg width="15" height="15" viewBox="0 0 16 16" fill="none" stroke="currentColor" stroke-width="1" stroke-linecap="round" stroke-linejoin="round"><path d="M5 3h4a2.5 2.5 0 0 1 0 5H5zM5 8h4.5a2.5 2.5 0 0 1 0 5H5z"></path></svg></button>
+              <button type="button" title="Eğik" style="display: inline-flex; align-items: center; justify-content: center; width: 24px; height: 24px; padding: 0; border: none; border-radius: 3px; cursor: pointer; color: var(--ikincil-metin); background: transparent;"><svg width="15" height="15" viewBox="0 0 16 16" fill="none" stroke="currentColor" stroke-width="1.5" stroke-linecap="round"><path d="M6.5 3h5M4.5 13h5M9.5 3l-3 10"></path></svg></button>
+              <button type="button" title="Altı çizili" style="display: inline-flex; align-items: center; justify-content: center; width: 24px; height: 24px; padding: 0; border: none; border-radius: 3px; cursor: pointer; color: var(--ikincil-metin); background: transparent;"><svg width="15" height="15" viewBox="0 0 16 16" fill="none" stroke="currentColor" stroke-width="1.5" stroke-linecap="round"><path d="M4.5 2.5v5a3.5 3.5 0 0 0 7 0v-5"></path><path d="M3.5 13.5h9"></path></svg></button>
+              <button type="button" title="Üstü çizili" style="display: inline-flex; align-items: center; justify-content: center; width: 24px; height: 24px; padding: 0; border: none; border-radius: 3px; cursor: pointer; color: var(--ikincil-metin); background: transparent;"><svg width="15" height="15" viewBox="0 0 16 16" fill="none" stroke="currentColor" stroke-width="1.5" stroke-linecap="round"><path d="M4.5 3.5v3a3.5 3.5 0 0 0 7 0v-3"></path><path d="M4.5 12.5h7"></path><path d="M2.5 8.5h11"></path></svg></button>
+              <span style="width: 1px; height: 16px; background: var(--kenarlik);"></span>
+              <button type="button" title="Yazı boyutunu büyüt · yalnız önizleme kutusundaki değere uygulanır" style="display: inline-flex; align-items: center; justify-content: center; width: 24px; height: 24px; padding: 0; border: none; border-radius: 3px; cursor: pointer; color: var(--ikincil-metin); background: transparent;"><svg width="15" height="15" viewBox="0 0 16 16" fill="none" stroke="currentColor" stroke-width="1.5" stroke-linecap="round"><path d="M1.5 12.5L5 3.5l3.5 9M2.8 9.5h4.4"></path><path d="M12 6.5v5M9.5 9h5"></path></svg></button>
+              <button type="button" title="Yazı boyutunu küçült · yalnız önizleme kutusundaki değere uygulanır" style="display: inline-flex; align-items: center; justify-content: center; width: 24px; height: 24px; padding: 0; border: none; border-radius: 3px; cursor: pointer; color: var(--ikincil-metin); background: transparent;"><svg width="15" height="15" viewBox="0 0 16 16" fill="none" stroke="currentColor" stroke-width="1.5" stroke-linecap="round"><path d="M1.5 12.5L5 3.5l3.5 9M2.8 9.5h4.4"></path><path d="M9.5 9h5"></path></svg></button>
+            </div>
+          </div>
+          <div style="display: flex; align-items: center; justify-content: space-between; gap: 6px; margin: 0 0 10px;">
+            <div style="display: flex; align-items: center; gap: 2px; padding: 2px; background: var(--yuzey); border: 1px solid var(--ince); border-radius: 4px; width: fit-content;">
+              <button type="button" title="Temizle" style="display: inline-flex; align-items: center; justify-content: center; width: 24px; height: 24px; padding: 0; border: none; border-radius: 3px; cursor: pointer; color: var(--vurgu); background: var(--vurgu-zemin);"><svg width="15" height="15" viewBox="0 0 16 16" fill="none" stroke="currentColor" stroke-width="1.4"><circle cx="8" cy="8" r="6"></circle><path d="M6 6l4 4M10 6l-4 4"></path></svg></button>
+              <button type="button" title="Aramayı başlat" style="display: inline-flex; align-items: center; justify-content: center; width: 24px; height: 24px; padding: 0; border: none; border-radius: 3px; cursor: pointer; color: var(--ikincil-metin); background: transparent;"><svg width="15" height="15" viewBox="0 0 16 16" fill="none" stroke="currentColor" stroke-width="1.4"><circle cx="7" cy="7" r="4.5"></circle><path d="M10.5 10.5L14 14"></path></svg></button>
+              <button type="button" title="Parolayı göster · yalnız Gizli içerik açıkken etkinleşir; kapalıyken pasif kalır" style="display: inline-flex; align-items: center; justify-content: center; width: 24px; height: 24px; padding: 0; border: none; border-radius: 3px; cursor: pointer; color: var(--ikincil-metin); background: transparent;"><svg width="15" height="15" viewBox="0 0 16 16" fill="none" stroke="currentColor" stroke-width="1.4"><path d="M1 8s2.5-4 7-4 7 4 7 4-2.5 4-7 4-7-4-7-4z"></path><circle cx="8" cy="8" r="1.8"></circle></svg></button>
+              <button type="button" title="Seçiciyi aç" style="display: inline-flex; align-items: center; justify-content: center; width: 24px; height: 24px; padding: 0; border: none; border-radius: 3px; cursor: pointer; color: var(--ikincil-metin); background: transparent;"><svg width="15" height="15" viewBox="0 0 16 16" fill="none" stroke="currentColor" stroke-width="1.4"><rect x="2" y="3" width="12" height="11" rx="2"></rect><path d="M2 6.5h12M5.5 2v2.5M10.5 2v2.5"></path></svg></button>
+            </div>
+            <div style="display: flex; align-items: center; gap: 6px;">
+              <div title="Yatay hizalama" style="display: flex; align-items: center; gap: 2px; padding: 2px; background: var(--yuzey); border: 1px solid var(--ince); border-radius: 4px;">
+                <button type="button" title="Genel" style="padding: 0; border: none; background: transparent; cursor: pointer; display: inline-flex; align-items: center; justify-content: center; width: 24px; height: 24px; color: var(--vurgu); background: var(--vurgu-zemin); border-radius: 3px;">
+                  <svg width="15" height="15" viewBox="0 0 16 16" fill="none" stroke="currentColor" stroke-width="1.5" stroke-linecap="round"><path d="M2.5 4h11M2.5 8h7M2.5 12h9" stroke-dasharray="3 2"></path></svg>
+                </button>
+                <button type="button" title="Sol" style="padding: 0; border: none; background: transparent; cursor: pointer; display: inline-flex; align-items: center; justify-content: center; width: 24px; height: 24px; color: var(--ikincil-metin); border-radius: 3px;">
+                  <svg width="15" height="15" viewBox="0 0 16 16" fill="none" stroke="currentColor" stroke-width="1.5" stroke-linecap="round"><path d="M2.5 4h11M2.5 8h7M2.5 12h9"></path></svg>
+                </button>
+                <button type="button" title="Orta" style="padding: 0; border: none; background: transparent; cursor: pointer; display: inline-flex; align-items: center; justify-content: center; width: 24px; height: 24px; color: var(--ikincil-metin); border-radius: 3px;">
+                  <svg width="15" height="15" viewBox="0 0 16 16" fill="none" stroke="currentColor" stroke-width="1.5" stroke-linecap="round"><path d="M2.5 4h11M4.5 8h7M3.5 12h9"></path></svg>
+                </button>
+                <button type="button" title="Sağ" style="padding: 0; border: none; background: transparent; cursor: pointer; display: inline-flex; align-items: center; justify-content: center; width: 24px; height: 24px; color: var(--ikincil-metin); border-radius: 3px;">
+                  <svg width="15" height="15" viewBox="0 0 16 16" fill="none" stroke="currentColor" stroke-width="1.5" stroke-linecap="round"><path d="M2.5 4h11M6.5 8h7M4.5 12h9"></path></svg>
+                </button>
+                <button type="button" title="Başlangıç" style="padding: 0; border: none; background: transparent; cursor: pointer; display: inline-flex; align-items: center; justify-content: center; width: 24px; height: 24px; color: var(--ikincil-metin); border-radius: 3px;">
+                  <svg width="15" height="15" viewBox="0 0 16 16" fill="none" stroke="currentColor" stroke-width="1.5" stroke-linecap="round"><path d="M4.5 4h9M4.5 8h6M4.5 12h7.5"></path><path d="M2 3v10" opacity="0.55"></path></svg>
+                </button>
+                <button type="button" title="Bitiş" style="padding: 0; border: none; background: transparent; cursor: pointer; display: inline-flex; align-items: center; justify-content: center; width: 24px; height: 24px; color: var(--ikincil-metin); border-radius: 3px;">
+                  <svg width="15" height="15" viewBox="0 0 16 16" fill="none" stroke="currentColor" stroke-width="1.5" stroke-linecap="round"><path d="M2.5 4h9M5.5 8h6M4 12h7.5"></path><path d="M14 3v10" opacity="0.55"></path></svg>
+                </button>
+              </div>
+              <div title="Dikey hizalama" style="display: flex; align-items: center; gap: 2px; padding: 2px; background: var(--yuzey); border: 1px solid var(--ince); border-radius: 4px;">
+                <button type="button" title="Üst" style="padding: 0; border: none; background: transparent; cursor: pointer; display: inline-flex; align-items: center; justify-content: center; width: 24px; height: 24px; color: var(--ikincil-metin); border-radius: 3px;">
+                  <svg width="15" height="15" viewBox="0 0 16 16" fill="none" stroke="currentColor" stroke-width="1.5" stroke-linecap="round"><path d="M3.5 4.5h9M3.5 7.5h6"></path><path d="M2 2h12" opacity="0.55"></path></svg>
+                </button>
+                <button type="button" title="Orta" style="padding: 0; border: none; background: transparent; cursor: pointer; display: inline-flex; align-items: center; justify-content: center; width: 24px; height: 24px; color: var(--vurgu); background: var(--vurgu-zemin); border-radius: 3px;">
+                  <svg width="15" height="15" viewBox="0 0 16 16" fill="none" stroke="currentColor" stroke-width="1.5" stroke-linecap="round"><path d="M3.5 6.5h9M3.5 9.5h6"></path><path d="M2 8h12" opacity="0.55"></path></svg>
+                </button>
+                <button type="button" title="Alt" style="padding: 0; border: none; background: transparent; cursor: pointer; display: inline-flex; align-items: center; justify-content: center; width: 24px; height: 24px; color: var(--ikincil-metin); border-radius: 3px;">
+                  <svg width="15" height="15" viewBox="0 0 16 16" fill="none" stroke="currentColor" stroke-width="1.5" stroke-linecap="round"><path d="M3.5 8.5h9M3.5 11.5h6"></path><path d="M2 14h12" opacity="0.55"></path></svg>
+                </button>
+              </div>
+            </div>
+          </div>
+
+          <div style="height: 58px; display: flex; align-items: center; gap: 10px; padding: 0 14px; background: var(--yuzey); border: 1px solid var(--kenarlik); border-radius: 8px; box-shadow: 0 1px 2px rgba(29,26,22,0.04);">
+            <div style="flex: 1 1 auto; min-width: 0; height: 100%; display: flex; justify-content: flex-start; align-items: center;">
+              <span style="flex: 0 0 auto; white-space: nowrap; padding-right: 0.2em; color: var(--soluk);">+90</span>
+              <span style="min-width: 0; white-space: pre; overflow: hidden; text-overflow: ellipsis; font-family: 'IBM Plex Mono', monospace;">(___) ___ __ __</span>
+            </div>
+            <button type="button" title="Temizle" style="padding: 0; border: none; background: transparent; cursor: pointer; flex: 0 0 auto; display: inline-flex; color: var(--ikincil-metin); opacity: 0.6;">
+              <svg width="15" height="15" viewBox="0 0 16 16" fill="none" stroke="currentColor" stroke-width="1.4"><circle cx="8" cy="8" r="6"></circle><path d="M6 6l4 4M10 6l-4 4"></path></svg>
+            </button>
+          </div>
+          <div style="display: grid; grid-template-columns: repeat(4, minmax(0, 1fr)); gap: 6px; margin: 12px 0 0;">
+            <button type="button" style="font: 400 12px/1.25 'IBM Plex Sans', sans-serif; cursor: pointer; display: inline-flex; align-items: center; justify-content: center; height: 30px; padding: 0 8px; color: var(--vurgu); background: var(--vurgu-zemin); border: 1px solid var(--vurgu); border-radius: 3px;">Metin</button>
+            <button type="button" style="font: 400 12px/1.25 'IBM Plex Sans', sans-serif; cursor: pointer; display: inline-flex; align-items: center; justify-content: center; height: 30px; padding: 0 8px; background: var(--yuzey); border: 1px solid var(--kenarlik); border-radius: 3px;">Tamsayı</button>
+            <button type="button" style="font: 400 12px/1.25 'IBM Plex Sans', sans-serif; cursor: pointer; display: inline-flex; align-items: center; justify-content: center; height: 30px; padding: 0 8px; background: var(--yuzey); border: 1px solid var(--kenarlik); border-radius: 3px;">Ondalık</button>
+            <button type="button" style="font: 400 12px/1.25 'IBM Plex Sans', sans-serif; cursor: pointer; display: inline-flex; align-items: center; justify-content: center; height: 30px; padding: 0 8px; background: var(--yuzey); border: 1px solid var(--kenarlik); border-radius: 3px;">Para</button>
+          </div>
+          <div style="margin-top: 12px; display: flex; align-items: center; justify-content: space-between; gap: 12px;">
+            <select style="height: 28px; max-width: 232px; padding: 0 6px; font: 400 12px/1.3 'IBM Plex Mono', monospace; color: var(--ana-metin); background: var(--yuzey); border: 1px solid var(--kenarlik); border-radius: 3px; cursor: pointer;">
+              <optgroup label="Biçim">
+                <option>Genel</option>
+                <option>Sayı · 1234,56</option>
+                <option>Binlik ayraçlı · 1.234,56</option>
+                <option>Para birimi · ₺1.234,56</option>
+                <option>Muhasebe · ₺ 1.234,56</option>
+                <option>Yüzde · %12,50</option>
+                <option>Bilimsel · 1,23E+04</option>
+                <option>Kesir · 1/4</option>
+                <option>Metin</option>
+              </optgroup>
+              <optgroup label="Tarih ve saat">
+                <option>Kısa tarih · 04.08.2026</option>
+                <option>Uzun tarih · 4 Ağustos 2026</option>
+                <option>Saat · 14:30</option>
+                <option>Uzun saat · 14:30:05</option>
+                <option>Tarih/saat · 04.08.2026 14:30</option>
+              </optgroup>
+              <optgroup label="Giriş maskesi">
+                <option selected="selected">Telefon · (000) 000 00 00</option>
+                <option>Cep telefonu · 0(500) 000 00 00</option>
+                <option>Tarih · 00/00/0000</option>
+                <option>Saat · 00:00</option>
+                <option>TC kimlik no · 00000000000</option>
+                <option>Vergi no · 0000000000</option>
+                <option>Posta kodu · 00000</option>
+                <option>Plaka · &gt;00 L?? 0999</option>
+                <option>IBAN · "TR"00 0000 0000 0000 0000 0000 00</option>
+                <option>Kredi kartı · 0000 0000 0000 0000</option>
+                <option>Parola · ••••••••</option>
+                <option>Kısaltma · &gt;LLL</option>
+                <option>Özel…</option>
+              </optgroup>
+            </select>
+            <div title="Sayı biçimi" style="display: flex; align-items: center; gap: 2px; padding: 2px; background: var(--yuzey); border: 1px solid var(--ince); border-radius: 4px;">
+              <button type="button" title="Binler ayracı · sayısal değerler seçildiğinde aktif olacak" style="display: inline-flex; align-items: center; justify-content: center; width: 30px; height: 24px; padding: 0; color: var(--ikincil-metin); background: transparent; border: none; border-radius: 3px; cursor: pointer;"><span style="font: 500 10px/1 'IBM Plex Mono', monospace; letter-spacing: -0.02em;">0.0</span></button>
+              <button type="button" title="Ondalık haneyi azalt · ondalık ve para değerleri seçildiğinde aktif olacak" style="display: inline-flex; align-items: center; justify-content: center; width: 30px; height: 24px; padding: 0; color: var(--ikincil-metin); background: transparent; border: none; border-radius: 3px; cursor: pointer;"><span style="display: inline-flex; align-items: center; gap: 1px;"><svg width="9" height="9" viewBox="0 0 9 9" fill="none" stroke="currentColor" stroke-width="1.3" stroke-linecap="round" stroke-linejoin="round"><path d="M7.5 4.5h-6M4 2L1.5 4.5 4 7"></path></svg><span style="font: 500 10px/1 'IBM Plex Mono', monospace; letter-spacing: -0.02em;">,0</span></span></button>
+              <button type="button" title="Ondalık haneyi artır · ondalık ve para değerleri seçildiğinde aktif olacak" style="display: inline-flex; align-items: center; justify-content: center; width: 30px; height: 24px; padding: 0; color: var(--ikincil-metin); background: transparent; border: none; border-radius: 3px; cursor: pointer;"><span style="display: inline-flex; align-items: center; gap: 1px;"><svg width="9" height="9" viewBox="0 0 9 9" fill="none" stroke="currentColor" stroke-width="1.3" stroke-linecap="round" stroke-linejoin="round"><path d="M1.5 4.5h6M5 2l2.5 2.5L5 7"></path></svg><span style="font: 500 10px/1 'IBM Plex Mono', monospace; letter-spacing: -0.02em;">,00</span></span></button>
+            </div>
+          </div>
+          <div style="margin-top: 8px; display: grid; grid-template-columns: repeat(4, minmax(0, 1fr)); gap: 6px;">
+            <details style="position: relative;">
+              <summary title="Ön ek · değerin başında duran sabit içerik; metni yüzer kutuda tanımlanır" style="font: 400 12px/1.25 'IBM Plex Sans', sans-serif; cursor: pointer; display: flex; align-items: center; justify-content: center; height: 28px; padding: 0 6px; border-radius: 3px; list-style: none; color: var(--vurgu); background: var(--vurgu-zemin); border: 1px solid var(--vurgu);">Ön ek</summary>
+              <div style="position: absolute; top: 32px; left: 0; z-index: 5; width: 216px; padding: 12px; background: var(--yuzey); border: 1px solid var(--kenarlik); border-radius: 4px; box-shadow: 0 6px 18px rgba(29,26,22,0.10);">
+                <div style="display: flex; align-items: baseline; justify-content: space-between; gap: 8px; margin-bottom: 8px; font: 400 11px/1 'IBM Plex Mono', monospace; color: var(--ikincil-metin);"><span>Ön ek</span><span style="color: var(--vurgu);">açık</span></div>
+                <input type="text" value="+90" readonly style="width: 100%; height: 28px; padding: 0 8px; font: 400 12px/1.3 'IBM Plex Mono', monospace; color: var(--ana-metin); background: var(--kagit); border: 1px solid var(--kenarlik); border-radius: 3px;">
+              </div>
+            </details>
+            <details style="position: relative;">
+              <summary title="Son ek · değerin sonunda duran sabit içerik; metni yüzer kutuda tanımlanır" style="font: 400 12px/1.25 'IBM Plex Sans', sans-serif; cursor: pointer; display: flex; align-items: center; justify-content: center; height: 28px; padding: 0 6px; border-radius: 3px; list-style: none; color: var(--ana-metin); background: var(--yuzey); border: 1px solid var(--kenarlik);">Son ek</summary>
+              <div style="position: absolute; top: 32px; left: 0; z-index: 5; width: 216px; padding: 12px; background: var(--yuzey); border: 1px solid var(--kenarlik); border-radius: 4px; box-shadow: 0 6px 18px rgba(29,26,22,0.10);">
+                <div style="display: flex; align-items: baseline; justify-content: space-between; gap: 8px; margin-bottom: 8px; font: 400 11px/1 'IBM Plex Mono', monospace; color: var(--ikincil-metin);"><span>Son ek</span><span style="color: var(--soluk);">kapalı</span></div>
+                <input type="text" value="KDV dahil" readonly style="width: 100%; height: 28px; padding: 0 8px; font: 400 12px/1.3 'IBM Plex Mono', monospace; color: var(--ana-metin); background: var(--kagit); border: 1px solid var(--kenarlik); border-radius: 3px;">
+              </div>
+            </details>
+            <details style="position: relative;">
+              <summary title="Uzunluk sınırı · en fazla grafem sayısı ve sınıra ulaşınca uygulanacak davranış" style="font: 400 12px/1.25 'IBM Plex Sans', sans-serif; cursor: pointer; display: flex; align-items: center; justify-content: center; height: 28px; padding: 0 6px; border-radius: 3px; list-style: none; color: var(--ana-metin); background: var(--yuzey); border: 1px solid var(--kenarlik);">Uzunluk sınırı</summary>
+              <div style="position: absolute; top: 32px; right: 0; z-index: 5; width: 216px; padding: 12px; background: var(--yuzey); border: 1px solid var(--kenarlik); border-radius: 4px; box-shadow: 0 6px 18px rgba(29,26,22,0.10);">
+                <div style="display: flex; align-items: baseline; justify-content: space-between; gap: 8px; margin-bottom: 8px; font: 400 11px/1 'IBM Plex Mono', monospace; color: var(--ikincil-metin);"><span>Uzunluk sınırı</span><span style="color: var(--soluk);">kapalı</span></div>
+                <input type="text" value="12" readonly style="width: 100%; height: 28px; padding: 0 8px; font: 400 12px/1.3 'IBM Plex Mono', monospace; color: var(--ana-metin); background: var(--kagit); border: 1px solid var(--kenarlik); border-radius: 3px;">
+                <div style="display: grid; grid-template-columns: repeat(2, minmax(0, 1fr)); gap: 6px; margin-top: 6px;">
+                  <button type="button" title="Sınıra ulaşınca fazlasını kırp" style="font: 400 12px/1.25 'IBM Plex Sans', sans-serif; cursor: pointer; display: flex; align-items: center; justify-content: center; height: 28px; padding: 0 6px; border-radius: 3px; list-style: none; color: var(--vurgu); background: var(--vurgu-zemin); border: 1px solid var(--vurgu);">Kırp</button>
+                  <button type="button" title="Sınıra ulaşınca girişi reddet" style="font: 400 12px/1.25 'IBM Plex Sans', sans-serif; cursor: pointer; display: flex; align-items: center; justify-content: center; height: 28px; padding: 0 6px; border-radius: 3px; list-style: none; color: var(--ana-metin); background: var(--yuzey); border: 1px solid var(--kenarlik);">Reddet</button>
+                </div>
+              </div>
+            </details>
+            <details style="position: relative;">
+              <summary title="Sayaç · yazılan grafem sayısını ve sınırı kutunun sağında gösterir" style="font: 400 12px/1.25 'IBM Plex Sans', sans-serif; cursor: pointer; display: flex; align-items: center; justify-content: center; height: 28px; padding: 0 6px; border-radius: 3px; list-style: none; color: var(--ana-metin); background: var(--yuzey); border: 1px solid var(--kenarlik);">Sayaç</summary>
+              <div style="position: absolute; top: 32px; right: 0; z-index: 5; width: 216px; padding: 12px; background: var(--yuzey); border: 1px solid var(--kenarlik); border-radius: 4px; box-shadow: 0 6px 18px rgba(29,26,22,0.10);">
+                <div style="display: flex; align-items: baseline; justify-content: space-between; gap: 8px; margin-bottom: 8px; font: 400 11px/1 'IBM Plex Mono', monospace; color: var(--ikincil-metin);"><span>Sayaç</span><span style="color: var(--soluk);">kapalı</span></div>
+                <div style="display: grid; grid-template-columns: repeat(2, minmax(0, 1fr)); gap: 6px;">
+                  <button type="button" title="Grafem sayısını say" style="font: 400 12px/1.25 'IBM Plex Sans', sans-serif; cursor: pointer; display: flex; align-items: center; justify-content: center; height: 28px; padding: 0 6px; border-radius: 3px; list-style: none; color: var(--vurgu); background: var(--vurgu-zemin); border: 1px solid var(--vurgu);">Grafem</button>
+                  <button type="button" title="Sözcük sayısını say" style="font: 400 12px/1.25 'IBM Plex Sans', sans-serif; cursor: pointer; display: flex; align-items: center; justify-content: center; height: 28px; padding: 0 6px; border-radius: 3px; list-style: none; color: var(--ana-metin); background: var(--yuzey); border: 1px solid var(--kenarlik);">Sözcük</button>
+                  <button type="button" title="Sınırı sayaçta göster" style="font: 400 12px/1.25 'IBM Plex Sans', sans-serif; cursor: pointer; display: flex; align-items: center; justify-content: center; height: 28px; padding: 0 6px; border-radius: 3px; list-style: none; color: var(--vurgu); background: var(--vurgu-zemin); border: 1px solid var(--vurgu);">Sınırı göster</button>
+                  <button type="button" title="Yalnız sayıyı göster" style="font: 400 12px/1.25 'IBM Plex Sans', sans-serif; cursor: pointer; display: flex; align-items: center; justify-content: center; height: 28px; padding: 0 6px; border-radius: 3px; list-style: none; color: var(--ana-metin); background: var(--yuzey); border: 1px solid var(--kenarlik);">Yalnız sayı</button>
+                </div>
+              </div>
+            </details>
+          </div>
+          <div style="margin-top: 6px; display: grid; grid-template-columns: repeat(4, minmax(0, 1fr)); gap: 6px;">
+            <button type="button" title="Ek tonu · soluk: ön ve son ek değerden daha açık tonda görünür" style="font: 400 12px/1.25 'IBM Plex Sans', sans-serif; cursor: pointer; display: flex; align-items: center; justify-content: center; height: 28px; padding: 0 6px; border-radius: 3px; list-style: none; color: var(--vurgu); background: var(--vurgu-zemin); border: 1px solid var(--vurgu);">Ek soluk</button>
+            <button type="button" title="Ek tonu · normal: ön ve son ek değerle aynı tonda görünür" style="font: 400 12px/1.25 'IBM Plex Sans', sans-serif; cursor: pointer; display: flex; align-items: center; justify-content: center; height: 28px; padding: 0 6px; border-radius: 3px; list-style: none; color: var(--ana-metin); background: var(--yuzey); border: 1px solid var(--kenarlik);">Ek normal</button>
+            <details style="position: relative;">
+              <summary title="Yer tutucu · değer boşken kutuda görünen metin; yüzer kutuda tanımlanır" style="font: 400 12px/1.25 'IBM Plex Sans', sans-serif; cursor: pointer; display: flex; align-items: center; justify-content: center; height: 28px; padding: 0 6px; border-radius: 3px; list-style: none; color: var(--vurgu); background: var(--vurgu-zemin); border: 1px solid var(--vurgu);">Yer tutucu</summary>
+              <div style="position: absolute; top: 32px; left: 0; z-index: 5; width: 216px; padding: 12px; background: var(--yuzey); border: 1px solid var(--kenarlik); border-radius: 4px; box-shadow: 0 6px 18px rgba(29,26,22,0.10);">
+                <div style="display: flex; align-items: baseline; justify-content: space-between; gap: 8px; margin-bottom: 8px; font: 400 11px/1 'IBM Plex Mono', monospace; color: var(--ikincil-metin);"><span>Yer tutucu metni</span><span style="color: var(--vurgu);">açık</span></div>
+                <input type="text" value="Değer girin…" readonly style="width: 100%; height: 28px; padding: 0 8px; font: 400 12px/1.3 'IBM Plex Mono', monospace; color: var(--ana-metin); background: var(--kagit); border: 1px solid var(--kenarlik); border-radius: 3px;">
+              </div>
+            </details>
+            <button type="button" title="Gizli içerik · değer • ile maskelenir. Açıkken yardımcı eylemlerdeki Parolayı göster düğmesi de etkinleşir; kapalıyken o düğme pasif kalır." style="font: 400 12px/1.25 'IBM Plex Sans', sans-serif; cursor: pointer; display: flex; align-items: center; justify-content: center; height: 28px; padding: 0 6px; border-radius: 3px; list-style: none; color: var(--ana-metin); background: var(--yuzey); border: 1px solid var(--kenarlik);">Gizli içerik</button>
+          </div>
+          <div style="margin-top: 6px; display: grid; grid-template-columns: repeat(4, minmax(0, 1fr)); gap: 6px;">
+            <details style="position: relative;">
+              <summary title="Enter davranışı · değeri işledikten sonra odağın ve seçimin ne olacağı" style="font: 400 12px/1.25 'IBM Plex Sans', sans-serif; cursor: pointer; display: flex; align-items: center; justify-content: center; height: 28px; padding: 0 6px; border-radius: 3px; list-style: none; color: var(--ana-metin); background: var(--yuzey); border: 1px solid var(--kenarlik);">Enter</summary>
+              <div style="position: absolute; top: 32px; left: 0; z-index: 5; width: 216px; padding: 6px; background: var(--yuzey); border: 1px solid var(--kenarlik); border-radius: 4px; box-shadow: 0 6px 18px rgba(29,26,22,0.10); display: grid; gap: 4px;">
+                <button type="button" style="font: 400 12px/1.25 'IBM Plex Sans', sans-serif; cursor: pointer; display: flex; align-items: center; height: 26px; padding: 0 8px; border-radius: 3px; border: none; color: var(--vurgu); background: var(--vurgu-zemin);">Değeri işle ve kal</button>
+                <button type="button" style="font: 400 12px/1.25 'IBM Plex Sans', sans-serif; cursor: pointer; display: flex; align-items: center; height: 26px; padding: 0 8px; border-radius: 3px; border: none; color: var(--ana-metin); background: transparent;">Değeri işle, seçimi koru</button>
+                <button type="button" style="font: 400 12px/1.25 'IBM Plex Sans', sans-serif; cursor: pointer; display: flex; align-items: center; height: 26px; padding: 0 8px; border-radius: 3px; border: none; color: var(--ana-metin); background: transparent;">Değeri işle, sonrakine geç</button>
+              </div>
+            </details>
+            <button type="button" title="Odakta tümünü seç · kutuya odaklanınca mevcut değerin tamamı seçilir" style="font: 400 12px/1.25 'IBM Plex Sans', sans-serif; cursor: pointer; display: flex; align-items: center; justify-content: center; height: 28px; padding: 0 6px; border-radius: 3px; list-style: none; color: var(--vurgu); background: var(--vurgu-zemin); border: 1px solid var(--vurgu);">Odakta seç</button>
+            <button type="button" title="Salt okunur · değer görünür ama düzenlenemez" style="font: 400 12px/1.25 'IBM Plex Sans', sans-serif; cursor: pointer; display: flex; align-items: center; justify-content: center; height: 28px; padding: 0 6px; border-radius: 3px; list-style: none; color: var(--ana-metin); background: var(--yuzey); border: 1px solid var(--kenarlik);">Salt okunur</button>
+            <button type="button" title="Etkin · kapatıldığında kutu tümüyle pasifleşir" style="font: 400 12px/1.25 'IBM Plex Sans', sans-serif; cursor: pointer; display: flex; align-items: center; justify-content: center; height: 28px; padding: 0 6px; border-radius: 3px; list-style: none; color: var(--vurgu); background: var(--vurgu-zemin); border: 1px solid var(--vurgu);">Etkin</button>
+          </div>
+          <!-- NOT (yapay zekâya): Bu iki simge yalnız tasarım doğrulaması içindir.
+               Binler ayracı simgesi: sayısal değer türleri (Tamsayı, Ondalık, ParaBirimi) seçildiğinde etkin olacak.
+               Ondalık haneyi azalt/artır simgeleri: yalnız Ondalık ve ParaBirimi seçildiğinde etkin olacak.
+               Diğer durumlarda pasif görünür. Bu notlar ve simge ipuçları gerçek uygulamada gösterilmez;
+               tezgâh etkileşimsizdir, yazma/maske/odak davranışı kanonik bileşene aittir. -->
+        </div>
+
+        <div>
+          <h2 style="margin: 0 0 10px; font: 500 11px/1 'IBM Plex Mono', monospace; letter-spacing: 0.1em; text-transform: uppercase; color: var(--ikincil-metin);">Karşılığı olan kod</h2>
+          <pre style="margin: 0; min-height: 132px; padding: 14px 16px; display: flex; align-items: center; background: #22201c; color: #8d867a; border-radius: 4px; font: 400 13px/1 'IBM Plex Mono', monospace; letter-spacing: 0.15em;">…</pre>
+        </div>
+      </div>
+
+    </div>
+  </div>
+</div>
+
+
+
+
+</body></html>

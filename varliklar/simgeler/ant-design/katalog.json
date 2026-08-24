@@ -1,0 +1,3980 @@
+{
+  "şema_sürümü": 1,
+  "kaynak": "ant-design-icons",
+  "commit": "6c18c63fbcfcf71dae09cd6bd6d63a48f8b688f1",
+  "lisans": "MIT",
+  "görüntü_kutusu": "0 0 1024 1024",
+  "simgeler": {
+    "account-book": {
+      "temalar": [
+        "outlined",
+        "filled",
+        "twotone"
+      ],
+      "iki_tonlu_ikincil_yollar": {
+        "twotone": [
+          0
+        ]
+      }
+    },
+    "aim": {
+      "temalar": [
+        "outlined"
+      ],
+      "iki_tonlu_ikincil_yollar": {}
+    },
+    "alert": {
+      "temalar": [
+        "outlined",
+        "filled",
+        "twotone"
+      ],
+      "iki_tonlu_ikincil_yollar": {
+        "twotone": [
+          0
+        ]
+      }
+    },
+    "alibaba": {
+      "temalar": [
+        "outlined"
+      ],
+      "iki_tonlu_ikincil_yollar": {}
+    },
+    "align-center": {
+      "temalar": [
+        "outlined"
+      ],
+      "iki_tonlu_ikincil_yollar": {}
+    },
+    "align-left": {
+      "temalar": [
+        "outlined"
+      ],
+      "iki_tonlu_ikincil_yollar": {}
+    },
+    "align-right": {
+      "temalar": [
+        "outlined"
+      ],
+      "iki_tonlu_ikincil_yollar": {}
+    },
+    "alipay": {
+      "temalar": [
+        "outlined"
+      ],
+      "iki_tonlu_ikincil_yollar": {}
+    },
+    "alipay-circle": {
+      "temalar": [
+        "outlined",
+        "filled"
+      ],
+      "iki_tonlu_ikincil_yollar": {}
+    },
+    "alipay-square": {
+      "temalar": [
+        "filled"
+      ],
+      "iki_tonlu_ikincil_yollar": {}
+    },
+    "aliwangwang": {
+      "temalar": [
+        "outlined",
+        "filled"
+      ],
+      "iki_tonlu_ikincil_yollar": {}
+    },
+    "aliyun": {
+      "temalar": [
+        "outlined"
+      ],
+      "iki_tonlu_ikincil_yollar": {}
+    },
+    "amazon": {
+      "temalar": [
+        "outlined"
+      ],
+      "iki_tonlu_ikincil_yollar": {}
+    },
+    "amazon-circle": {
+      "temalar": [
+        "filled"
+      ],
+      "iki_tonlu_ikincil_yollar": {}
+    },
+    "amazon-square": {
+      "temalar": [
+        "filled"
+      ],
+      "iki_tonlu_ikincil_yollar": {}
+    },
+    "android": {
+      "temalar": [
+        "outlined",
+        "filled"
+      ],
+      "iki_tonlu_ikincil_yollar": {}
+    },
+    "ant-cloud": {
+      "temalar": [
+        "outlined"
+      ],
+      "iki_tonlu_ikincil_yollar": {}
+    },
+    "ant-design": {
+      "temalar": [
+        "outlined"
+      ],
+      "iki_tonlu_ikincil_yollar": {}
+    },
+    "anthropic": {
+      "temalar": [
+        "filled"
+      ],
+      "iki_tonlu_ikincil_yollar": {}
+    },
+    "apartment": {
+      "temalar": [
+        "outlined"
+      ],
+      "iki_tonlu_ikincil_yollar": {}
+    },
+    "api": {
+      "temalar": [
+        "outlined",
+        "filled",
+        "twotone"
+      ],
+      "iki_tonlu_ikincil_yollar": {
+        "twotone": [
+          0
+        ]
+      }
+    },
+    "apple": {
+      "temalar": [
+        "outlined",
+        "filled"
+      ],
+      "iki_tonlu_ikincil_yollar": {}
+    },
+    "appstore": {
+      "temalar": [
+        "outlined",
+        "filled",
+        "twotone"
+      ],
+      "iki_tonlu_ikincil_yollar": {
+        "twotone": [
+          1
+        ]
+      }
+    },
+    "appstore-add": {
+      "temalar": [
+        "outlined"
+      ],
+      "iki_tonlu_ikincil_yollar": {}
+    },
+    "area-chart": {
+      "temalar": [
+        "outlined"
+      ],
+      "iki_tonlu_ikincil_yollar": {}
+    },
+    "arrow-down": {
+      "temalar": [
+        "outlined"
+      ],
+      "iki_tonlu_ikincil_yollar": {}
+    },
+    "arrow-left": {
+      "temalar": [
+        "outlined"
+      ],
+      "iki_tonlu_ikincil_yollar": {}
+    },
+    "arrow-right": {
+      "temalar": [
+        "outlined"
+      ],
+      "iki_tonlu_ikincil_yollar": {}
+    },
+    "arrow-up": {
+      "temalar": [
+        "outlined"
+      ],
+      "iki_tonlu_ikincil_yollar": {}
+    },
+    "arrows-alt": {
+      "temalar": [
+        "outlined"
+      ],
+      "iki_tonlu_ikincil_yollar": {}
+    },
+    "audio": {
+      "temalar": [
+        "outlined",
+        "filled",
+        "twotone"
+      ],
+      "iki_tonlu_ikincil_yollar": {
+        "twotone": [
+          0
+        ]
+      }
+    },
+    "audio-muted": {
+      "temalar": [
+        "outlined"
+      ],
+      "iki_tonlu_ikincil_yollar": {}
+    },
+    "audit": {
+      "temalar": [
+        "outlined"
+      ],
+      "iki_tonlu_ikincil_yollar": {}
+    },
+    "backward": {
+      "temalar": [
+        "outlined",
+        "filled"
+      ],
+      "iki_tonlu_ikincil_yollar": {}
+    },
+    "baidu": {
+      "temalar": [
+        "outlined"
+      ],
+      "iki_tonlu_ikincil_yollar": {}
+    },
+    "bank": {
+      "temalar": [
+        "outlined",
+        "filled",
+        "twotone"
+      ],
+      "iki_tonlu_ikincil_yollar": {
+        "twotone": [
+          0
+        ]
+      }
+    },
+    "bar-chart": {
+      "temalar": [
+        "outlined"
+      ],
+      "iki_tonlu_ikincil_yollar": {}
+    },
+    "barcode": {
+      "temalar": [
+        "outlined"
+      ],
+      "iki_tonlu_ikincil_yollar": {}
+    },
+    "bars": {
+      "temalar": [
+        "outlined"
+      ],
+      "iki_tonlu_ikincil_yollar": {}
+    },
+    "behance": {
+      "temalar": [
+        "outlined"
+      ],
+      "iki_tonlu_ikincil_yollar": {}
+    },
+    "behance-circle": {
+      "temalar": [
+        "filled"
+      ],
+      "iki_tonlu_ikincil_yollar": {}
+    },
+    "behance-square": {
+      "temalar": [
+        "outlined",
+        "filled"
+      ],
+      "iki_tonlu_ikincil_yollar": {}
+    },
+    "bell": {
+      "temalar": [
+        "outlined",
+        "filled",
+        "twotone"
+      ],
+      "iki_tonlu_ikincil_yollar": {
+        "twotone": [
+          0
+        ]
+      }
+    },
+    "bg-colors": {
+      "temalar": [
+        "outlined"
+      ],
+      "iki_tonlu_ikincil_yollar": {}
+    },
+    "bilibili": {
+      "temalar": [
+        "outlined",
+        "filled"
+      ],
+      "iki_tonlu_ikincil_yollar": {}
+    },
+    "block": {
+      "temalar": [
+        "outlined"
+      ],
+      "iki_tonlu_ikincil_yollar": {}
+    },
+    "bold": {
+      "temalar": [
+        "outlined"
+      ],
+      "iki_tonlu_ikincil_yollar": {}
+    },
+    "book": {
+      "temalar": [
+        "outlined",
+        "filled",
+        "twotone"
+      ],
+      "iki_tonlu_ikincil_yollar": {
+        "twotone": [
+          1,
+          2
+        ]
+      }
+    },
+    "border": {
+      "temalar": [
+        "outlined"
+      ],
+      "iki_tonlu_ikincil_yollar": {}
+    },
+    "border-bottom": {
+      "temalar": [
+        "outlined"
+      ],
+      "iki_tonlu_ikincil_yollar": {}
+    },
+    "border-horizontal": {
+      "temalar": [
+        "outlined"
+      ],
+      "iki_tonlu_ikincil_yollar": {}
+    },
+    "border-inner": {
+      "temalar": [
+        "outlined"
+      ],
+      "iki_tonlu_ikincil_yollar": {}
+    },
+    "border-left": {
+      "temalar": [
+        "outlined"
+      ],
+      "iki_tonlu_ikincil_yollar": {}
+    },
+    "border-outer": {
+      "temalar": [
+        "outlined"
+      ],
+      "iki_tonlu_ikincil_yollar": {}
+    },
+    "border-right": {
+      "temalar": [
+        "outlined"
+      ],
+      "iki_tonlu_ikincil_yollar": {}
+    },
+    "border-top": {
+      "temalar": [
+        "outlined"
+      ],
+      "iki_tonlu_ikincil_yollar": {}
+    },
+    "border-verticle": {
+      "temalar": [
+        "outlined"
+      ],
+      "iki_tonlu_ikincil_yollar": {}
+    },
+    "borderless-table": {
+      "temalar": [
+        "outlined"
+      ],
+      "iki_tonlu_ikincil_yollar": {}
+    },
+    "box-plot": {
+      "temalar": [
+        "outlined",
+        "filled",
+        "twotone"
+      ],
+      "iki_tonlu_ikincil_yollar": {
+        "twotone": [
+          0
+        ]
+      }
+    },
+    "branches": {
+      "temalar": [
+        "outlined"
+      ],
+      "iki_tonlu_ikincil_yollar": {}
+    },
+    "bug": {
+      "temalar": [
+        "outlined",
+        "filled",
+        "twotone"
+      ],
+      "iki_tonlu_ikincil_yollar": {
+        "twotone": [
+          1
+        ]
+      }
+    },
+    "build": {
+      "temalar": [
+        "outlined",
+        "filled",
+        "twotone"
+      ],
+      "iki_tonlu_ikincil_yollar": {
+        "twotone": [
+          0
+        ]
+      }
+    },
+    "bulb": {
+      "temalar": [
+        "outlined",
+        "filled",
+        "twotone"
+      ],
+      "iki_tonlu_ikincil_yollar": {
+        "twotone": [
+          0
+        ]
+      }
+    },
+    "calculator": {
+      "temalar": [
+        "outlined",
+        "filled",
+        "twotone"
+      ],
+      "iki_tonlu_ikincil_yollar": {
+        "twotone": [
+          1
+        ]
+      }
+    },
+    "calendar": {
+      "temalar": [
+        "outlined",
+        "filled",
+        "twotone"
+      ],
+      "iki_tonlu_ikincil_yollar": {
+        "twotone": [
+          0
+        ]
+      }
+    },
+    "camera": {
+      "temalar": [
+        "outlined",
+        "filled",
+        "twotone"
+      ],
+      "iki_tonlu_ikincil_yollar": {
+        "twotone": [
+          0
+        ]
+      }
+    },
+    "car": {
+      "temalar": [
+        "outlined",
+        "filled",
+        "twotone"
+      ],
+      "iki_tonlu_ikincil_yollar": {
+        "twotone": [
+          0
+        ]
+      }
+    },
+    "caret-down": {
+      "temalar": [
+        "outlined",
+        "filled"
+      ],
+      "iki_tonlu_ikincil_yollar": {}
+    },
+    "caret-left": {
+      "temalar": [
+        "outlined",
+        "filled"
+      ],
+      "iki_tonlu_ikincil_yollar": {}
+    },
+    "caret-right": {
+      "temalar": [
+        "outlined",
+        "filled"
+      ],
+      "iki_tonlu_ikincil_yollar": {}
+    },
+    "caret-up": {
+      "temalar": [
+        "outlined",
+        "filled"
+      ],
+      "iki_tonlu_ikincil_yollar": {}
+    },
+    "carry-out": {
+      "temalar": [
+        "outlined",
+        "filled",
+        "twotone"
+      ],
+      "iki_tonlu_ikincil_yollar": {
+        "twotone": [
+          1
+        ]
+      }
+    },
+    "check": {
+      "temalar": [
+        "outlined"
+      ],
+      "iki_tonlu_ikincil_yollar": {}
+    },
+    "check-circle": {
+      "temalar": [
+        "outlined",
+        "filled",
+        "twotone"
+      ],
+      "iki_tonlu_ikincil_yollar": {
+        "twotone": [
+          1
+        ]
+      }
+    },
+    "check-square": {
+      "temalar": [
+        "outlined",
+        "filled",
+        "twotone"
+      ],
+      "iki_tonlu_ikincil_yollar": {
+        "twotone": [
+          1
+        ]
+      }
+    },
+    "chrome": {
+      "temalar": [
+        "outlined",
+        "filled"
+      ],
+      "iki_tonlu_ikincil_yollar": {}
+    },
+    "ci": {
+      "temalar": [
+        "outlined",
+        "twotone"
+      ],
+      "iki_tonlu_ikincil_yollar": {
+        "twotone": [
+          1
+        ]
+      }
+    },
+    "ci-circle": {
+      "temalar": [
+        "outlined",
+        "filled",
+        "twotone"
+      ],
+      "iki_tonlu_ikincil_yollar": {
+        "twotone": [
+          1
+        ]
+      }
+    },
+    "claude": {
+      "temalar": [
+        "filled"
+      ],
+      "iki_tonlu_ikincil_yollar": {}
+    },
+    "clear": {
+      "temalar": [
+        "outlined"
+      ],
+      "iki_tonlu_ikincil_yollar": {}
+    },
+    "clock-circle": {
+      "temalar": [
+        "outlined",
+        "filled",
+        "twotone"
+      ],
+      "iki_tonlu_ikincil_yollar": {
+        "twotone": [
+          1
+        ]
+      }
+    },
+    "close": {
+      "temalar": [
+        "outlined"
+      ],
+      "iki_tonlu_ikincil_yollar": {}
+    },
+    "close-circle": {
+      "temalar": [
+        "outlined",
+        "filled",
+        "twotone"
+      ],
+      "iki_tonlu_ikincil_yollar": {
+        "twotone": [
+          1
+        ]
+      }
+    },
+    "close-square": {
+      "temalar": [
+        "outlined",
+        "filled",
+        "twotone"
+      ],
+      "iki_tonlu_ikincil_yollar": {
+        "twotone": [
+          1
+        ]
+      }
+    },
+    "cloud": {
+      "temalar": [
+        "outlined",
+        "filled",
+        "twotone"
+      ],
+      "iki_tonlu_ikincil_yollar": {
+        "twotone": [
+          0
+        ]
+      }
+    },
+    "cloud-download": {
+      "temalar": [
+        "outlined"
+      ],
+      "iki_tonlu_ikincil_yollar": {}
+    },
+    "cloud-server": {
+      "temalar": [
+        "outlined"
+      ],
+      "iki_tonlu_ikincil_yollar": {}
+    },
+    "cloud-sync": {
+      "temalar": [
+        "outlined"
+      ],
+      "iki_tonlu_ikincil_yollar": {}
+    },
+    "cloud-upload": {
+      "temalar": [
+        "outlined"
+      ],
+      "iki_tonlu_ikincil_yollar": {}
+    },
+    "cluster": {
+      "temalar": [
+        "outlined"
+      ],
+      "iki_tonlu_ikincil_yollar": {}
+    },
+    "code": {
+      "temalar": [
+        "outlined",
+        "filled",
+        "twotone"
+      ],
+      "iki_tonlu_ikincil_yollar": {
+        "twotone": [
+          1
+        ]
+      }
+    },
+    "code-sandbox": {
+      "temalar": [
+        "outlined"
+      ],
+      "iki_tonlu_ikincil_yollar": {}
+    },
+    "code-sandbox-circle": {
+      "temalar": [
+        "filled"
+      ],
+      "iki_tonlu_ikincil_yollar": {}
+    },
+    "code-sandbox-square": {
+      "temalar": [
+        "filled"
+      ],
+      "iki_tonlu_ikincil_yollar": {}
+    },
+    "codepen": {
+      "temalar": [
+        "outlined"
+      ],
+      "iki_tonlu_ikincil_yollar": {}
+    },
+    "codepen-circle": {
+      "temalar": [
+        "outlined",
+        "filled"
+      ],
+      "iki_tonlu_ikincil_yollar": {}
+    },
+    "codepen-square": {
+      "temalar": [
+        "filled"
+      ],
+      "iki_tonlu_ikincil_yollar": {}
+    },
+    "coffee": {
+      "temalar": [
+        "outlined"
+      ],
+      "iki_tonlu_ikincil_yollar": {}
+    },
+    "column-height": {
+      "temalar": [
+        "outlined"
+      ],
+      "iki_tonlu_ikincil_yollar": {}
+    },
+    "column-width": {
+      "temalar": [
+        "outlined"
+      ],
+      "iki_tonlu_ikincil_yollar": {}
+    },
+    "comment": {
+      "temalar": [
+        "outlined"
+      ],
+      "iki_tonlu_ikincil_yollar": {}
+    },
+    "compass": {
+      "temalar": [
+        "outlined",
+        "filled",
+        "twotone"
+      ],
+      "iki_tonlu_ikincil_yollar": {
+        "twotone": [
+          0
+        ]
+      }
+    },
+    "compress": {
+      "temalar": [
+        "outlined"
+      ],
+      "iki_tonlu_ikincil_yollar": {}
+    },
+    "console-sql": {
+      "temalar": [
+        "outlined"
+      ],
+      "iki_tonlu_ikincil_yollar": {}
+    },
+    "contacts": {
+      "temalar": [
+        "outlined",
+        "filled",
+        "twotone"
+      ],
+      "iki_tonlu_ikincil_yollar": {
+        "twotone": [
+          0,
+          1
+        ]
+      }
+    },
+    "container": {
+      "temalar": [
+        "outlined",
+        "filled",
+        "twotone"
+      ],
+      "iki_tonlu_ikincil_yollar": {
+        "twotone": [
+          0
+        ]
+      }
+    },
+    "control": {
+      "temalar": [
+        "outlined",
+        "filled",
+        "twotone"
+      ],
+      "iki_tonlu_ikincil_yollar": {
+        "twotone": [
+          1,
+          2
+        ]
+      }
+    },
+    "copy": {
+      "temalar": [
+        "outlined",
+        "filled",
+        "twotone"
+      ],
+      "iki_tonlu_ikincil_yollar": {
+        "twotone": [
+          0
+        ]
+      }
+    },
+    "copyright": {
+      "temalar": [
+        "outlined",
+        "twotone"
+      ],
+      "iki_tonlu_ikincil_yollar": {
+        "twotone": [
+          1
+        ]
+      }
+    },
+    "copyright-circle": {
+      "temalar": [
+        "outlined",
+        "filled",
+        "twotone"
+      ],
+      "iki_tonlu_ikincil_yollar": {
+        "twotone": [
+          1
+        ]
+      }
+    },
+    "credit-card": {
+      "temalar": [
+        "outlined",
+        "filled",
+        "twotone"
+      ],
+      "iki_tonlu_ikincil_yollar": {
+        "twotone": [
+          0
+        ]
+      }
+    },
+    "crown": {
+      "temalar": [
+        "outlined",
+        "filled",
+        "twotone"
+      ],
+      "iki_tonlu_ikincil_yollar": {
+        "twotone": [
+          0,
+          1
+        ]
+      }
+    },
+    "customer-service": {
+      "temalar": [
+        "outlined",
+        "filled",
+        "twotone"
+      ],
+      "iki_tonlu_ikincil_yollar": {
+        "twotone": [
+          0
+        ]
+      }
+    },
+    "dash": {
+      "temalar": [
+        "outlined"
+      ],
+      "iki_tonlu_ikincil_yollar": {}
+    },
+    "dashboard": {
+      "temalar": [
+        "outlined",
+        "filled",
+        "twotone"
+      ],
+      "iki_tonlu_ikincil_yollar": {
+        "twotone": [
+          0
+        ]
+      }
+    },
+    "database": {
+      "temalar": [
+        "outlined",
+        "filled",
+        "twotone"
+      ],
+      "iki_tonlu_ikincil_yollar": {
+        "twotone": [
+          0
+        ]
+      }
+    },
+    "deep-seek": {
+      "temalar": [
+        "filled"
+      ],
+      "iki_tonlu_ikincil_yollar": {}
+    },
+    "delete": {
+      "temalar": [
+        "outlined",
+        "filled",
+        "twotone"
+      ],
+      "iki_tonlu_ikincil_yollar": {
+        "twotone": [
+          0
+        ]
+      }
+    },
+    "delete-column": {
+      "temalar": [
+        "outlined"
+      ],
+      "iki_tonlu_ikincil_yollar": {}
+    },
+    "delete-row": {
+      "temalar": [
+        "outlined"
+      ],
+      "iki_tonlu_ikincil_yollar": {}
+    },
+    "delivered-procedure": {
+      "temalar": [
+        "outlined"
+      ],
+      "iki_tonlu_ikincil_yollar": {}
+    },
+    "deployment-unit": {
+      "temalar": [
+        "outlined"
+      ],
+      "iki_tonlu_ikincil_yollar": {}
+    },
+    "desktop": {
+      "temalar": [
+        "outlined"
+      ],
+      "iki_tonlu_ikincil_yollar": {}
+    },
+    "diff": {
+      "temalar": [
+        "outlined",
+        "filled",
+        "twotone"
+      ],
+      "iki_tonlu_ikincil_yollar": {
+        "twotone": [
+          0
+        ]
+      }
+    },
+    "dingding": {
+      "temalar": [
+        "outlined"
+      ],
+      "iki_tonlu_ikincil_yollar": {}
+    },
+    "dingtalk": {
+      "temalar": [
+        "outlined"
+      ],
+      "iki_tonlu_ikincil_yollar": {}
+    },
+    "dingtalk-circle": {
+      "temalar": [
+        "filled"
+      ],
+      "iki_tonlu_ikincil_yollar": {}
+    },
+    "dingtalk-square": {
+      "temalar": [
+        "filled"
+      ],
+      "iki_tonlu_ikincil_yollar": {}
+    },
+    "disconnect": {
+      "temalar": [
+        "outlined"
+      ],
+      "iki_tonlu_ikincil_yollar": {}
+    },
+    "discord": {
+      "temalar": [
+        "outlined",
+        "filled"
+      ],
+      "iki_tonlu_ikincil_yollar": {}
+    },
+    "dislike": {
+      "temalar": [
+        "outlined",
+        "filled",
+        "twotone"
+      ],
+      "iki_tonlu_ikincil_yollar": {
+        "twotone": [
+          0
+        ]
+      }
+    },
+    "docker": {
+      "temalar": [
+        "outlined"
+      ],
+      "iki_tonlu_ikincil_yollar": {}
+    },
+    "dollar": {
+      "temalar": [
+        "outlined",
+        "twotone"
+      ],
+      "iki_tonlu_ikincil_yollar": {
+        "twotone": [
+          1,
+          2
+        ]
+      }
+    },
+    "dollar-circle": {
+      "temalar": [
+        "outlined",
+        "filled",
+        "twotone"
+      ],
+      "iki_tonlu_ikincil_yollar": {
+        "twotone": [
+          1,
+          2
+        ]
+      }
+    },
+    "dot-chart": {
+      "temalar": [
+        "outlined"
+      ],
+      "iki_tonlu_ikincil_yollar": {}
+    },
+    "dot-net": {
+      "temalar": [
+        "outlined"
+      ],
+      "iki_tonlu_ikincil_yollar": {}
+    },
+    "double-left": {
+      "temalar": [
+        "outlined"
+      ],
+      "iki_tonlu_ikincil_yollar": {}
+    },
+    "double-right": {
+      "temalar": [
+        "outlined"
+      ],
+      "iki_tonlu_ikincil_yollar": {}
+    },
+    "down": {
+      "temalar": [
+        "outlined"
+      ],
+      "iki_tonlu_ikincil_yollar": {}
+    },
+    "down-circle": {
+      "temalar": [
+        "outlined",
+        "filled",
+        "twotone"
+      ],
+      "iki_tonlu_ikincil_yollar": {
+        "twotone": [
+          0
+        ]
+      }
+    },
+    "down-square": {
+      "temalar": [
+        "outlined",
+        "filled",
+        "twotone"
+      ],
+      "iki_tonlu_ikincil_yollar": {
+        "twotone": [
+          1
+        ]
+      }
+    },
+    "download": {
+      "temalar": [
+        "outlined"
+      ],
+      "iki_tonlu_ikincil_yollar": {}
+    },
+    "drag": {
+      "temalar": [
+        "outlined"
+      ],
+      "iki_tonlu_ikincil_yollar": {}
+    },
+    "dribbble": {
+      "temalar": [
+        "outlined"
+      ],
+      "iki_tonlu_ikincil_yollar": {}
+    },
+    "dribbble-circle": {
+      "temalar": [
+        "filled"
+      ],
+      "iki_tonlu_ikincil_yollar": {}
+    },
+    "dribbble-square": {
+      "temalar": [
+        "outlined",
+        "filled"
+      ],
+      "iki_tonlu_ikincil_yollar": {}
+    },
+    "dropbox": {
+      "temalar": [
+        "outlined"
+      ],
+      "iki_tonlu_ikincil_yollar": {}
+    },
+    "dropbox-circle": {
+      "temalar": [
+        "filled"
+      ],
+      "iki_tonlu_ikincil_yollar": {}
+    },
+    "dropbox-square": {
+      "temalar": [
+        "filled"
+      ],
+      "iki_tonlu_ikincil_yollar": {}
+    },
+    "edit": {
+      "temalar": [
+        "outlined",
+        "filled",
+        "twotone"
+      ],
+      "iki_tonlu_ikincil_yollar": {
+        "twotone": [
+          0
+        ]
+      }
+    },
+    "eleven-labs": {
+      "temalar": [
+        "filled"
+      ],
+      "iki_tonlu_ikincil_yollar": {}
+    },
+    "ellipsis": {
+      "temalar": [
+        "outlined"
+      ],
+      "iki_tonlu_ikincil_yollar": {}
+    },
+    "enter": {
+      "temalar": [
+        "outlined"
+      ],
+      "iki_tonlu_ikincil_yollar": {}
+    },
+    "environment": {
+      "temalar": [
+        "outlined",
+        "filled",
+        "twotone"
+      ],
+      "iki_tonlu_ikincil_yollar": {
+        "twotone": [
+          0
+        ]
+      }
+    },
+    "euro": {
+      "temalar": [
+        "outlined",
+        "twotone"
+      ],
+      "iki_tonlu_ikincil_yollar": {
+        "twotone": [
+          1
+        ]
+      }
+    },
+    "euro-circle": {
+      "temalar": [
+        "outlined",
+        "filled",
+        "twotone"
+      ],
+      "iki_tonlu_ikincil_yollar": {
+        "twotone": [
+          1
+        ]
+      }
+    },
+    "exception": {
+      "temalar": [
+        "outlined"
+      ],
+      "iki_tonlu_ikincil_yollar": {}
+    },
+    "exclamation": {
+      "temalar": [
+        "outlined"
+      ],
+      "iki_tonlu_ikincil_yollar": {}
+    },
+    "exclamation-circle": {
+      "temalar": [
+        "outlined",
+        "filled",
+        "twotone"
+      ],
+      "iki_tonlu_ikincil_yollar": {
+        "twotone": [
+          1
+        ]
+      }
+    },
+    "expand": {
+      "temalar": [
+        "outlined"
+      ],
+      "iki_tonlu_ikincil_yollar": {}
+    },
+    "expand-alt": {
+      "temalar": [
+        "outlined"
+      ],
+      "iki_tonlu_ikincil_yollar": {}
+    },
+    "experiment": {
+      "temalar": [
+        "outlined",
+        "filled",
+        "twotone"
+      ],
+      "iki_tonlu_ikincil_yollar": {
+        "twotone": [
+          0
+        ]
+      }
+    },
+    "export": {
+      "temalar": [
+        "outlined"
+      ],
+      "iki_tonlu_ikincil_yollar": {}
+    },
+    "eye": {
+      "temalar": [
+        "outlined",
+        "filled",
+        "twotone"
+      ],
+      "iki_tonlu_ikincil_yollar": {
+        "twotone": [
+          0,
+          1
+        ]
+      }
+    },
+    "eye-invisible": {
+      "temalar": [
+        "outlined",
+        "filled",
+        "twotone"
+      ],
+      "iki_tonlu_ikincil_yollar": {
+        "twotone": [
+          0,
+          1
+        ]
+      }
+    },
+    "facebook": {
+      "temalar": [
+        "outlined",
+        "filled"
+      ],
+      "iki_tonlu_ikincil_yollar": {}
+    },
+    "fall": {
+      "temalar": [
+        "outlined"
+      ],
+      "iki_tonlu_ikincil_yollar": {}
+    },
+    "fast-backward": {
+      "temalar": [
+        "outlined",
+        "filled"
+      ],
+      "iki_tonlu_ikincil_yollar": {}
+    },
+    "fast-forward": {
+      "temalar": [
+        "outlined",
+        "filled"
+      ],
+      "iki_tonlu_ikincil_yollar": {}
+    },
+    "field-binary": {
+      "temalar": [
+        "outlined"
+      ],
+      "iki_tonlu_ikincil_yollar": {}
+    },
+    "field-number": {
+      "temalar": [
+        "outlined"
+      ],
+      "iki_tonlu_ikincil_yollar": {}
+    },
+    "field-string": {
+      "temalar": [
+        "outlined"
+      ],
+      "iki_tonlu_ikincil_yollar": {}
+    },
+    "field-time": {
+      "temalar": [
+        "outlined"
+      ],
+      "iki_tonlu_ikincil_yollar": {}
+    },
+    "file": {
+      "temalar": [
+        "outlined",
+        "filled",
+        "twotone"
+      ],
+      "iki_tonlu_ikincil_yollar": {
+        "twotone": [
+          0
+        ]
+      }
+    },
+    "file-add": {
+      "temalar": [
+        "outlined",
+        "filled",
+        "twotone"
+      ],
+      "iki_tonlu_ikincil_yollar": {
+        "twotone": [
+          0
+        ]
+      }
+    },
+    "file-done": {
+      "temalar": [
+        "outlined"
+      ],
+      "iki_tonlu_ikincil_yollar": {}
+    },
+    "file-excel": {
+      "temalar": [
+        "outlined",
+        "filled",
+        "twotone"
+      ],
+      "iki_tonlu_ikincil_yollar": {
+        "twotone": [
+          0
+        ]
+      }
+    },
+    "file-exclamation": {
+      "temalar": [
+        "outlined",
+        "filled",
+        "twotone"
+      ],
+      "iki_tonlu_ikincil_yollar": {
+        "twotone": [
+          0
+        ]
+      }
+    },
+    "file-gif": {
+      "temalar": [
+        "outlined"
+      ],
+      "iki_tonlu_ikincil_yollar": {}
+    },
+    "file-image": {
+      "temalar": [
+        "outlined",
+        "filled",
+        "twotone"
+      ],
+      "iki_tonlu_ikincil_yollar": {
+        "twotone": [
+          0
+        ]
+      }
+    },
+    "file-jpg": {
+      "temalar": [
+        "outlined"
+      ],
+      "iki_tonlu_ikincil_yollar": {}
+    },
+    "file-markdown": {
+      "temalar": [
+        "outlined",
+        "filled",
+        "twotone"
+      ],
+      "iki_tonlu_ikincil_yollar": {
+        "twotone": [
+          0
+        ]
+      }
+    },
+    "file-pdf": {
+      "temalar": [
+        "outlined",
+        "filled",
+        "twotone"
+      ],
+      "iki_tonlu_ikincil_yollar": {
+        "twotone": [
+          0,
+          1,
+          2
+        ]
+      }
+    },
+    "file-ppt": {
+      "temalar": [
+        "outlined",
+        "filled",
+        "twotone"
+      ],
+      "iki_tonlu_ikincil_yollar": {
+        "twotone": [
+          0,
+          1
+        ]
+      }
+    },
+    "file-protect": {
+      "temalar": [
+        "outlined"
+      ],
+      "iki_tonlu_ikincil_yollar": {}
+    },
+    "file-search": {
+      "temalar": [
+        "outlined"
+      ],
+      "iki_tonlu_ikincil_yollar": {}
+    },
+    "file-sync": {
+      "temalar": [
+        "outlined"
+      ],
+      "iki_tonlu_ikincil_yollar": {}
+    },
+    "file-text": {
+      "temalar": [
+        "outlined",
+        "filled",
+        "twotone"
+      ],
+      "iki_tonlu_ikincil_yollar": {
+        "twotone": [
+          0
+        ]
+      }
+    },
+    "file-unknown": {
+      "temalar": [
+        "outlined",
+        "filled",
+        "twotone"
+      ],
+      "iki_tonlu_ikincil_yollar": {
+        "twotone": [
+          0
+        ]
+      }
+    },
+    "file-word": {
+      "temalar": [
+        "outlined",
+        "filled",
+        "twotone"
+      ],
+      "iki_tonlu_ikincil_yollar": {
+        "twotone": [
+          0
+        ]
+      }
+    },
+    "file-zip": {
+      "temalar": [
+        "outlined",
+        "filled",
+        "twotone"
+      ],
+      "iki_tonlu_ikincil_yollar": {
+        "twotone": [
+          0,
+          1
+        ]
+      }
+    },
+    "filter": {
+      "temalar": [
+        "outlined",
+        "filled",
+        "twotone"
+      ],
+      "iki_tonlu_ikincil_yollar": {
+        "twotone": [
+          0
+        ]
+      }
+    },
+    "fire": {
+      "temalar": [
+        "outlined",
+        "filled",
+        "twotone"
+      ],
+      "iki_tonlu_ikincil_yollar": {
+        "twotone": [
+          0
+        ]
+      }
+    },
+    "flag": {
+      "temalar": [
+        "outlined",
+        "filled",
+        "twotone"
+      ],
+      "iki_tonlu_ikincil_yollar": {
+        "twotone": [
+          0,
+          1
+        ]
+      }
+    },
+    "folder": {
+      "temalar": [
+        "outlined",
+        "filled",
+        "twotone"
+      ],
+      "iki_tonlu_ikincil_yollar": {
+        "twotone": [
+          1
+        ]
+      }
+    },
+    "folder-add": {
+      "temalar": [
+        "outlined",
+        "filled",
+        "twotone"
+      ],
+      "iki_tonlu_ikincil_yollar": {
+        "twotone": [
+          0
+        ]
+      }
+    },
+    "folder-open": {
+      "temalar": [
+        "outlined",
+        "filled",
+        "twotone"
+      ],
+      "iki_tonlu_ikincil_yollar": {
+        "twotone": [
+          0
+        ]
+      }
+    },
+    "folder-view": {
+      "temalar": [
+        "outlined"
+      ],
+      "iki_tonlu_ikincil_yollar": {}
+    },
+    "font-colors": {
+      "temalar": [
+        "outlined"
+      ],
+      "iki_tonlu_ikincil_yollar": {}
+    },
+    "font-size": {
+      "temalar": [
+        "outlined"
+      ],
+      "iki_tonlu_ikincil_yollar": {}
+    },
+    "fork": {
+      "temalar": [
+        "outlined"
+      ],
+      "iki_tonlu_ikincil_yollar": {}
+    },
+    "form": {
+      "temalar": [
+        "outlined"
+      ],
+      "iki_tonlu_ikincil_yollar": {}
+    },
+    "format-painter": {
+      "temalar": [
+        "outlined",
+        "filled"
+      ],
+      "iki_tonlu_ikincil_yollar": {}
+    },
+    "forward": {
+      "temalar": [
+        "outlined",
+        "filled"
+      ],
+      "iki_tonlu_ikincil_yollar": {}
+    },
+    "frown": {
+      "temalar": [
+        "outlined",
+        "filled",
+        "twotone"
+      ],
+      "iki_tonlu_ikincil_yollar": {
+        "twotone": [
+          1
+        ]
+      }
+    },
+    "fullscreen": {
+      "temalar": [
+        "outlined"
+      ],
+      "iki_tonlu_ikincil_yollar": {}
+    },
+    "fullscreen-exit": {
+      "temalar": [
+        "outlined"
+      ],
+      "iki_tonlu_ikincil_yollar": {}
+    },
+    "function": {
+      "temalar": [
+        "outlined"
+      ],
+      "iki_tonlu_ikincil_yollar": {}
+    },
+    "fund": {
+      "temalar": [
+        "outlined",
+        "filled",
+        "twotone"
+      ],
+      "iki_tonlu_ikincil_yollar": {
+        "twotone": [
+          1
+        ]
+      }
+    },
+    "fund-projection-screen": {
+      "temalar": [
+        "outlined"
+      ],
+      "iki_tonlu_ikincil_yollar": {}
+    },
+    "fund-view": {
+      "temalar": [
+        "outlined"
+      ],
+      "iki_tonlu_ikincil_yollar": {}
+    },
+    "funnel-plot": {
+      "temalar": [
+        "outlined",
+        "filled",
+        "twotone"
+      ],
+      "iki_tonlu_ikincil_yollar": {
+        "twotone": [
+          0
+        ]
+      }
+    },
+    "gateway": {
+      "temalar": [
+        "outlined"
+      ],
+      "iki_tonlu_ikincil_yollar": {}
+    },
+    "gemini": {
+      "temalar": [
+        "filled"
+      ],
+      "iki_tonlu_ikincil_yollar": {}
+    },
+    "gif": {
+      "temalar": [
+        "outlined"
+      ],
+      "iki_tonlu_ikincil_yollar": {}
+    },
+    "gift": {
+      "temalar": [
+        "outlined",
+        "filled",
+        "twotone"
+      ],
+      "iki_tonlu_ikincil_yollar": {
+        "twotone": [
+          0
+        ]
+      }
+    },
+    "github": {
+      "temalar": [
+        "outlined",
+        "filled"
+      ],
+      "iki_tonlu_ikincil_yollar": {}
+    },
+    "gitlab": {
+      "temalar": [
+        "outlined",
+        "filled"
+      ],
+      "iki_tonlu_ikincil_yollar": {}
+    },
+    "global": {
+      "temalar": [
+        "outlined"
+      ],
+      "iki_tonlu_ikincil_yollar": {}
+    },
+    "gold": {
+      "temalar": [
+        "outlined",
+        "filled",
+        "twotone"
+      ],
+      "iki_tonlu_ikincil_yollar": {
+        "twotone": [
+          1
+        ]
+      }
+    },
+    "golden": {
+      "temalar": [
+        "filled"
+      ],
+      "iki_tonlu_ikincil_yollar": {}
+    },
+    "google": {
+      "temalar": [
+        "outlined"
+      ],
+      "iki_tonlu_ikincil_yollar": {}
+    },
+    "google-circle": {
+      "temalar": [
+        "filled"
+      ],
+      "iki_tonlu_ikincil_yollar": {}
+    },
+    "google-plus": {
+      "temalar": [
+        "outlined"
+      ],
+      "iki_tonlu_ikincil_yollar": {}
+    },
+    "google-plus-circle": {
+      "temalar": [
+        "filled"
+      ],
+      "iki_tonlu_ikincil_yollar": {}
+    },
+    "google-plus-square": {
+      "temalar": [
+        "filled"
+      ],
+      "iki_tonlu_ikincil_yollar": {}
+    },
+    "google-square": {
+      "temalar": [
+        "filled"
+      ],
+      "iki_tonlu_ikincil_yollar": {}
+    },
+    "group": {
+      "temalar": [
+        "outlined"
+      ],
+      "iki_tonlu_ikincil_yollar": {}
+    },
+    "harmony-o-s": {
+      "temalar": [
+        "outlined"
+      ],
+      "iki_tonlu_ikincil_yollar": {}
+    },
+    "hdd": {
+      "temalar": [
+        "outlined",
+        "filled",
+        "twotone"
+      ],
+      "iki_tonlu_ikincil_yollar": {
+        "twotone": [
+          0
+        ]
+      }
+    },
+    "heart": {
+      "temalar": [
+        "outlined",
+        "filled",
+        "twotone"
+      ],
+      "iki_tonlu_ikincil_yollar": {
+        "twotone": [
+          1
+        ]
+      }
+    },
+    "heat-map": {
+      "temalar": [
+        "outlined"
+      ],
+      "iki_tonlu_ikincil_yollar": {}
+    },
+    "highlight": {
+      "temalar": [
+        "outlined",
+        "filled",
+        "twotone"
+      ],
+      "iki_tonlu_ikincil_yollar": {
+        "twotone": [
+          0
+        ]
+      }
+    },
+    "history": {
+      "temalar": [
+        "outlined"
+      ],
+      "iki_tonlu_ikincil_yollar": {}
+    },
+    "holder": {
+      "temalar": [
+        "outlined"
+      ],
+      "iki_tonlu_ikincil_yollar": {}
+    },
+    "home": {
+      "temalar": [
+        "outlined",
+        "filled",
+        "twotone"
+      ],
+      "iki_tonlu_ikincil_yollar": {
+        "twotone": [
+          0
+        ]
+      }
+    },
+    "hourglass": {
+      "temalar": [
+        "outlined",
+        "filled",
+        "twotone"
+      ],
+      "iki_tonlu_ikincil_yollar": {
+        "twotone": [
+          0
+        ]
+      }
+    },
+    "html5": {
+      "temalar": [
+        "outlined",
+        "filled",
+        "twotone"
+      ],
+      "iki_tonlu_ikincil_yollar": {
+        "twotone": [
+          1
+        ]
+      }
+    },
+    "hugging-face": {
+      "temalar": [
+        "filled"
+      ],
+      "iki_tonlu_ikincil_yollar": {}
+    },
+    "idcard": {
+      "temalar": [
+        "outlined",
+        "filled",
+        "twotone"
+      ],
+      "iki_tonlu_ikincil_yollar": {
+        "twotone": [
+          1,
+          2
+        ]
+      }
+    },
+    "ie": {
+      "temalar": [
+        "outlined"
+      ],
+      "iki_tonlu_ikincil_yollar": {}
+    },
+    "ie-circle": {
+      "temalar": [
+        "filled"
+      ],
+      "iki_tonlu_ikincil_yollar": {}
+    },
+    "ie-square": {
+      "temalar": [
+        "filled"
+      ],
+      "iki_tonlu_ikincil_yollar": {}
+    },
+    "import": {
+      "temalar": [
+        "outlined"
+      ],
+      "iki_tonlu_ikincil_yollar": {}
+    },
+    "inbox": {
+      "temalar": [
+        "outlined"
+      ],
+      "iki_tonlu_ikincil_yollar": {}
+    },
+    "info": {
+      "temalar": [
+        "outlined"
+      ],
+      "iki_tonlu_ikincil_yollar": {}
+    },
+    "info-circle": {
+      "temalar": [
+        "outlined",
+        "filled",
+        "twotone"
+      ],
+      "iki_tonlu_ikincil_yollar": {
+        "twotone": [
+          1
+        ]
+      }
+    },
+    "insert-row-above": {
+      "temalar": [
+        "outlined"
+      ],
+      "iki_tonlu_ikincil_yollar": {}
+    },
+    "insert-row-below": {
+      "temalar": [
+        "outlined"
+      ],
+      "iki_tonlu_ikincil_yollar": {}
+    },
+    "insert-row-left": {
+      "temalar": [
+        "outlined"
+      ],
+      "iki_tonlu_ikincil_yollar": {}
+    },
+    "insert-row-right": {
+      "temalar": [
+        "outlined"
+      ],
+      "iki_tonlu_ikincil_yollar": {}
+    },
+    "instagram": {
+      "temalar": [
+        "outlined",
+        "filled"
+      ],
+      "iki_tonlu_ikincil_yollar": {}
+    },
+    "insurance": {
+      "temalar": [
+        "outlined",
+        "filled",
+        "twotone"
+      ],
+      "iki_tonlu_ikincil_yollar": {
+        "twotone": [
+          1,
+          2
+        ]
+      }
+    },
+    "interaction": {
+      "temalar": [
+        "outlined",
+        "filled",
+        "twotone"
+      ],
+      "iki_tonlu_ikincil_yollar": {
+        "twotone": [
+          1
+        ]
+      }
+    },
+    "issues-close": {
+      "temalar": [
+        "outlined"
+      ],
+      "iki_tonlu_ikincil_yollar": {}
+    },
+    "italic": {
+      "temalar": [
+        "outlined"
+      ],
+      "iki_tonlu_ikincil_yollar": {}
+    },
+    "java": {
+      "temalar": [
+        "outlined"
+      ],
+      "iki_tonlu_ikincil_yollar": {}
+    },
+    "java-script": {
+      "temalar": [
+        "outlined"
+      ],
+      "iki_tonlu_ikincil_yollar": {}
+    },
+    "key": {
+      "temalar": [
+        "outlined"
+      ],
+      "iki_tonlu_ikincil_yollar": {}
+    },
+    "kubernetes": {
+      "temalar": [
+        "outlined"
+      ],
+      "iki_tonlu_ikincil_yollar": {}
+    },
+    "laptop": {
+      "temalar": [
+        "outlined"
+      ],
+      "iki_tonlu_ikincil_yollar": {}
+    },
+    "layout": {
+      "temalar": [
+        "outlined",
+        "filled",
+        "twotone"
+      ],
+      "iki_tonlu_ikincil_yollar": {
+        "twotone": [
+          0
+        ]
+      }
+    },
+    "left": {
+      "temalar": [
+        "outlined"
+      ],
+      "iki_tonlu_ikincil_yollar": {}
+    },
+    "left-circle": {
+      "temalar": [
+        "outlined",
+        "filled",
+        "twotone"
+      ],
+      "iki_tonlu_ikincil_yollar": {
+        "twotone": [
+          0
+        ]
+      }
+    },
+    "left-square": {
+      "temalar": [
+        "outlined",
+        "filled",
+        "twotone"
+      ],
+      "iki_tonlu_ikincil_yollar": {
+        "twotone": [
+          1
+        ]
+      }
+    },
+    "like": {
+      "temalar": [
+        "outlined",
+        "filled",
+        "twotone"
+      ],
+      "iki_tonlu_ikincil_yollar": {
+        "twotone": [
+          0
+        ]
+      }
+    },
+    "line": {
+      "temalar": [
+        "outlined"
+      ],
+      "iki_tonlu_ikincil_yollar": {}
+    },
+    "line-chart": {
+      "temalar": [
+        "outlined"
+      ],
+      "iki_tonlu_ikincil_yollar": {}
+    },
+    "line-height": {
+      "temalar": [
+        "outlined"
+      ],
+      "iki_tonlu_ikincil_yollar": {}
+    },
+    "link": {
+      "temalar": [
+        "outlined"
+      ],
+      "iki_tonlu_ikincil_yollar": {}
+    },
+    "linkedin": {
+      "temalar": [
+        "outlined",
+        "filled"
+      ],
+      "iki_tonlu_ikincil_yollar": {}
+    },
+    "linux": {
+      "temalar": [
+        "outlined"
+      ],
+      "iki_tonlu_ikincil_yollar": {}
+    },
+    "loading": {
+      "temalar": [
+        "outlined"
+      ],
+      "iki_tonlu_ikincil_yollar": {}
+    },
+    "loading-3-quarters": {
+      "temalar": [
+        "outlined"
+      ],
+      "iki_tonlu_ikincil_yollar": {}
+    },
+    "lock": {
+      "temalar": [
+        "outlined",
+        "filled",
+        "twotone"
+      ],
+      "iki_tonlu_ikincil_yollar": {
+        "twotone": [
+          1
+        ]
+      }
+    },
+    "login": {
+      "temalar": [
+        "outlined"
+      ],
+      "iki_tonlu_ikincil_yollar": {}
+    },
+    "logout": {
+      "temalar": [
+        "outlined"
+      ],
+      "iki_tonlu_ikincil_yollar": {}
+    },
+    "mac-command": {
+      "temalar": [
+        "outlined",
+        "filled"
+      ],
+      "iki_tonlu_ikincil_yollar": {}
+    },
+    "mail": {
+      "temalar": [
+        "outlined",
+        "filled",
+        "twotone"
+      ],
+      "iki_tonlu_ikincil_yollar": {
+        "twotone": [
+          0,
+          1
+        ]
+      }
+    },
+    "man": {
+      "temalar": [
+        "outlined"
+      ],
+      "iki_tonlu_ikincil_yollar": {}
+    },
+    "mastodon": {
+      "temalar": [
+        "filled"
+      ],
+      "iki_tonlu_ikincil_yollar": {}
+    },
+    "medicine-box": {
+      "temalar": [
+        "outlined",
+        "filled",
+        "twotone"
+      ],
+      "iki_tonlu_ikincil_yollar": {
+        "twotone": [
+          0
+        ]
+      }
+    },
+    "medium": {
+      "temalar": [
+        "outlined"
+      ],
+      "iki_tonlu_ikincil_yollar": {}
+    },
+    "medium-circle": {
+      "temalar": [
+        "filled"
+      ],
+      "iki_tonlu_ikincil_yollar": {}
+    },
+    "medium-square": {
+      "temalar": [
+        "filled"
+      ],
+      "iki_tonlu_ikincil_yollar": {}
+    },
+    "medium-workmark": {
+      "temalar": [
+        "outlined"
+      ],
+      "iki_tonlu_ikincil_yollar": {}
+    },
+    "meh": {
+      "temalar": [
+        "outlined",
+        "filled",
+        "twotone"
+      ],
+      "iki_tonlu_ikincil_yollar": {
+        "twotone": [
+          1
+        ]
+      }
+    },
+    "menu": {
+      "temalar": [
+        "outlined"
+      ],
+      "iki_tonlu_ikincil_yollar": {}
+    },
+    "menu-fold": {
+      "temalar": [
+        "outlined"
+      ],
+      "iki_tonlu_ikincil_yollar": {}
+    },
+    "menu-unfold": {
+      "temalar": [
+        "outlined"
+      ],
+      "iki_tonlu_ikincil_yollar": {}
+    },
+    "merge": {
+      "temalar": [
+        "outlined",
+        "filled"
+      ],
+      "iki_tonlu_ikincil_yollar": {}
+    },
+    "merge-cells": {
+      "temalar": [
+        "outlined"
+      ],
+      "iki_tonlu_ikincil_yollar": {}
+    },
+    "message": {
+      "temalar": [
+        "outlined",
+        "filled",
+        "twotone"
+      ],
+      "iki_tonlu_ikincil_yollar": {
+        "twotone": [
+          0
+        ]
+      }
+    },
+    "meta": {
+      "temalar": [
+        "filled"
+      ],
+      "iki_tonlu_ikincil_yollar": {}
+    },
+    "minus": {
+      "temalar": [
+        "outlined"
+      ],
+      "iki_tonlu_ikincil_yollar": {}
+    },
+    "minus-circle": {
+      "temalar": [
+        "outlined",
+        "filled",
+        "twotone"
+      ],
+      "iki_tonlu_ikincil_yollar": {
+        "twotone": [
+          1
+        ]
+      }
+    },
+    "minus-square": {
+      "temalar": [
+        "outlined",
+        "filled",
+        "twotone"
+      ],
+      "iki_tonlu_ikincil_yollar": {
+        "twotone": [
+          1
+        ]
+      }
+    },
+    "mistral": {
+      "temalar": [
+        "filled"
+      ],
+      "iki_tonlu_ikincil_yollar": {}
+    },
+    "mobile": {
+      "temalar": [
+        "outlined",
+        "filled",
+        "twotone"
+      ],
+      "iki_tonlu_ikincil_yollar": {
+        "twotone": [
+          1
+        ]
+      }
+    },
+    "money-collect": {
+      "temalar": [
+        "outlined",
+        "filled",
+        "twotone"
+      ],
+      "iki_tonlu_ikincil_yollar": {
+        "twotone": [
+          0
+        ]
+      }
+    },
+    "monitor": {
+      "temalar": [
+        "outlined"
+      ],
+      "iki_tonlu_ikincil_yollar": {}
+    },
+    "moon": {
+      "temalar": [
+        "outlined",
+        "filled"
+      ],
+      "iki_tonlu_ikincil_yollar": {}
+    },
+    "more": {
+      "temalar": [
+        "outlined"
+      ],
+      "iki_tonlu_ikincil_yollar": {}
+    },
+    "muted": {
+      "temalar": [
+        "outlined",
+        "filled"
+      ],
+      "iki_tonlu_ikincil_yollar": {}
+    },
+    "netflix": {
+      "temalar": [
+        "filled"
+      ],
+      "iki_tonlu_ikincil_yollar": {}
+    },
+    "node-collapse": {
+      "temalar": [
+        "outlined"
+      ],
+      "iki_tonlu_ikincil_yollar": {}
+    },
+    "node-expand": {
+      "temalar": [
+        "outlined"
+      ],
+      "iki_tonlu_ikincil_yollar": {}
+    },
+    "node-index": {
+      "temalar": [
+        "outlined"
+      ],
+      "iki_tonlu_ikincil_yollar": {}
+    },
+    "notification": {
+      "temalar": [
+        "outlined",
+        "filled",
+        "twotone"
+      ],
+      "iki_tonlu_ikincil_yollar": {
+        "twotone": [
+          0
+        ]
+      }
+    },
+    "number": {
+      "temalar": [
+        "outlined"
+      ],
+      "iki_tonlu_ikincil_yollar": {}
+    },
+    "ollama": {
+      "temalar": [
+        "filled"
+      ],
+      "iki_tonlu_ikincil_yollar": {}
+    },
+    "one-to-one": {
+      "temalar": [
+        "outlined"
+      ],
+      "iki_tonlu_ikincil_yollar": {}
+    },
+    "open-a-i": {
+      "temalar": [
+        "outlined",
+        "filled"
+      ],
+      "iki_tonlu_ikincil_yollar": {}
+    },
+    "ordered-list": {
+      "temalar": [
+        "outlined"
+      ],
+      "iki_tonlu_ikincil_yollar": {}
+    },
+    "paper-clip": {
+      "temalar": [
+        "outlined"
+      ],
+      "iki_tonlu_ikincil_yollar": {}
+    },
+    "partition": {
+      "temalar": [
+        "outlined"
+      ],
+      "iki_tonlu_ikincil_yollar": {}
+    },
+    "pause": {
+      "temalar": [
+        "outlined"
+      ],
+      "iki_tonlu_ikincil_yollar": {}
+    },
+    "pause-circle": {
+      "temalar": [
+        "outlined",
+        "filled",
+        "twotone"
+      ],
+      "iki_tonlu_ikincil_yollar": {
+        "twotone": [
+          1
+        ]
+      }
+    },
+    "pay-circle": {
+      "temalar": [
+        "outlined",
+        "filled"
+      ],
+      "iki_tonlu_ikincil_yollar": {}
+    },
+    "percentage": {
+      "temalar": [
+        "outlined"
+      ],
+      "iki_tonlu_ikincil_yollar": {}
+    },
+    "perplexity": {
+      "temalar": [
+        "filled"
+      ],
+      "iki_tonlu_ikincil_yollar": {}
+    },
+    "phone": {
+      "temalar": [
+        "outlined",
+        "filled",
+        "twotone"
+      ],
+      "iki_tonlu_ikincil_yollar": {
+        "twotone": [
+          0
+        ]
+      }
+    },
+    "pic-center": {
+      "temalar": [
+        "outlined"
+      ],
+      "iki_tonlu_ikincil_yollar": {}
+    },
+    "pic-left": {
+      "temalar": [
+        "outlined"
+      ],
+      "iki_tonlu_ikincil_yollar": {}
+    },
+    "pic-right": {
+      "temalar": [
+        "outlined"
+      ],
+      "iki_tonlu_ikincil_yollar": {}
+    },
+    "picture": {
+      "temalar": [
+        "outlined",
+        "filled",
+        "twotone"
+      ],
+      "iki_tonlu_ikincil_yollar": {
+        "twotone": [
+          1,
+          2,
+          3
+        ]
+      }
+    },
+    "pie-chart": {
+      "temalar": [
+        "outlined",
+        "filled",
+        "twotone"
+      ],
+      "iki_tonlu_ikincil_yollar": {
+        "twotone": [
+          0,
+          1,
+          2
+        ]
+      }
+    },
+    "pinterest": {
+      "temalar": [
+        "outlined",
+        "filled"
+      ],
+      "iki_tonlu_ikincil_yollar": {}
+    },
+    "play-circle": {
+      "temalar": [
+        "outlined",
+        "filled",
+        "twotone"
+      ],
+      "iki_tonlu_ikincil_yollar": {
+        "twotone": [
+          1
+        ]
+      }
+    },
+    "play-square": {
+      "temalar": [
+        "outlined",
+        "filled",
+        "twotone"
+      ],
+      "iki_tonlu_ikincil_yollar": {
+        "twotone": [
+          1
+        ]
+      }
+    },
+    "plus": {
+      "temalar": [
+        "outlined"
+      ],
+      "iki_tonlu_ikincil_yollar": {}
+    },
+    "plus-circle": {
+      "temalar": [
+        "outlined",
+        "filled",
+        "twotone"
+      ],
+      "iki_tonlu_ikincil_yollar": {
+        "twotone": [
+          1
+        ]
+      }
+    },
+    "plus-square": {
+      "temalar": [
+        "outlined",
+        "filled",
+        "twotone"
+      ],
+      "iki_tonlu_ikincil_yollar": {
+        "twotone": [
+          1
+        ]
+      }
+    },
+    "pound": {
+      "temalar": [
+        "outlined"
+      ],
+      "iki_tonlu_ikincil_yollar": {}
+    },
+    "pound-circle": {
+      "temalar": [
+        "outlined",
+        "filled",
+        "twotone"
+      ],
+      "iki_tonlu_ikincil_yollar": {
+        "twotone": [
+          1
+        ]
+      }
+    },
+    "poweroff": {
+      "temalar": [
+        "outlined"
+      ],
+      "iki_tonlu_ikincil_yollar": {}
+    },
+    "printer": {
+      "temalar": [
+        "outlined",
+        "filled",
+        "twotone"
+      ],
+      "iki_tonlu_ikincil_yollar": {
+        "twotone": [
+          0
+        ]
+      }
+    },
+    "product": {
+      "temalar": [
+        "outlined",
+        "filled"
+      ],
+      "iki_tonlu_ikincil_yollar": {}
+    },
+    "profile": {
+      "temalar": [
+        "outlined",
+        "filled",
+        "twotone"
+      ],
+      "iki_tonlu_ikincil_yollar": {
+        "twotone": [
+          1
+        ]
+      }
+    },
+    "project": {
+      "temalar": [
+        "outlined",
+        "filled",
+        "twotone"
+      ],
+      "iki_tonlu_ikincil_yollar": {
+        "twotone": [
+          1
+        ]
+      }
+    },
+    "property-safety": {
+      "temalar": [
+        "outlined",
+        "filled",
+        "twotone"
+      ],
+      "iki_tonlu_ikincil_yollar": {
+        "twotone": [
+          1
+        ]
+      }
+    },
+    "pull-request": {
+      "temalar": [
+        "outlined"
+      ],
+      "iki_tonlu_ikincil_yollar": {}
+    },
+    "pushpin": {
+      "temalar": [
+        "outlined",
+        "filled",
+        "twotone"
+      ],
+      "iki_tonlu_ikincil_yollar": {
+        "twotone": [
+          0
+        ]
+      }
+    },
+    "python": {
+      "temalar": [
+        "outlined"
+      ],
+      "iki_tonlu_ikincil_yollar": {}
+    },
+    "qq": {
+      "temalar": [
+        "outlined"
+      ],
+      "iki_tonlu_ikincil_yollar": {}
+    },
+    "qq-circle": {
+      "temalar": [
+        "filled"
+      ],
+      "iki_tonlu_ikincil_yollar": {}
+    },
+    "qq-square": {
+      "temalar": [
+        "filled"
+      ],
+      "iki_tonlu_ikincil_yollar": {}
+    },
+    "qrcode": {
+      "temalar": [
+        "outlined"
+      ],
+      "iki_tonlu_ikincil_yollar": {}
+    },
+    "question": {
+      "temalar": [
+        "outlined"
+      ],
+      "iki_tonlu_ikincil_yollar": {}
+    },
+    "question-circle": {
+      "temalar": [
+        "outlined",
+        "filled",
+        "twotone"
+      ],
+      "iki_tonlu_ikincil_yollar": {
+        "twotone": [
+          1
+        ]
+      }
+    },
+    "qwen": {
+      "temalar": [
+        "filled"
+      ],
+      "iki_tonlu_ikincil_yollar": {}
+    },
+    "radar-chart": {
+      "temalar": [
+        "outlined"
+      ],
+      "iki_tonlu_ikincil_yollar": {}
+    },
+    "radius-bottomleft": {
+      "temalar": [
+        "outlined"
+      ],
+      "iki_tonlu_ikincil_yollar": {}
+    },
+    "radius-bottomright": {
+      "temalar": [
+        "outlined"
+      ],
+      "iki_tonlu_ikincil_yollar": {}
+    },
+    "radius-setting": {
+      "temalar": [
+        "outlined"
+      ],
+      "iki_tonlu_ikincil_yollar": {}
+    },
+    "radius-upleft": {
+      "temalar": [
+        "outlined"
+      ],
+      "iki_tonlu_ikincil_yollar": {}
+    },
+    "radius-upright": {
+      "temalar": [
+        "outlined"
+      ],
+      "iki_tonlu_ikincil_yollar": {}
+    },
+    "read": {
+      "temalar": [
+        "outlined",
+        "filled"
+      ],
+      "iki_tonlu_ikincil_yollar": {}
+    },
+    "reconciliation": {
+      "temalar": [
+        "outlined",
+        "filled",
+        "twotone"
+      ],
+      "iki_tonlu_ikincil_yollar": {
+        "twotone": [
+          0,
+          1
+        ]
+      }
+    },
+    "red-envelope": {
+      "temalar": [
+        "outlined",
+        "filled",
+        "twotone"
+      ],
+      "iki_tonlu_ikincil_yollar": {
+        "twotone": [
+          1,
+          2
+        ]
+      }
+    },
+    "reddit": {
+      "temalar": [
+        "outlined"
+      ],
+      "iki_tonlu_ikincil_yollar": {}
+    },
+    "reddit-circle": {
+      "temalar": [
+        "filled"
+      ],
+      "iki_tonlu_ikincil_yollar": {}
+    },
+    "reddit-square": {
+      "temalar": [
+        "filled"
+      ],
+      "iki_tonlu_ikincil_yollar": {}
+    },
+    "redo": {
+      "temalar": [
+        "outlined"
+      ],
+      "iki_tonlu_ikincil_yollar": {}
+    },
+    "reload": {
+      "temalar": [
+        "outlined"
+      ],
+      "iki_tonlu_ikincil_yollar": {}
+    },
+    "replicate": {
+      "temalar": [
+        "filled"
+      ],
+      "iki_tonlu_ikincil_yollar": {}
+    },
+    "rest": {
+      "temalar": [
+        "outlined",
+        "filled",
+        "twotone"
+      ],
+      "iki_tonlu_ikincil_yollar": {
+        "twotone": [
+          0
+        ]
+      }
+    },
+    "retweet": {
+      "temalar": [
+        "outlined"
+      ],
+      "iki_tonlu_ikincil_yollar": {}
+    },
+    "right": {
+      "temalar": [
+        "outlined"
+      ],
+      "iki_tonlu_ikincil_yollar": {}
+    },
+    "right-circle": {
+      "temalar": [
+        "outlined",
+        "filled",
+        "twotone"
+      ],
+      "iki_tonlu_ikincil_yollar": {
+        "twotone": [
+          0
+        ]
+      }
+    },
+    "right-square": {
+      "temalar": [
+        "outlined",
+        "filled",
+        "twotone"
+      ],
+      "iki_tonlu_ikincil_yollar": {
+        "twotone": [
+          1
+        ]
+      }
+    },
+    "rise": {
+      "temalar": [
+        "outlined"
+      ],
+      "iki_tonlu_ikincil_yollar": {}
+    },
+    "robot": {
+      "temalar": [
+        "outlined",
+        "filled"
+      ],
+      "iki_tonlu_ikincil_yollar": {}
+    },
+    "rocket": {
+      "temalar": [
+        "outlined",
+        "filled",
+        "twotone"
+      ],
+      "iki_tonlu_ikincil_yollar": {
+        "twotone": [
+          0
+        ]
+      }
+    },
+    "rollback": {
+      "temalar": [
+        "outlined"
+      ],
+      "iki_tonlu_ikincil_yollar": {}
+    },
+    "rotate-left": {
+      "temalar": [
+        "outlined"
+      ],
+      "iki_tonlu_ikincil_yollar": {}
+    },
+    "rotate-right": {
+      "temalar": [
+        "outlined"
+      ],
+      "iki_tonlu_ikincil_yollar": {}
+    },
+    "ruby": {
+      "temalar": [
+        "outlined"
+      ],
+      "iki_tonlu_ikincil_yollar": {}
+    },
+    "safety": {
+      "temalar": [
+        "outlined"
+      ],
+      "iki_tonlu_ikincil_yollar": {}
+    },
+    "safety-certificate": {
+      "temalar": [
+        "outlined",
+        "filled",
+        "twotone"
+      ],
+      "iki_tonlu_ikincil_yollar": {
+        "twotone": [
+          1
+        ]
+      }
+    },
+    "save": {
+      "temalar": [
+        "outlined",
+        "filled",
+        "twotone"
+      ],
+      "iki_tonlu_ikincil_yollar": {
+        "twotone": [
+          0
+        ]
+      }
+    },
+    "scan": {
+      "temalar": [
+        "outlined"
+      ],
+      "iki_tonlu_ikincil_yollar": {}
+    },
+    "schedule": {
+      "temalar": [
+        "outlined",
+        "filled",
+        "twotone"
+      ],
+      "iki_tonlu_ikincil_yollar": {
+        "twotone": [
+          0
+        ]
+      }
+    },
+    "scissor": {
+      "temalar": [
+        "outlined"
+      ],
+      "iki_tonlu_ikincil_yollar": {}
+    },
+    "search": {
+      "temalar": [
+        "outlined"
+      ],
+      "iki_tonlu_ikincil_yollar": {}
+    },
+    "security-scan": {
+      "temalar": [
+        "outlined",
+        "filled",
+        "twotone"
+      ],
+      "iki_tonlu_ikincil_yollar": {
+        "twotone": [
+          1,
+          2
+        ]
+      }
+    },
+    "select": {
+      "temalar": [
+        "outlined"
+      ],
+      "iki_tonlu_ikincil_yollar": {}
+    },
+    "send": {
+      "temalar": [
+        "outlined"
+      ],
+      "iki_tonlu_ikincil_yollar": {}
+    },
+    "setting": {
+      "temalar": [
+        "outlined",
+        "filled",
+        "twotone"
+      ],
+      "iki_tonlu_ikincil_yollar": {
+        "twotone": [
+          0,
+          1
+        ]
+      }
+    },
+    "shake": {
+      "temalar": [
+        "outlined"
+      ],
+      "iki_tonlu_ikincil_yollar": {}
+    },
+    "share-alt": {
+      "temalar": [
+        "outlined"
+      ],
+      "iki_tonlu_ikincil_yollar": {}
+    },
+    "shop": {
+      "temalar": [
+        "outlined",
+        "filled",
+        "twotone"
+      ],
+      "iki_tonlu_ikincil_yollar": {
+        "twotone": [
+          0
+        ]
+      }
+    },
+    "shopping": {
+      "temalar": [
+        "outlined",
+        "filled",
+        "twotone"
+      ],
+      "iki_tonlu_ikincil_yollar": {
+        "twotone": [
+          0
+        ]
+      }
+    },
+    "shopping-cart": {
+      "temalar": [
+        "outlined"
+      ],
+      "iki_tonlu_ikincil_yollar": {}
+    },
+    "shrink": {
+      "temalar": [
+        "outlined"
+      ],
+      "iki_tonlu_ikincil_yollar": {}
+    },
+    "signal": {
+      "temalar": [
+        "filled"
+      ],
+      "iki_tonlu_ikincil_yollar": {}
+    },
+    "signature": {
+      "temalar": [
+        "outlined",
+        "filled"
+      ],
+      "iki_tonlu_ikincil_yollar": {}
+    },
+    "sisternode": {
+      "temalar": [
+        "outlined"
+      ],
+      "iki_tonlu_ikincil_yollar": {}
+    },
+    "sketch": {
+      "temalar": [
+        "outlined"
+      ],
+      "iki_tonlu_ikincil_yollar": {}
+    },
+    "sketch-circle": {
+      "temalar": [
+        "filled"
+      ],
+      "iki_tonlu_ikincil_yollar": {}
+    },
+    "sketch-square": {
+      "temalar": [
+        "filled"
+      ],
+      "iki_tonlu_ikincil_yollar": {}
+    },
+    "skin": {
+      "temalar": [
+        "outlined",
+        "filled",
+        "twotone"
+      ],
+      "iki_tonlu_ikincil_yollar": {
+        "twotone": [
+          0
+        ]
+      }
+    },
+    "skype": {
+      "temalar": [
+        "outlined",
+        "filled"
+      ],
+      "iki_tonlu_ikincil_yollar": {}
+    },
+    "slack": {
+      "temalar": [
+        "outlined"
+      ],
+      "iki_tonlu_ikincil_yollar": {}
+    },
+    "slack-circle": {
+      "temalar": [
+        "filled"
+      ],
+      "iki_tonlu_ikincil_yollar": {}
+    },
+    "slack-square": {
+      "temalar": [
+        "outlined",
+        "filled"
+      ],
+      "iki_tonlu_ikincil_yollar": {}
+    },
+    "sliders": {
+      "temalar": [
+        "outlined",
+        "filled",
+        "twotone"
+      ],
+      "iki_tonlu_ikincil_yollar": {
+        "twotone": [
+          0
+        ]
+      }
+    },
+    "small-dash": {
+      "temalar": [
+        "outlined"
+      ],
+      "iki_tonlu_ikincil_yollar": {}
+    },
+    "smile": {
+      "temalar": [
+        "outlined",
+        "filled",
+        "twotone"
+      ],
+      "iki_tonlu_ikincil_yollar": {
+        "twotone": [
+          1
+        ]
+      }
+    },
+    "snapchat": {
+      "temalar": [
+        "filled"
+      ],
+      "iki_tonlu_ikincil_yollar": {}
+    },
+    "snippets": {
+      "temalar": [
+        "outlined",
+        "filled",
+        "twotone"
+      ],
+      "iki_tonlu_ikincil_yollar": {
+        "twotone": [
+          0
+        ]
+      }
+    },
+    "solution": {
+      "temalar": [
+        "outlined"
+      ],
+      "iki_tonlu_ikincil_yollar": {}
+    },
+    "sort-ascending": {
+      "temalar": [
+        "outlined"
+      ],
+      "iki_tonlu_ikincil_yollar": {}
+    },
+    "sort-descending": {
+      "temalar": [
+        "outlined"
+      ],
+      "iki_tonlu_ikincil_yollar": {}
+    },
+    "sound": {
+      "temalar": [
+        "outlined",
+        "filled",
+        "twotone"
+      ],
+      "iki_tonlu_ikincil_yollar": {
+        "twotone": [
+          0
+        ]
+      }
+    },
+    "split-cells": {
+      "temalar": [
+        "outlined"
+      ],
+      "iki_tonlu_ikincil_yollar": {}
+    },
+    "spotify": {
+      "temalar": [
+        "outlined",
+        "filled"
+      ],
+      "iki_tonlu_ikincil_yollar": {}
+    },
+    "star": {
+      "temalar": [
+        "outlined",
+        "filled",
+        "twotone"
+      ],
+      "iki_tonlu_ikincil_yollar": {
+        "twotone": [
+          0
+        ]
+      }
+    },
+    "step-backward": {
+      "temalar": [
+        "outlined",
+        "filled"
+      ],
+      "iki_tonlu_ikincil_yollar": {}
+    },
+    "step-forward": {
+      "temalar": [
+        "outlined",
+        "filled"
+      ],
+      "iki_tonlu_ikincil_yollar": {}
+    },
+    "stock": {
+      "temalar": [
+        "outlined"
+      ],
+      "iki_tonlu_ikincil_yollar": {}
+    },
+    "stop": {
+      "temalar": [
+        "outlined",
+        "filled",
+        "twotone"
+      ],
+      "iki_tonlu_ikincil_yollar": {
+        "twotone": [
+          1
+        ]
+      }
+    },
+    "strikethrough": {
+      "temalar": [
+        "outlined"
+      ],
+      "iki_tonlu_ikincil_yollar": {}
+    },
+    "subnode": {
+      "temalar": [
+        "outlined"
+      ],
+      "iki_tonlu_ikincil_yollar": {}
+    },
+    "sun": {
+      "temalar": [
+        "outlined",
+        "filled"
+      ],
+      "iki_tonlu_ikincil_yollar": {}
+    },
+    "swap": {
+      "temalar": [
+        "outlined"
+      ],
+      "iki_tonlu_ikincil_yollar": {}
+    },
+    "swap-left": {
+      "temalar": [
+        "outlined"
+      ],
+      "iki_tonlu_ikincil_yollar": {}
+    },
+    "swap-right": {
+      "temalar": [
+        "outlined"
+      ],
+      "iki_tonlu_ikincil_yollar": {}
+    },
+    "switcher": {
+      "temalar": [
+        "outlined",
+        "filled",
+        "twotone"
+      ],
+      "iki_tonlu_ikincil_yollar": {
+        "twotone": [
+          0
+        ]
+      }
+    },
+    "sync": {
+      "temalar": [
+        "outlined"
+      ],
+      "iki_tonlu_ikincil_yollar": {}
+    },
+    "table": {
+      "temalar": [
+        "outlined"
+      ],
+      "iki_tonlu_ikincil_yollar": {}
+    },
+    "tablet": {
+      "temalar": [
+        "outlined",
+        "filled",
+        "twotone"
+      ],
+      "iki_tonlu_ikincil_yollar": {
+        "twotone": [
+          1
+        ]
+      }
+    },
+    "tag": {
+      "temalar": [
+        "outlined",
+        "filled",
+        "twotone"
+      ],
+      "iki_tonlu_ikincil_yollar": {
+        "twotone": [
+          0
+        ]
+      }
+    },
+    "tags": {
+      "temalar": [
+        "outlined",
+        "filled",
+        "twotone"
+      ],
+      "iki_tonlu_ikincil_yollar": {
+        "twotone": [
+          0,
+          1
+        ]
+      }
+    },
+    "taobao": {
+      "temalar": [
+        "outlined"
+      ],
+      "iki_tonlu_ikincil_yollar": {}
+    },
+    "taobao-circle": {
+      "temalar": [
+        "outlined",
+        "filled"
+      ],
+      "iki_tonlu_ikincil_yollar": {}
+    },
+    "taobao-square": {
+      "temalar": [
+        "filled"
+      ],
+      "iki_tonlu_ikincil_yollar": {}
+    },
+    "team": {
+      "temalar": [
+        "outlined"
+      ],
+      "iki_tonlu_ikincil_yollar": {}
+    },
+    "telegram": {
+      "temalar": [
+        "filled"
+      ],
+      "iki_tonlu_ikincil_yollar": {}
+    },
+    "threads": {
+      "temalar": [
+        "filled"
+      ],
+      "iki_tonlu_ikincil_yollar": {}
+    },
+    "thunderbolt": {
+      "temalar": [
+        "outlined",
+        "filled",
+        "twotone"
+      ],
+      "iki_tonlu_ikincil_yollar": {
+        "twotone": [
+          0
+        ]
+      }
+    },
+    "tik-tok": {
+      "temalar": [
+        "outlined",
+        "filled"
+      ],
+      "iki_tonlu_ikincil_yollar": {}
+    },
+    "to-top": {
+      "temalar": [
+        "outlined"
+      ],
+      "iki_tonlu_ikincil_yollar": {}
+    },
+    "tool": {
+      "temalar": [
+        "outlined",
+        "filled",
+        "twotone"
+      ],
+      "iki_tonlu_ikincil_yollar": {
+        "twotone": [
+          0
+        ]
+      }
+    },
+    "trademark": {
+      "temalar": [
+        "outlined"
+      ],
+      "iki_tonlu_ikincil_yollar": {}
+    },
+    "trademark-circle": {
+      "temalar": [
+        "outlined",
+        "filled",
+        "twotone"
+      ],
+      "iki_tonlu_ikincil_yollar": {
+        "twotone": [
+          1,
+          2
+        ]
+      }
+    },
+    "transaction": {
+      "temalar": [
+        "outlined"
+      ],
+      "iki_tonlu_ikincil_yollar": {}
+    },
+    "translation": {
+      "temalar": [
+        "outlined"
+      ],
+      "iki_tonlu_ikincil_yollar": {}
+    },
+    "trophy": {
+      "temalar": [
+        "outlined",
+        "filled",
+        "twotone"
+      ],
+      "iki_tonlu_ikincil_yollar": {
+        "twotone": [
+          0
+        ]
+      }
+    },
+    "truck": {
+      "temalar": [
+        "outlined",
+        "filled"
+      ],
+      "iki_tonlu_ikincil_yollar": {}
+    },
+    "twitch": {
+      "temalar": [
+        "outlined",
+        "filled"
+      ],
+      "iki_tonlu_ikincil_yollar": {}
+    },
+    "twitter": {
+      "temalar": [
+        "outlined"
+      ],
+      "iki_tonlu_ikincil_yollar": {}
+    },
+    "twitter-circle": {
+      "temalar": [
+        "filled"
+      ],
+      "iki_tonlu_ikincil_yollar": {}
+    },
+    "twitter-square": {
+      "temalar": [
+        "filled"
+      ],
+      "iki_tonlu_ikincil_yollar": {}
+    },
+    "underline": {
+      "temalar": [
+        "outlined"
+      ],
+      "iki_tonlu_ikincil_yollar": {}
+    },
+    "undo": {
+      "temalar": [
+        "outlined"
+      ],
+      "iki_tonlu_ikincil_yollar": {}
+    },
+    "ungroup": {
+      "temalar": [
+        "outlined"
+      ],
+      "iki_tonlu_ikincil_yollar": {}
+    },
+    "unlock": {
+      "temalar": [
+        "outlined",
+        "filled",
+        "twotone"
+      ],
+      "iki_tonlu_ikincil_yollar": {
+        "twotone": [
+          0
+        ]
+      }
+    },
+    "unordered-list": {
+      "temalar": [
+        "outlined"
+      ],
+      "iki_tonlu_ikincil_yollar": {}
+    },
+    "up": {
+      "temalar": [
+        "outlined"
+      ],
+      "iki_tonlu_ikincil_yollar": {}
+    },
+    "up-circle": {
+      "temalar": [
+        "outlined",
+        "filled",
+        "twotone"
+      ],
+      "iki_tonlu_ikincil_yollar": {
+        "twotone": [
+          0
+        ]
+      }
+    },
+    "up-square": {
+      "temalar": [
+        "outlined",
+        "filled",
+        "twotone"
+      ],
+      "iki_tonlu_ikincil_yollar": {
+        "twotone": [
+          1
+        ]
+      }
+    },
+    "upload": {
+      "temalar": [
+        "outlined"
+      ],
+      "iki_tonlu_ikincil_yollar": {}
+    },
+    "usb": {
+      "temalar": [
+        "outlined",
+        "filled",
+        "twotone"
+      ],
+      "iki_tonlu_ikincil_yollar": {
+        "twotone": [
+          0
+        ]
+      }
+    },
+    "user": {
+      "temalar": [
+        "outlined"
+      ],
+      "iki_tonlu_ikincil_yollar": {}
+    },
+    "user-add": {
+      "temalar": [
+        "outlined"
+      ],
+      "iki_tonlu_ikincil_yollar": {}
+    },
+    "user-delete": {
+      "temalar": [
+        "outlined"
+      ],
+      "iki_tonlu_ikincil_yollar": {}
+    },
+    "user-switch": {
+      "temalar": [
+        "outlined"
+      ],
+      "iki_tonlu_ikincil_yollar": {}
+    },
+    "usergroup-add": {
+      "temalar": [
+        "outlined"
+      ],
+      "iki_tonlu_ikincil_yollar": {}
+    },
+    "usergroup-delete": {
+      "temalar": [
+        "outlined"
+      ],
+      "iki_tonlu_ikincil_yollar": {}
+    },
+    "verified": {
+      "temalar": [
+        "outlined"
+      ],
+      "iki_tonlu_ikincil_yollar": {}
+    },
+    "vertical-align-bottom": {
+      "temalar": [
+        "outlined"
+      ],
+      "iki_tonlu_ikincil_yollar": {}
+    },
+    "vertical-align-middle": {
+      "temalar": [
+        "outlined"
+      ],
+      "iki_tonlu_ikincil_yollar": {}
+    },
+    "vertical-align-top": {
+      "temalar": [
+        "outlined"
+      ],
+      "iki_tonlu_ikincil_yollar": {}
+    },
+    "vertical-left": {
+      "temalar": [
+        "outlined"
+      ],
+      "iki_tonlu_ikincil_yollar": {}
+    },
+    "vertical-right": {
+      "temalar": [
+        "outlined"
+      ],
+      "iki_tonlu_ikincil_yollar": {}
+    },
+    "video-camera": {
+      "temalar": [
+        "outlined",
+        "filled",
+        "twotone"
+      ],
+      "iki_tonlu_ikincil_yollar": {
+        "twotone": [
+          0
+        ]
+      }
+    },
+    "video-camera-add": {
+      "temalar": [
+        "outlined"
+      ],
+      "iki_tonlu_ikincil_yollar": {}
+    },
+    "wallet": {
+      "temalar": [
+        "outlined",
+        "filled",
+        "twotone"
+      ],
+      "iki_tonlu_ikincil_yollar": {
+        "twotone": [
+          1,
+          3
+        ]
+      }
+    },
+    "warning": {
+      "temalar": [
+        "outlined",
+        "filled",
+        "twotone"
+      ],
+      "iki_tonlu_ikincil_yollar": {
+        "twotone": [
+          1
+        ]
+      }
+    },
+    "wechat": {
+      "temalar": [
+        "outlined",
+        "filled"
+      ],
+      "iki_tonlu_ikincil_yollar": {}
+    },
+    "wechat-work": {
+      "temalar": [
+        "outlined",
+        "filled"
+      ],
+      "iki_tonlu_ikincil_yollar": {}
+    },
+    "weibo": {
+      "temalar": [
+        "outlined"
+      ],
+      "iki_tonlu_ikincil_yollar": {}
+    },
+    "weibo-circle": {
+      "temalar": [
+        "outlined",
+        "filled"
+      ],
+      "iki_tonlu_ikincil_yollar": {}
+    },
+    "weibo-square": {
+      "temalar": [
+        "outlined",
+        "filled"
+      ],
+      "iki_tonlu_ikincil_yollar": {}
+    },
+    "whats-app": {
+      "temalar": [
+        "outlined"
+      ],
+      "iki_tonlu_ikincil_yollar": {}
+    },
+    "wifi": {
+      "temalar": [
+        "outlined"
+      ],
+      "iki_tonlu_ikincil_yollar": {}
+    },
+    "windows": {
+      "temalar": [
+        "outlined",
+        "filled"
+      ],
+      "iki_tonlu_ikincil_yollar": {}
+    },
+    "woman": {
+      "temalar": [
+        "outlined"
+      ],
+      "iki_tonlu_ikincil_yollar": {}
+    },
+    "x": {
+      "temalar": [
+        "outlined",
+        "filled"
+      ],
+      "iki_tonlu_ikincil_yollar": {
+        "filled": [
+          1,
+          2,
+          3
+        ]
+      }
+    },
+    "yahoo": {
+      "temalar": [
+        "outlined",
+        "filled"
+      ],
+      "iki_tonlu_ikincil_yollar": {}
+    },
+    "youtube": {
+      "temalar": [
+        "outlined",
+        "filled"
+      ],
+      "iki_tonlu_ikincil_yollar": {}
+    },
+    "yuque": {
+      "temalar": [
+        "outlined",
+        "filled"
+      ],
+      "iki_tonlu_ikincil_yollar": {}
+    },
+    "zhihu": {
+      "temalar": [
+        "outlined"
+      ],
+      "iki_tonlu_ikincil_yollar": {}
+    },
+    "zhihu-circle": {
+      "temalar": [
+        "filled"
+      ],
+      "iki_tonlu_ikincil_yollar": {}
+    },
+    "zhihu-square": {
+      "temalar": [
+        "filled"
+      ],
+      "iki_tonlu_ikincil_yollar": {}
+    },
+    "zoom-in": {
+      "temalar": [
+        "outlined"
+      ],
+      "iki_tonlu_ikincil_yollar": {}
+    },
+    "zoom-out": {
+      "temalar": [
+        "outlined"
+      ],
+      "iki_tonlu_ikincil_yollar": {}
+    }
+  }
+}

@@ -1,0 +1,24 @@
+[package]
+name = "gpui-bilesenleri-galeri"
+version.workspace = true
+edition.workspace = true
+license.workspace = true
+publish.workspace = true
+
+[lints]
+workspace = true
+
+[dependencies]
+gpui.workspace = true
+gpui-bilesenleri.workspace = true
+gpui-bilesenleri-kabuk.workspace = true
+
+# `ORT-018` ölçümü tarayıcıda `performance.now()` okur; yalnız WASM
+# hedefinde bağlanır, masaüstü profiline girmez.
+[target.'cfg(target_family = "wasm")'.dependencies]
+web-sys = { version = "0.3", features = ["Window", "Performance"] }
+
+# Galeri render yolunu gerçek GPUI penceresinde koşturmak için yalnız test
+# profilinde gerekir; WASM çalışma profiline transitif olarak giremez.
+[dev-dependencies]
+gpui = { workspace = true, features = ["test-support"] }

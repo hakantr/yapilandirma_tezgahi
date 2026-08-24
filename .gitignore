@@ -1,0 +1,6 @@
+.DS_Store
+__pycache__/
+**/.DS_Store
+/target/
+/crates/gpui-bilesenleri-galeri-wasm/web/pkg/
+Tezgah_yeni_tasarimi/

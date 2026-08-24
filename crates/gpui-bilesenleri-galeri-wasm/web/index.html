@@ -1,0 +1,198 @@
+<!doctype html>
+<html lang="tr">
+  <head>
+    <meta charset="utf-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1" />
+    <title>GPUI Bileşen Galerisi</title>
+    <style>
+      :root {
+        color-scheme: light;
+        font-family: system-ui, sans-serif;
+        background: #f6f8fc;
+      }
+
+      html,
+      body {
+        width: 100%;
+        height: 100%;
+        margin: 0;
+        overflow: hidden;
+      }
+
+      #durum {
+        position: fixed;
+        inset: 0;
+        z-index: 1;
+        display: grid;
+        place-items: center;
+        color: #475467;
+        background: #f6f8fc;
+      }
+
+      html[data-gpui-durum="hazir"] #durum {
+        display: none;
+      }
+
+      html[data-gpui-durum="hata"] #durum {
+        color: #b42318;
+        background: #fff6f5;
+      }
+
+      canvas {
+        width: var(--gpui-tuval-genişliği, 100%) !important;
+        height: var(--gpui-tuval-yüksekliği, 100%) !important;
+      }
+    </style>
+  </head>
+  <body>
+    <div id="durum" role="status">GPUI bileşen galerisi hazırlanıyor…</div>
+    <script type="module">
+      const durum = document.querySelector("#durum");
+      const sorgu = new URLSearchParams(window.location.search);
+      const tuvalBoyutunuUygula = (ad, değişken) => {
+        const değer = Number.parseInt(sorgu.get(ad) ?? "", 10);
+        if (Number.isInteger(değer) && değer >= 320 && değer <= 4096) {
+          document.documentElement.style.setProperty(değişken, `${değer}px`);
+        }
+      };
+      tuvalBoyutunuUygula("tuval-genisligi", "--gpui-tuval-genişliği");
+      tuvalBoyutunuUygula("tuval-yuksekligi", "--gpui-tuval-yüksekliği");
+
+      // Paket değişince sayfayı kendisi yeniler.
+      //
+      // WASM paketi Rust kaynağından ayrı bir adımda üretilir; sayfa açık
+      // kalırsa yeniden derlenen kodu görmez. Bu, yerel geliştirmede en sinsi
+      // hata kaynağıdır: iki taraf aynı adrese bakar ama farklı paket çalışır.
+      // Yalnız yerel konakta çalışır, yayımlanan bir yüzey değildir.
+      const paketiIzle = (yüklenenSürüm) => {
+        const yerel = ["localhost", "127.0.0.1", "[::1]"].includes(
+          window.location.hostname,
+        );
+        if (!yerel) {
+          return;
+        }
+        const denetle = async () => {
+          try {
+            const yanıt = await fetch(`./pkg/build.json?t=${Date.now()}`, {
+              cache: "no-store",
+            });
+            if (!yanıt.ok) {
+              return;
+            }
+            const güncel = await yanıt.json();
+            if (güncel.wasm_sha256 !== yüklenenSürüm) {
+              window.location.reload();
+            }
+          } catch {
+            // Sunucu yeniden başlarken kısa kesintiler olağandır; sessiz geç.
+          }
+        };
+        // Arka plan sekmelerinde tarayıcı zamanlayıcıyı kısar, hatta durdurur.
+        // Bu yüzden yoklama tek dayanak değil: sekme görünür olduğu ve pencere
+        // odağı geri geldiği anda da denetlenir. Kullanıcı sekmeye döndüğünde
+        // eski paketle karşılaşmaz.
+        setInterval(denetle, 2000);
+        document.addEventListener("visibilitychange", () => {
+          if (document.visibilityState === "visible") {
+            denetle();
+          }
+        });
+        window.addEventListener("focus", denetle);
+      };
+
+      // `ORT-002 §5.2` tarayıcı saat dilimi bildirimi. Politika Rust
+      // tarafındadır; burası yalnız standart API'yi okur.
+      globalThis.gpuiSaatDilimiKimligi = () => {
+        try {
+          return Intl.DateTimeFormat().resolvedOptions().timeZone || "";
+        } catch {
+          return "";
+        }
+      };
+      globalThis.gpuiSaatDilimiFarki = () => new Date().getTimezoneOffset();
+
+      // `ORT-004` tarayıcı imleç yanıp sönme hızını bildirmez; bildirdiği tek
+      // ilgili tercih azaltılmış hareket.
+      globalThis.gpuiHareketAzaltilsin = () => {
+        try {
+          return globalThis.matchMedia("(prefers-reduced-motion: reduce)").matches;
+        } catch {
+          return false;
+        }
+      };
+
+      globalThis.gpuiGaleriDurumu = (asama, ayrinti) => {
+        document.documentElement.dataset.gpuiAsama = asama;
+        if (asama === "pencere-hatasi") {
+          console.error(`GPUI penceresi açılamadı: ${ayrinti}`);
+        }
+      };
+
+      const tuvaliBekle = () =>
+        new Promise((resolve, reject) => {
+          const varOlanTuval = document.querySelector("canvas");
+          if (varOlanTuval) {
+            resolve(varOlanTuval);
+            return;
+          }
+
+          const gozlemci = new MutationObserver(() => {
+            const tuval = document.querySelector("canvas");
+            if (tuval) {
+              clearTimeout(zamanAsimi);
+              gozlemci.disconnect();
+              resolve(tuval);
+            }
+          });
+          const zamanAsimi = setTimeout(() => {
+            gozlemci.disconnect();
+            reject(new Error("GPUI çizim tuvali zamanında oluşmadı."));
+          }, 15_000);
+
+          gozlemci.observe(document.body, { childList: true });
+        });
+
+      try {
+        // GPUI web platformu önce WebGPU dener, başarısızsa WebGL2'ye düşer.
+        // Bu yüzden `navigator.gpu` yokluğu başlı başına engel değildir; konak
+        // yalnız iki backend de yokken erken ve net teşhis verir. WebGPU'yu tek
+        // koşul saymak, WebGPU'yu varsayılan kapalı tutan tarayıcılarda (tipik
+        // Linux masaüstü kurulumları) çalışabilir bir galeriyi bloke ediyordu.
+        const webgpuVar = Boolean(navigator.gpu);
+        const webgl2Var = typeof WebGL2RenderingContext !== "undefined";
+        if (!webgpuVar && !webgl2Var) {
+          throw new Error("Bu tarayıcı ne WebGPU ne WebGL2 sunuyor.");
+        }
+        const buildYanıtı = await fetch(`./pkg/build.json?t=${Date.now()}`, {
+          cache: "no-store",
+        });
+        if (!buildYanıtı.ok) {
+          throw new Error("WASM build manifesti alınamadı.");
+        }
+        const build = await buildYanıtı.json();
+        const sürüm = encodeURIComponent(build.wasm_sha256);
+        const modül = await import(
+          `./pkg/gpui_bilesenleri_galeri_wasm.js?build=${sürüm}`
+        );
+        await modül.default(
+          `./pkg/gpui_bilesenleri_galeri_wasm_bg.wasm?build=${sürüm}`,
+        );
+        modül.baslat();
+        // `ORT-018` ölçümü konaktan çağrılır; sayfa kendi başına ölçüm
+        // koşturmaz, ölçüm açıkça istenir.
+        globalThis.olcumKostur = modül.olcumKostur;
+        globalThis.olcumTopluMs = modül.olcumTopluMs;
+        const tuval = await tuvaliBekle();
+        tuval.dataset.gpuiGaleri = "";
+        document.documentElement.dataset.gpuiDurum = "hazir";
+        paketiIzle(build.wasm_sha256);
+      } catch (hata) {
+        document.documentElement.dataset.gpuiDurum = "hata";
+        durum.textContent =
+          "Galeri başlatılamadı: WebGPU veya WebGL2 destekli güncel bir tarayıcı gerekiyor.";
+        durum.setAttribute("role", "alert");
+        console.error(hata);
+      }
+    </script>
+  </body>
+</html>

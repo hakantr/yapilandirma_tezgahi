@@ -1,0 +1,25 @@
+[package]
+name = "gpui-bilesenleri-galeri-wasm"
+version.workspace = true
+edition.workspace = true
+license.workspace = true
+publish.workspace = true
+
+[lib]
+crate-type = ["cdylib", "rlib"]
+
+[lints]
+workspace = true
+
+[dependencies]
+gpui.workspace = true
+gpui_web.workspace = true
+gpui-bilesenleri-galeri.workspace = true
+
+[target.'cfg(target_family = "wasm")'.dependencies]
+wasm-bindgen.workspace = true
+
+# `§25` tarayıcı otomatik doldurma, gizli girdiye `autocomplete` yazar.
+[target.'cfg(target_family = "wasm")'.dependencies.web-sys]
+version = "0.3"
+features = ["Window", "Document", "Element", "HtmlInputElement"]
