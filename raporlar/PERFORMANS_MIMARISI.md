@@ -175,16 +175,59 @@ Kabuk yine hiçbir bileşen tipini tanımaz.
   listener taşınması); kolon içi ön ek kutusuna yazma çalışıyor; kaydırma
   akıcı; koyu kip bütün kolona işliyor.
 
-## 5. Üçüncü tur adayları (sıradaki işler)
+## 5. Üçüncü tur: üst şerit ve sol tercih şeritleri — TAMAMLANDI (24 Ağu 2026)
 
-- **Üst şerit ve sol kolonun tercih şeritleri** hâlâ kök çiziminde her
-  karede kurulur. Üst şerit `flex_wrap` ile içerik yükseklikli olduğu için
-  bugünkü hâliyle `cached` sınırına giremez; ya sabit yüksekliğe
-  bağlanmalı ya da kendi kaydıran/kırpan kabına alınmalı. Sol sabit blok
-  (köşe/hizalama/yardımcı eylem şeritleri) tercih-türevlidir ve
-  `BölümlerPaneli` deseniyle (kökü gözleyen `cached` bölge) taşınabilir.
-- Ölçüm sağ kolonun maliyet payını küçük gösterirse durmak da meşru:
-  kalan bölgeler küçüktür.
+Bu bölgeler `cached` sınırına **alınmadı** ve bu bir tercihtir, eksik
+değil:
+
+- `cached` view stilden yerleşir, içerikten ölçülmez. Üst şerit
+  (`flex_wrap`) ve sol kolonun şerit/kartları içerik yüksekliklidir;
+  onlara sabit yükseklik yazmak tipografi/yoğunluk eksenlerine karşı
+  kırılgandır. Kaydıran sol blok ise alan gözleyen panellerle (türetilmiş
+  durum, değer üçlüsü, olay akışı, yuva notu) serpiştirilmiştir — o
+  panellerin bildirimi ataları kirlettiği için bloğu saran bir önbellek
+  her tuş vuruşunda patlar, kazanç sıfırlanır.
+
+Bunun yerine bu bölgelerin kare-başı maliyetinin asıl kaynağı öldürüldü:
+
+### 5.1 Açılır liste içerikleri tembel (`şerit_seçicisi`)
+
+İçerik parametresi `impl FnOnce(&mut Context<…>) -> AnyElement` oldu ve
+yalnız seçici **açıkken** çağrılır. Eski imza hazır element alıyordu:
+kapalı 15 seçicinin listeleri — üst şeritteki yazı ailesi listesi
+(masaüstünde yüzlerce sistem ailesi), tema/ölçek/yoğunluk/iç boşluk/
+hareket, sol kolondaki parça ailesi ve imleç listeleri, sağ kolondaki
+biçim/adım/varsayılan/bölüm/doldurma/saat dilimi listeleri — dinleyicileri
+ve öğeleriyle her karede kuruluyor ve hiç çizilmeden atılıyordu. Artık
+kapalı seçicinin kare maliyeti tek tetikleyici satırıdır. Bekçi:
+`şerit_seçicisi_içeriği_tembel_alır` (sergiler.rs test modülü).
+
+### 5.2 Kare dikişi önbellekleri (tema sürümüne bağlı)
+
+- **Çözülmüş görünüm** (`tasarım_görünümünü_çöz` + onun kurduğu tam tema
+  anlık görüntüsü) artık kök `kare_dikişlerini_kur` içinde tema sürümüne
+  bağlı önbellekten gelir; `görünümü_paylaşımlı_kur` aynı `Arc`'ı kare
+  kare paylaşır. `temayı_tazele` sürümü dikişten **önce** artırır ki
+  önbellek bayat çözüm döndürmesin. Bekçi:
+  `görünüm_çözümü_tek_yerden_koşar`.
+- **`ORT-003` yarıçap tavanı** (`en_fazla_yarıçap`): profil içeriği her
+  karede tek ölçü için tam `tezgah_teması(...)` anlık görüntüsü
+  kuruyordu; değer tema sürümüne bağlandı.
+- Render'daki ve `temayı_tazele`deki kopya dikiş blokları tek
+  `kare_dikişlerini_kur` metodunda birleşti.
+
+### 5.3 Doğrulama
+
+- 210 test yeşil (208 + 2 bekçi).
+- WASM'de elle: yazı ailesi listesi tembel yoldan açılıyor ve seçim tüm
+  ekranın tipografisini değiştiriyor (görünüm önbelleği geçersizlemesi);
+  imleç seçicisi açılıp kalınlık uyguluyor; koyu kip önbellekli sağ kolon
+  dâhil her yere işliyor; alana yazma ve yuva notu canlılığı bozulmadı.
+
+Bu turdan sonra tuş vuruşu karesinde kalan iş: kök kabuğu + sol kolonun
+şerit/kart elementleri (listeleri kırpılmış hâlde) + alan gözleyen küçük
+paneller. Sağ kolon kurulmaz, hiçbir liste kurulmaz, hiçbir çözüm/rapor/
+kod yeniden hesaplanmaz.
 
 ## 6. Kabul hedefleri ve ölçüm
 

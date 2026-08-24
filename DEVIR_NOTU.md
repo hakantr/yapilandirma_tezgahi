@@ -74,15 +74,17 @@ Taşınma uyarlamaları:
 
 ## 5. Sıradaki işler (yeni sohbetin gündemi)
 
-1. **Performans mimarisi turu** — kullanıcı onaylı plan. **Birinci ve
-   ikinci tur tamamlandı (24 Ağu 2026):** kök `observe(&alan)`/`subscribe`
-   köprüleri `AlanDurumPaneli` + `OlayAkışıPaneli` entity'lerine taşındı;
-   `§29` raporu ve kod paneli tercih sürümüne bağlandı; `akici-dev`
-   profili eklendi; sağ kolon `BölümlerPaneli` olarak `Entity::cached`
-   sınırına alındı (kökü gözler, tuş vuruşunda hiç kurulmaz) ve
-   `yuva_görünürlük_notu` kendi gözleyen paneline taşındı — kökün çizim
-   yolunda alan okuması kalmadı. Mekanik, kazançlar, üçüncü tur adayları
-   (üst şerit + sol tercih şeritleri) ve ölçüm hedefleri:
+1. **Performans mimarisi turu** — kullanıcı onaylı plan. **Üç tur da
+   tamamlandı (24 Ağu 2026):** (1) kök `observe(&alan)`/`subscribe`
+   köprüleri `AlanDurumPaneli` + `OlayAkışıPaneli` entity'lerine taşındı,
+   `§29` raporu ve kod paneli tercih sürümüne bağlandı, `akici-dev`
+   profili eklendi; (2) sağ kolon `BölümlerPaneli` olarak `Entity::cached`
+   sınırına alındı (kökü gözler, tuş vuruşunda hiç kurulmaz),
+   `yuva_görünürlük_notu` kendi gözleyen paneline taşındı; (3) açılır
+   liste içerikleri tembelleşti (yalnız açıkken kurulur), çözülmüş görünüm
+   ve yarıçap tavanı tema sürümüne bağlandı — üst şerit ve sol şeritler
+   bilinçli olarak `cached`e alınmadı (içerik yükseklikli + panel
+   serpiştirmeli; gerekçe raporda). Mekanik, kazançlar ve ölçüm hedefleri:
    `raporlar/PERFORMANS_MIMARISI.md`. (Önceki devirde anılan
    "TEZGAH_DEVIR_NOTU sonundaki performans raporu" hiç yazılmamıştı; o
    boşluğu bu belge doldurur.) Linux ölçümü ve sayısal kare ölçümü
