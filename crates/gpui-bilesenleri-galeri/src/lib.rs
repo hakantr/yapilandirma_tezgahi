@@ -412,6 +412,9 @@ impl GaleriUygulaması {
         } else {
             Some(kimlik)
         };
+        // Kolondaki seçicilerin açık/kapalı yüzü ve tembel liste içeriği
+        // bu duruma bakar.
+        self.kolonu_geçersizle(bağlam);
         bağlam.notify();
     }
 
@@ -494,6 +497,8 @@ impl GaleriUygulaması {
         if let Some(alanlar) = self.sergi_girişleri.clone() {
             alanlar.temayı_değiştir(bağlam);
         }
+        // Palet ve çözülmüş görünüm kolonun bütün yüzlerini besler.
+        self.kolonu_geçersizle(bağlam);
         bağlam.notify();
     }
 
@@ -574,9 +579,10 @@ impl GaleriUygulaması {
             alan.doğrulama_portu = Some(std::sync::Arc::new(GösterimDoğrulamaPortu(sorunlar)));
             alan.eşzamansız_doğrulamayı_başlat(bağlam);
         });
-        // Port kapıları kartı `doğrulama_portu.is_some()` okur ve kök
-        // çizimindedir. Kök artık alanı gözlemediği için buradaki değişim
+        // Port kapıları kartı `doğrulama_portu.is_some()` okur ve kolonun
+        // içindedir. Kök artık alanı gözlemediği için buradaki değişim
         // açıkça bildirilir; sorunların kendisi panellerin işidir.
+        self.kolonu_geçersizle(bağlam);
         bağlam.notify();
     }
 
@@ -691,6 +697,8 @@ impl GaleriUygulaması {
             });
         }
         self.tercih_alanlarını_eşitle(bağlam);
+        // Bölüm listesi, rapor ve kod tercihe bağlıdır: kolon tazelenmeli.
+        self.kolonu_geçersizle(bağlam);
         bağlam.notify();
     }
 
@@ -922,6 +930,28 @@ impl GaleriUygulaması {
         }
         self.tezgah_alanı = Some(alan.clone());
         alan
+    }
+
+    /// Önbellekli sağ kolonun geçersizleme yolu.
+    ///
+    /// Kolon `Entity::cached` sınırındadır ve GPUI'de **`notify` onu
+    /// patlatmaz**: `App::notify` bir entity'nin bildirimini yalnız o
+    /// entity pencerenin `tracked_entities` kümesindeyken `invalidate_view`e
+    /// çevirir; önbellekten dönen bir view render edilmediği için o kümeye
+    /// kendi kimliğiyle girmez. Ölçüldü: ne kökün bildirimi, ne panele
+    /// doğrudan `notify` kolonu yeniden kurdurur (`raporlar/
+    /// PERFORMANS_MIMARISI.md` §6.3).
+    ///
+    /// Çalışan yol `refresh`tir: `refreshing` bayrağı prepaint'teki cache
+    /// koşulunu düşürür. Efekt üzerinden çağrılır çünkü `Window` erişimi
+    /// gerektirmez ve gerçek akışa uyar — listener bildirir, efekt döngüsü
+    /// bayrağı kurar, sıradaki kare kolonu yeniden kurar, sonraki temiz
+    /// kareler yine önbellekten gelir.
+    ///
+    /// Kolonu ilgilendiren **her** kök değişimi bunu çağırmalıdır; kapı
+    /// `tests/kolon_tazeligi.rs`.
+    fn kolonu_geçersizle(&self, bağlam: &mut Context<Self>) {
+        bağlam.refresh_windows();
     }
 
     /// Tezgâhın yürürlükteki tercihleri; paneller çizimde buradan okur.

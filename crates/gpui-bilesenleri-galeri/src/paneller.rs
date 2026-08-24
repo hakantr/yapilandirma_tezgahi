@@ -7,9 +7,10 @@
 //! çizimde yeniden kurulur; kirlenen alan tuş vuruşunda kabuğun tamamına
 //! değil bu üç küçük panele değer.
 //!
-//! Sağ kolon (`BölümlerPaneli`) da burada yaşar ama alanı gözlemez; kök
-//! çiziminin parçası olarak çizilir. Bir süre `Entity::cached` sınırındaydı
-//! ve üçüncü tur ölçümü onu geri aldı — gerekçe tipin belgesinde.
+//! Sağ kolon (`BölümlerPaneli`) da burada yaşar ama alanı gözlemez:
+//! `Entity::cached` sınırındadır ve tuş vuruşu karelerinde kurulmaz.
+//! Geçersizlemesi `notify` ile değil `refresh` ile olur — gerekçe tipin
+//! belgesinde.
 //!
 //! Panel çizimleri `sergiler.rs`'teki `pub(crate)` fonksiyonları kullanır;
 //! kart gövdeleri orada kalır çünkü `§16.2` yapısal kanıt testleri
@@ -253,33 +254,39 @@ impl Render for YuvaNotuPaneli {
 /// Kabuk (`tezgah/govde.rs`) kolonu hazır element olarak alır ve yalnız
 /// yerleştirir.
 ///
-/// **Önbellek denendi ve geri alındı (üçüncü tur ölçümü).** Kolon bir süre
-/// `Entity::cached` sınırındaydı; ölçüm koşumuna eklenen çizim sayacı,
-/// önbelleğin ilk çizimden sonra **hiç patlamadığını** gösterdi: ne kökün
-/// bildirimi, ne panele doğrudan `notify`, ne `refresh_windows` kolonu
-/// yeniden kurdurdu (kanıt: `tests/kolon_tazeligi.rs` ve raporun §5.4'ü).
-/// Donmuş bir kolon bayat yapılandırma gösterir; bu bir hız kazancı değil,
-/// doğruluk hatasıdır. Panel yapısı korunuyor çünkü kabuk sınırı temiz ve
-/// doğru geçersizleme yolu bulunursa önbellek tek satırla geri gelir —
-/// ama o gün `kolon_tazeligi` testi onu doğrulamadan geri gelmemeli.
+/// Kolon `Entity::cached` sınırındadır: tuş vuruşu karelerinde element
+/// ağacı kurulmaz, prepaint/paint aralıkları yeniden kullanılır.
+///
+/// **Geçersizleme `refresh` ile yapılır, `notify` ile değil.** GPUI'de
+/// `App::notify` bir entity'nin bildirimini yalnız o entity pencerenin
+/// `tracked_entities` kümesindeyken `invalidate_view`e çevirir; önbellekten
+/// dönen bir view render edilmediği için o kümeye kendi kimliğiyle girmez.
+/// Ölçüldü: kökün bildirimi de, panele doğrudan `notify` de kolonu
+/// yeniden kurdurmuyor — kolon açılıştaki hâlinde donuyordu. Kökün
+/// `kolonu_geçersizle` yolu bu yüzden `refresh_windows` çağırır. İki yönü
+/// birden tutan kapı: `tests/kolon_tazeligi.rs` (ayrıntı: raporun §6'sı).
 pub struct BölümlerPaneli {
     kök: WeakEntity<GaleriUygulaması>,
 }
 
-/// Sağ kolonun çizim sayacı.
-///
-/// "Kolon bu karede kuruldu mu" sorusunu kare süresi yanıtlayamaz: kolon
-/// kurulumu toplam karenin küçük bir payıdır ve gürültüde kaybolur. Bu
-/// yüzden soru doğrudan sayılır — üçüncü turun önbellek bulgusu da bu
-/// sayaçla çıktı. `tests/kolon_tazeligi.rs` ve ölçüm koşumu okur.
-///
-/// `Relaxed` yeterli: sayaç yalnız aynı iş parçacığındaki çizimleri sayar
-/// ve başka veriye erişim sıralamaz.
-static BÖLÜM_ÇİZİMİ: std::sync::atomic::AtomicU64 = std::sync::atomic::AtomicU64::new(0);
+thread_local! {
+    /// Sağ kolonun çizim sayacı.
+    ///
+    /// "Kolon bu karede kuruldu mu" sorusunu kare süresi yanıtlayamaz: kolon
+    /// kurulumu toplam karenin küçük bir payıdır ve gürültüde kaybolur. Bu
+    /// yüzden soru doğrudan sayılır — üçüncü turun önbellek bulgusu da bu
+    /// sayaçla çıktı. `tests/kolon_tazeligi.rs` ve ölçüm koşumu okur.
+    ///
+    /// **Thread-local olmalı.** Süreç genelinde tek bir sayaç, aynı süreçte
+    /// paralel koşan testlerin çizimlerini birbirine karıştırıyor ve
+    /// sahte başarısızlık üretiyordu. Bir GPUI uygulaması zaten kendi
+    /// iş parçacığında çizer, yani kapsam doğal olarak doğru olan.
+    static BÖLÜM_ÇİZİMİ: std::cell::Cell<u64> = const { std::cell::Cell::new(0) };
+}
 
-/// Sağ kolonun şimdiye kadarki çizim sayısı.
+/// Bu iş parçacığında sağ kolonun şimdiye kadarki çizim sayısı.
 pub fn bölüm_çizim_sayısı() -> u64 {
-    BÖLÜM_ÇİZİMİ.load(std::sync::atomic::Ordering::Relaxed)
+    BÖLÜM_ÇİZİMİ.with(std::cell::Cell::get)
 }
 
 impl BölümlerPaneli {
@@ -289,24 +296,23 @@ impl BölümlerPaneli {
         }
     }
 
-    /// Panelin gövdeye giren elementi.
+    /// Panelin gövdeye giren önbellekli elementi.
     ///
-    /// Sarmalayıcı, kolonun flex sızasını taşır: kalan genişliği alır,
-    /// sıkışabilir. Panel bu sarmalayıcının çocuğudur ve her karede
-    /// çizilir.
+    /// Stil kolonun flex sızasını taşır: kalan genişliği alır, sıkışabilir.
+    /// Önbellekli view içerikten ölçülmez; boyut bu stilden ve satırın
+    /// çapraz ekseninden çözülür — kolon kaydıran bir kap olduğu için bu
+    /// kısıt sorun değildir.
     pub(crate) fn öğe(panel: &Entity<Self>) -> AnyElement {
-        div()
-            .flex_1()
-            .min_w(px(0.))
-            .min_h(px(0.))
-            .child(panel.clone())
+        panel
+            .clone()
+            .cached(gpui::StyleRefinement::default().flex_1().min_w(px(0.)).min_h(px(0.)))
             .into_any_element()
     }
 }
 
 impl Render for BölümlerPaneli {
     fn render(&mut self, pencere: &mut Window, bağlam: &mut Context<Self>) -> impl IntoElement {
-        BÖLÜM_ÇİZİMİ.fetch_add(1, std::sync::atomic::Ordering::Relaxed);
+        BÖLÜM_ÇİZİMİ.with(|sayaç| sayaç.set(sayaç.get() + 1));
         // Bölümler kökün bağlamında üretilir: kart içeriklerindeki bütün
         // dinleyiciler `tezgahı_değiştir` ve akrabalarına, yani köke bağlı.
         let Ok(bölümler) = self
@@ -410,14 +416,23 @@ mod testler {
             !gövde.contains("observe(alan") && !gövde.contains("subscribe(alan"),
             "bölüm paneli alana bağlanmış: tuş vuruşu kolonu kirletir"
         );
-        // Önbellek geri gelirse davranış kapısı `tests/kolon_tazeligi.rs`
-        // olmalı: `cached` sınırı ölçümde geçersizleşmedi ve kolonu
-        // donduruyordu.
-        assert!(
-            !gövde.contains(".cached("),
-            "sağ kolon yeniden önbelleğe alınmış: `kolon_tazeligi` kapısı \
-             geçilmeden `cached` geri gelmemeli"
-        );
+        // Önbellek ile geçersizleme yolu **birlikte** yaşar: `cached`
+        // sınırı GPUI'de `notify` ile patlamaz, yalnız `refresh` patlatır
+        // (§6.3). Biri varken diğeri yoksa kolon donar ve bayat
+        // yapılandırma gösterir.
+        let lib = include_str!("lib.rs");
+        if gövde.contains(".cached(") {
+            assert!(
+                lib.contains("bağlam.refresh_windows()"),
+                "kolon önbellekli ama geçersizleme yolu yok: `refresh` \
+                 çağrılmadan `notify` bu sınırı patlatmaz"
+            );
+            assert!(
+                lib.matches("self.kolonu_geçersizle(bağlam)").count() >= 4,
+                "kolonu ilgilendiren kök değişimlerinden biri geçersizleme \
+                 çağırmıyor (tercih, tema, seçici, dış bildirim)"
+            );
+        }
     }
 
     /// Kökün çizim yolunda alan okuması kalmadı.

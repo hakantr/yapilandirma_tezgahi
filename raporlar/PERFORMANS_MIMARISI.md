@@ -109,30 +109,34 @@ GPUI kökten çizdiği için tuş vuruşu başına ağaç kuruluşu birinci turd
    kimlik fabrikası tüketimi kalktı (ölçülebilir, kesin).
 2. Çift köprünün gereksiz gözlemci çağrıları kalktı.
 3. Alan okuyan her kart artık gözleyen bir entity'de — ikinci turun
-   (`cached` bölgeler) doğruluk ön koşulu hazırlandı.
+   (`cached` bölgeler) doğruluk ön koşulu hazırlandı. Bu ön koşul işe
+   yaradı: sağ kolon önbelleğe alındığında alan okumadığı için bayatlama
+   riski taşımadı (§6.5).
 
-## 4. İkinci tur: sağ kolon bölüm paneli — ÖNBELLEK KISMI GERİ ALINDI
+## 4. İkinci tur: sağ kolon bölüm paneli — HEDEF TUTTU (düzeltmeyle)
 
-> **Uyarı (ölçüm turu, 24 Ağu 2026).** Bu bölümün önbellek iddiası
-> **çürütüldü**: `Entity::cached` sınırı ilk çizimden sonra hiç
-> geçersizleşmiyordu, yani kolon "tuş vuruşunda kurulmuyor" değil, **hiçbir
-> zaman yeniden kurulmuyordu** — bayat bir yapılandırma yüzeyi. Önbellek
-> kaldırıldı; panel yapısı, kabuk sınırı ve `tezgah_bölümleri` tek-kaynağı
-> korundu. Ayrıntı ve kanıt: §6.3. Aşağıdaki alt bölümler, neyin
-> denendiğini ve hangi gerekçelerin ayakta kaldığını göstermek için
-> bırakıldı; önbellekle ilgili cümleler artık **tarihsel**dir.
+> **Not (ölçüm turu, 24 Ağu 2026).** Bu turun hedefi — tuş vuruşu karesinde
+> sağ kolonun kurulmaması — **gerçekleşti ve ölçüldü** (§6.2), ama o günkü
+> hâliyle değil. Önbellek sınırı doğruydu; eksik olan **geçersizleme
+> yoluydu**: GPUI'de `notify` bir `cached` sınırını patlatmaz, bu yüzden
+> kolon açılıştan sonra hiç yeniden kurulmuyor, yani bayat kalıyordu.
+> Ölçüm bunu yakaladı, çalışan yol (`refresh`) bulundu ve kolon doğru
+> geçersizlemeyle önbelleğe geri alındı. Kanıt ve gerekçe: §6.3–6.5.
+> Aşağıdaki alt bölümlerde önbellekle ilgili cümleler o günkü hâli anlatır;
+> geçerli mekanik §6.5'tedir.
 
 ### 4.1 `BölümlerPaneli` (`src/paneller.rs`)
 
-- Sağ kolonun tamamı tek entity: gövdeye hazır element olarak girer
-  (`Tezgahİçeriği.yapılandırma: AnyElement`). *(Tarihsel: bir süre
-  `Entity::cached(StyleRefinement …flex_1())` sınırındaydı; kolon kaydıran
-  bir kap olduğu için `cached`ın "stilden yerleşir, içerikten ölçülmez"
-  kısıtına uygun görünüyordu. Bölüm kartları içerik yükseklikli olduğundan
-  kart başına önbellek zaten kurulamaz.)*
-- Panel alanı **gözlemez** — tuş vuruşları kolona bu yoldan işlemez.
-  *(Tarihsel: kökü `observe` ediyordu; önbellek kalkınca o abonelik de
-  gereksizleşti ve kaldırıldı — panel zaten kök çiziminin parçası.)*
+- Sağ kolonun tamamı tek önbellekli entity:
+  `Entity::cached(StyleRefinement …flex_1())` sınırında gövdeye girer
+  (`Tezgahİçeriği.yapılandırma: AnyElement`). Kolon kaydıran bir kap
+  olduğu için boyutu içerikten bağımsızdır — `cached`ın "stilden yerleşir,
+  içerikten ölçülmez" kısıtına uyar. Bölüm **kartları** içerik yükseklikli
+  olduğundan kart başına önbellek kurulamaz; sınır kolon düzeyindedir.
+- Panel alanı **gözlemez** — tuş vuruşları kolona işlemez. *(O gün kökü
+  `observe` ediyordu ve geçersizlemenin bundan geleceği sanılıyordu;
+  §6.3 bunun çalışmadığını gösterdi, abonelik kaldırıldı ve yerini kökün
+  `kolonu_geçersizle` çağrısı aldı.)*
 - **Listener'lar yeniden yazılmadı.** Panelin çizimi kökü `update` ile
   açar ve bölümleri kökün kendi bağlamında üretir
   (`GaleriUygulaması::tezgah_bölümleri` → profilin `bölümler()`i);
@@ -240,10 +244,10 @@ kapalı seçicinin kare maliyeti tek tetikleyici satırıdır. Bekçi:
   dâhil her yere işliyor; alana yazma ve yuva notu canlılığı bozulmadı.
 
 Bu turdan sonra tuş vuruşu karesinde kalan iş: kök kabuğu + sol kolonun
-şerit/kart elementleri (listeleri kırpılmış hâlde) + sağ kolon + alan
-gözleyen küçük paneller. Hiçbir kapalı liste kurulmaz, hiçbir
-çözüm/rapor/kod yeniden hesaplanmaz. *(Bu cümle önce "sağ kolon
-kurulmaz" diyordu; ölçüm turu onu düzeltti — §6.)*
+şerit/kart elementleri (listeleri kırpılmış hâlde) + alan gözleyen küçük
+paneller. Sağ kolon önbellekten gelir (§6.5), hiçbir kapalı liste
+kurulmaz, hiçbir çözüm/rapor/kod yeniden hesaplanmaz. Ölçülen karşılık:
+~1,16 ms (§6.2).
 
 ## 6. Ölçüm turu (24 Ağu 2026) — hakem konuştu
 
@@ -276,21 +280,30 @@ kendi geçerlilik kapısını taşıyor (`kolon N/N`).
 
 ### 6.2 Sayılar (macOS, `akici-dev`, 1600×1000, 200 tekrar)
 
-| Senaryo | ort | p50 | p95 | en az |
-|---|---|---|---|---|
-| D · temiz kare | 3,03 ms | 3,00 ms | 3,23 ms | 2,96 ms |
-| K · tuş vuruşu | 3,11 ms | 3,09 ms | 3,21 ms | 3,06 ms |
-| S · seçici | 3,19 ms | 3,21 ms | 3,34 ms | 3,06 ms |
-| T · tercih | 3,16 ms | 3,15 ms | 3,29 ms | 3,06 ms |
+| Senaryo | ort | p50 | p95 | en az | kolon kurulumu |
+|---|---|---|---|---|---|
+| D · temiz kare | 1,06 ms | 1,05 ms | 1,11 ms | 1,05 ms | 0/200 |
+| K · tuş vuruşu | 1,16 ms | 1,15 ms | 1,20 ms | 1,14 ms | 0/200 |
+| S · seçici | 1,28 ms | 1,32 ms | 1,41 ms | 1,17 ms | 200/200 |
+| T · tercih | 1,22 ms | 1,23 ms | 1,30 ms | 1,17 ms | 200/200 |
+
+Karşılaştırma — kolon önbelleksizken (aynı koşum, aynı makine):
+
+| Senaryo | önbelleksiz | önbellekli | kazanç |
+|---|---|---|---|
+| D · temiz kare | 3,03 ms | 1,06 ms | %65 |
+| K · tuş vuruşu | 3,11 ms | 1,16 ms | **%63** |
+| T · tercih | 3,16 ms | 1,22 ms | %61 |
 
 Okuma:
 
-- **Kare maliyeti ~3 ms** ve senaryolar arası fark %2–5. Yani maliyet
-  mutasyonun türünde değil, **ekranın tamamını her karede kurmakta**.
-  Üç turun daralttığı işler (rapor, kod, kapalı listeler, çözüm) bu
-  tablodaki farkların altında kalıyor — çünkü hepsi zaten kaldırıldı.
-- 120 FPS bütçesi (8,33 ms) karşısında ~%37, 60 FPS (16,7 ms) karşısında
-  ~%19. Rahat ama bedava değil.
+- **Tuş vuruşu karesi ~1,16 ms** ve o karede sağ kolon hiç kurulmuyor
+  (0/200). İkinci turun hedefi buydu; artık ölçülü.
+- Tercih ve seçici karelerinde kolon her seferinde kuruluyor (200/200) —
+  tazelik korunuyor. Sayı sütunu bu yüzden tabloda: süreler ancak bu
+  kapıyla birlikte anlamlı.
+- 120 FPS bütçesi (8,33 ms) karşısında ~%14, 60 FPS (16,7 ms) karşısında
+  ~%7.
 - Bu sayılar headless CPU'dur ve **gerçek gecikme değildir**; sunum,
   giriş kuyruğu ve vsync eklenmemiştir.
 
@@ -315,22 +328,71 @@ değişimiydi ve ekranda değişen şeyler kolon dışındaki yollardan da
 geliyordu; "kolon güncel görünüyor" izlenimi, "bu kare kolonu yeniden
 kurdu" ile aynı şey değil. Bu ayrımı yalnız sayaç yapabiliyor.
 
-**Kaybın büyüklüğü ölçüldü.** Donmuş kolonla kare ~1,1 ms, canlı kolonla
-~3,0 ms. Yani sağ kolonun kurulumu kare maliyetinin **~%60'ı**. Doğru
-geçersizleme yolu bulunursa kazanç büyüktür — bu yüzden `cached` fikri
-ölü değil, **kapıya bağlandı**: `tests/kolon_tazeligi.rs` geçilmeden geri
-gelmemeli. Bir sonraki denemede araştırılacak yer, GPUI'nin bildirimi
-`dirty_views`e çeviren yolu: `App::notify` yalnız pencerenin
-`tracked_entities` kümesindeki entity'ler için `invalidate_view` çağırır
-ve önbellekten dönen bir view o kümeye kendi kimliğiyle girmiyor olabilir.
+**Kaybın büyüklüğü ölçüldü.** Donmuş kolonla kare ~1,1 ms, önbelleksiz
+canlı kolonla ~3,0 ms. Yani sağ kolonun kurulumu kare maliyetinin
+**~%60'ı** — kazanç gerçek, eksik olan tek şey geçersizlemeydi.
 
-### 6.4 Kalıcı kapı (`tests/kolon_tazeligi.rs`)
+### 6.4 Ölçümün kendi iki hatası
 
-Ölçümden bağımsız, her `cargo test` koşumunda koşar ve davranış sabitler:
-temiz karede, tercih değişiminde, tür değişiminde ve tuş vuruşunda kolon
-**kurulur**. Sıfır dönen bir senaryo donmuş bir önbellek demektir. Yapısal
-bekçi de tamamlandı: `paneller.rs` içinde `.cached(` yeniden belirirse
-test düşer.
+Sayaç yalnız mimariyi değil, ölçümü de denetledi:
+
+- **Yanlış kare.** Mutasyon ayrı bir `update` bloğuna konduğunda, test
+  kipindeki efekt döngüsü kirli pencereyi kendiliğinden çiziyor
+  (`app.rs`, `flush_effects`) ve ölçülen `draw` mutasyondan **sonraki
+  ikinci** kare oluyordu. Bu, bir ara "`refresh_windows` de işe yaramıyor"
+  sonucunu üretti — oysa işe yarıyordu, etkisi ölçülmeyen karede kalıyordu.
+- **Paylaşılan sayaç.** Sayaç süreç genelinde `static`ti; aynı süreçte
+  paralel koşan testler birbirinin çizimlerini sayıyor ve sahte
+  başarısızlık üretiyordu. `thread_local` yapıldı — bir GPUI uygulaması
+  zaten kendi iş parçacığında çizer.
+
+Ders: ölçüm aracı da ölçülen sistem kadar şüpheyle karşılanmalı. Her iki
+hata da "beklenmedik sayı" olarak göründü ve kovalandığında araçta çıktı.
+
+### 6.5 Çözüm: geçersizleme `refresh` ile yapılır
+
+Üç yol denendi ve sayaçla ayırt edildi:
+
+| Yol | Kolon yeniden kuruldu mu? |
+|---|---|
+| Kökün bildirimi (`observe(kök) → notify`) | hayır |
+| Panele **doğrudan** `notify` | hayır |
+| `refresh_windows()` / `Window::refresh()` | **evet** |
+
+Nedeni GPUI'nin bildirim yolundadır: `App::notify` bir entity'nin
+bildirimini yalnız o entity pencerenin `tracked_entities` kümesindeyken
+`invalidate_view`e çevirir; önbellekten dönen bir view render edilmediği
+için o kümeye kendi kimliğiyle girmez ve `dirty_views`e hiç ulaşmaz.
+`refresh` ise ayrı bir kanaldır: `refreshing` bayrağı prepaint'teki cache
+koşulunu doğrudan düşürür (`view.rs` · `!window.refreshing`).
+
+Uygulama: kök `GaleriUygulaması::kolonu_geçersizle` ile
+`cx.refresh_windows()` çağırır ve bunu kolonu ilgilendiren **her** kök
+değişiminde yapar — tercih (`tezgahı_değiştir`), tema (`temayı_tazele`),
+açık seçici (`seçiciyi_değiştir`), `§16` dış bildirim
+(`tezgah_dış_bildirimi`). Efekt üzerinden çalışması `Window` erişimi
+gerektirmemesini sağlar ve gerçek akışa uyar: listener bildirir, efekt
+döngüsü bayrağı kurar, sıradaki kare kolonu yeniden kurar, sonraki temiz
+kareler yine önbellekten gelir.
+
+Bir yan gözlem: alana ilk yazma da bütün önbellekleri atlar, çünkü
+`Window::focus` `refresh()` çağırır (odak halkası ve tuş yönlendirmesi
+pencere geneli meselelerdir). Sonraki vuruşlar odağı değiştirmediği için
+önbellek isabet eder — ölçümdeki 0/200 bu evrenindir.
+
+### 6.6 Kalıcı kapı (`tests/kolon_tazeligi.rs`)
+
+Ölçümden bağımsız, her `cargo test` koşumunda koşar ve **iki yönü birden**
+sabitler; biri olmadan diğeri değersizdir:
+
+- **Tazelik:** tercih, tür, tema, açık seçici ve dış bildirim kolonu
+  yeniden kurdurur. Kurdurmazsa ekranda bayat yapılandırma kalır.
+- **Kazanç:** temiz kare ve (odak kurulduktan sonraki) tuş vuruşları
+  kolonu kurdurmaz. Kurdururlarsa önbellek hiçbir işe yaramıyordur.
+
+Yapısal bekçi de buna bağlandı: `paneller.rs` içinde `.cached(` varsa,
+`lib.rs` içinde `refresh_windows` çağrısı ve en az dört
+`kolonu_geçersizle` kullanımı bulunmalıdır.
 
 ## 7. İnceleme düzeltmeleri (24 Ağu 2026, bağımsız salt-okunur inceleme)
 
@@ -368,10 +430,12 @@ koşar; hiçbir entity kirli değilse çizim de yoktur.
 
 ## 8. Sıradaki işler
 
-1. **Doğru geçersizleme yolu** (§6.3): `cached`'in neden patlamadığı
-   GPUI'nin `tracked_entities` → `invalidate_view` kapısında aranmalı.
-   Bulunursa kazanç ölçülü ve büyüktür (~%60 kare maliyeti); bulunmazsa
-   sağ kolon bugünkü hâlinde kalır ve bu da kayıtlı bir karardır.
+1. **Sol kolon ve üst şerit için aynı desen:** kolonda işe yarayan
+   "önbellek + `refresh` ile geçersizleme" ikilisi oralara da uygulanabilir
+   mi? Engel duruyor (içerik yükseklikli bölgeler, alan gözleyen
+   panellerle serpiştirme — §5) ama artık çalışan bir desen ve ölçen bir
+   koşum var. Beklenen kazanç, kalan ~1,06 ms'lik taban maliyetin bir
+   bölümü.
 2. **Linux ölçümü:** aynı koşum kullanıcının Linux düğümünde
    (`CosmicTextSystem` iki hedefte de aynı olduğu için sayılar
    karşılaştırılabilir).

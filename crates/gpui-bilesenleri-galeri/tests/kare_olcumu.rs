@@ -20,14 +20,14 @@
 //! Linux'ta Cosmic shaping kullanılır; Noop metin sistemi kullanılmaz
 //! çünkü kare maliyetinin metin payını sıfır gösterirdi.
 //!
-//! Senaryolar (dördünde de tam ağaç kurulur; fark, ağaç dışındaki işte):
-//! - **D · temiz kare**: mutasyon yok. Ekranın taban çizim maliyeti.
+//! Senaryolar:
+//! - **D · temiz kare**: mutasyon yok; önbellekli kolon yeniden kullanılır.
 //! - **K · tuş vuruşu**: alan metni gerçek giriş yolundan değişir; alan ve
-//!   onu gözleyen paneller kirlenir. Mimarinin hedef senaryosu.
-//! - **S · seçici**: açık seçici değişir; açılan seçicinin liste içeriği
-//!   de kurulur (tembel liste yolu).
-//! - **T · tercih**: `tezgahı_değiştir` — tercih sürümü artar, `§29`
-//!   raporu ve kod paneli metni yeniden üretilir. En pahalı olağan yol.
+//!   onu gözleyen paneller kirlenir, kolon **kurulmaz**. Hedef senaryo.
+//! - **S · seçici**: açık seçici değişir; kolon tazelenir ve açılan
+//!   seçicinin liste içeriği de kurulur (tembel liste yolu).
+//! - **T · tercih**: `tezgahı_değiştir` — sürüm artar, `§29` raporu ve kod
+//!   metni yeniden üretilir, kolon tazelenir. En pahalı olağan yol.
 
 #![allow(non_ascii_idents)]
 
@@ -192,12 +192,18 @@ fn kare_maliyeti() {
     // Ölçümün kendi geçerlilik kapısı: süreler ancak kolonun her karede
     // gerçekten kurulduğu biliniyorsa yorumlanabilir. Donmuş bir kolon
     // sayıları olduğundan ucuz gösterirdi — üçüncü turda tam da bu oldu.
-    for (ad, sonuç) in [("D", &d), ("K", &k), ("S", &s), ("T", &t)] {
-        assert!(
-            sonuç.kolon_çizimi >= TEKRAR as u64,
-            "{ad}: kolon {}/{TEKRAR} karede kuruldu — süreler bu hâliyle \
-             yorumlanamaz (bkz. tests/kolon_tazeligi.rs)",
-            sonuç.kolon_çizimi
-        );
-    }
+    // Kolon önbelleklidir: D ve K'de kurulmamalı (kazanç), T'de kurulmalı
+    // (tazelik). Sayı bu yüzden sürelerin nasıl okunacağını da söyler.
+    assert_eq!(
+        d.kolon_çizimi, 0,
+        "temiz karede kolon kuruluyor: önbellek isabet etmiyor"
+    );
+    assert_eq!(
+        k.kolon_çizimi, 0,
+        "tuş vuruşunda kolon kuruluyor: alan bildirimi kolona sızıyor"
+    );
+    assert!(
+        t.kolon_çizimi > 0,
+        "tercih değişiminde kolon kurulmuyor: yüzey bayat kalır"
+    );
 }
