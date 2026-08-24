@@ -1,14 +1,15 @@
-//! Alanı gözleyen tezgâh panelleri.
+//! Tezgâh panelleri.
 //!
-//! Kök `GaleriUygulaması` alanın durum değişimlerini dinlemez. GPUI her
-//! çizimde kökten render eder; render atlama yalnız `Entity::cached`
-//! sınırlarında, `dirty_views` kümesi üzerinden çalışır ve bir view ancak
-//! **kendisi** bildirdiğinde (ya da bir alt view'ı bildirdiğinde) kirlenir.
-//! Alan durumunu okuyan kartların kendi entity'lerinde yaşaması bu yüzden
-//! yalnız düzen değil, ilerideki önbellekli bölgelerin (sağ kolon bölüm
-//! entity'leri) **doğruluk ön koşuludur**: önbelleğe alınmış bir bölge alanı
-//! okusaydı, alan değiştiğinde bayat kalırdı — okuma gözleyen panelde
-//! durursa alanın bildirimi yalnız paneli kirletir.
+//! Kök `GaleriUygulaması` alanın durum değişimlerini dinlemez: alan
+//! durumunu okuyan kartlar kendi entity'lerinde yaşar ve alanın bildirimi
+//! yalnız onları kirletir. Kazanç **yarıçaptır**, sıklık değil — GPUI
+//! gerçekleşen her çizimde kökten render eder, yani bu paneller de her
+//! çizimde yeniden kurulur; kirlenen alan tuş vuruşunda kabuğun tamamına
+//! değil bu üç küçük panele değer.
+//!
+//! Sağ kolon (`BölümlerPaneli`) da burada yaşar ama alanı gözlemez; kök
+//! çiziminin parçası olarak çizilir. Bir süre `Entity::cached` sınırındaydı
+//! ve üçüncü tur ölçümü onu geri aldı — gerekçe tipin belgesinde.
 //!
 //! Panel çizimleri `sergiler.rs`'teki `pub(crate)` fonksiyonları kullanır;
 //! kart gövdeleri orada kalır çünkü `§16.2` yapısal kanıt testleri
@@ -16,8 +17,7 @@
 //! `include_str!` ile okur.
 
 use gpui::{
-    AnyElement, Context, Entity, IntoElement, Render, StyleRefinement, WeakEntity, Window, div,
-    prelude::*, px,
+    AnyElement, Context, Entity, IntoElement, Render, WeakEntity, Window, div, prelude::*, px,
 };
 use gpui_bilesenleri::GirişKutusu;
 
@@ -25,8 +25,8 @@ use crate::{GaleriUygulaması, TezgahOlayı, OLAY_AKIŞI_SINIRI};
 
 /// Tezgâhın panel entity'leri; profil girdisinde birlikte taşınır.
 ///
-/// İlk üçü alanı gözler; `bölümler` ise **kökü** gözleyen önbellekli sağ
-/// kolondur.
+/// İlk üçü alanı gözler ve alan bildirdiğinde yalnız kendileri kirlenir;
+/// `bölümler` sağ kolondur ve kök çiziminin bir parçası olarak çizilir.
 #[derive(Clone)]
 pub struct TezgahPanelleri {
     pub alan_durumu: Entity<AlanDurumPaneli>,
@@ -246,53 +246,67 @@ impl Render for YuvaNotuPaneli {
     }
 }
 
-/// Sağ kolon: yapılandırma bölümlerinin **önbellekli** paneli.
-///
-/// Panel kökü gözler, alanı gözlemez. Çizimi `Entity::cached` sınırında
-/// yaşar: kök bildirmedikçe (tercih, tema, açık seçici, dış bildirim)
-/// bölümlerin element ağacı yeniden kurulmaz — tuş vuruşu karelerinde
-/// kolonun prepaint/paint aralıkları olduğu gibi yeniden kullanılır.
+/// Sağ kolon: yapılandırma bölümlerini kendi entity'sinde çizen panel.
 ///
 /// Bölüm kartlarının içindeki tıklama dinleyicileri köke bağlı kalır:
 /// çizim, kökü `update` ile açıp bölümleri kökün kendi bağlamında üretir.
-/// Kolonun içine gömülü tercih kutuları (desen, ön ek, son ek) kendi
-/// bildirimlerini yayımlar; GPUI bildirilen view'ın atalarını da
-/// kirlettiği için onlara yazmak bu panelin önbelleğini kendiliğinden
-/// patlatır. Kaydırma da aynı yoldan geçer: GPUI kaydırma ofsetini
-/// değiştirirken kaydıran öğenin view'ını bildirir.
+/// Kabuk (`tezgah/govde.rs`) kolonu hazır element olarak alır ve yalnız
+/// yerleştirir.
+///
+/// **Önbellek denendi ve geri alındı (üçüncü tur ölçümü).** Kolon bir süre
+/// `Entity::cached` sınırındaydı; ölçüm koşumuna eklenen çizim sayacı,
+/// önbelleğin ilk çizimden sonra **hiç patlamadığını** gösterdi: ne kökün
+/// bildirimi, ne panele doğrudan `notify`, ne `refresh_windows` kolonu
+/// yeniden kurdurdu (kanıt: `tests/kolon_tazeligi.rs` ve raporun §5.4'ü).
+/// Donmuş bir kolon bayat yapılandırma gösterir; bu bir hız kazancı değil,
+/// doğruluk hatasıdır. Panel yapısı korunuyor çünkü kabuk sınırı temiz ve
+/// doğru geçersizleme yolu bulunursa önbellek tek satırla geri gelir —
+/// ama o gün `kolon_tazeligi` testi onu doğrulamadan geri gelmemeli.
 pub struct BölümlerPaneli {
     kök: WeakEntity<GaleriUygulaması>,
-    _abonelik: gpui::Subscription,
+}
+
+/// Sağ kolonun çizim sayacı.
+///
+/// "Kolon bu karede kuruldu mu" sorusunu kare süresi yanıtlayamaz: kolon
+/// kurulumu toplam karenin küçük bir payıdır ve gürültüde kaybolur. Bu
+/// yüzden soru doğrudan sayılır — üçüncü turun önbellek bulgusu da bu
+/// sayaçla çıktı. `tests/kolon_tazeligi.rs` ve ölçüm koşumu okur.
+///
+/// `Relaxed` yeterli: sayaç yalnız aynı iş parçacığındaki çizimleri sayar
+/// ve başka veriye erişim sıralamaz.
+static BÖLÜM_ÇİZİMİ: std::sync::atomic::AtomicU64 = std::sync::atomic::AtomicU64::new(0);
+
+/// Sağ kolonun şimdiye kadarki çizim sayısı.
+pub fn bölüm_çizim_sayısı() -> u64 {
+    BÖLÜM_ÇİZİMİ.load(std::sync::atomic::Ordering::Relaxed)
 }
 
 impl BölümlerPaneli {
-    pub(crate) fn yeni(kök: &Entity<GaleriUygulaması>, bağlam: &mut Context<Self>) -> Self {
-        // Kökün her bildirimi önbelleği patlatır: panel kökün durumundan
-        // (tercih, rapor, portlar, açık seçici, tema) çizer ve o durum
-        // yalnız kök bildirdiğinde değişir. Alan bildirimleri kökü artık
-        // bildirmediği için tuş vuruşları buraya işlemez.
-        let abonelik = bağlam.observe(kök, |_, _, bağlam| bağlam.notify());
+    pub(crate) fn yeni(kök: &Entity<GaleriUygulaması>) -> Self {
         Self {
             kök: kök.downgrade(),
-            _abonelik: abonelik,
         }
     }
 
-    /// Panelin gövdeye giren önbellekli elementi.
+    /// Panelin gövdeye giren elementi.
     ///
-    /// Sarmalayıcı stil, kolonun eski flex sızasını birebir taşır: kalan
-    /// genişliği alır, sıkışabilir. Önbellekli view içerikten ölçülmez;
-    /// boyut bu stilden ve satırın çapraz ekseninden (stretch) çözülür.
+    /// Sarmalayıcı, kolonun flex sızasını taşır: kalan genişliği alır,
+    /// sıkışabilir. Panel bu sarmalayıcının çocuğudur ve her karede
+    /// çizilir.
     pub(crate) fn öğe(panel: &Entity<Self>) -> AnyElement {
-        panel
-            .clone()
-            .cached(StyleRefinement::default().flex_1().min_w(px(0.)).min_h(px(0.)))
+        div()
+            .flex_1()
+            .min_w(px(0.))
+            .min_h(px(0.))
+            .child(panel.clone())
             .into_any_element()
     }
 }
 
 impl Render for BölümlerPaneli {
     fn render(&mut self, pencere: &mut Window, bağlam: &mut Context<Self>) -> impl IntoElement {
+        BÖLÜM_ÇİZİMİ.fetch_add(1, std::sync::atomic::Ordering::Relaxed);
         // Bölümler kökün bağlamında üretilir: kart içeriklerindeki bütün
         // dinleyiciler `tezgahı_değiştir` ve akrabalarına, yani köke bağlı.
         let Ok(bölümler) = self
@@ -379,7 +393,7 @@ mod testler {
     /// karede yeniden kurulur; kök gözlemi olmadan da önbellek tercih ve
     /// tema değişiminde bayat kalır. Bekçi ikisini birlikte tutar.
     #[test]
-    fn bölüm_kolonu_önbellekli_ve_kökü_gözler() {
+    fn bölüm_kolonu_alana_bağlanmaz() {
         let paneller = include_str!("paneller.rs");
         // Testin kendi gövdesi aramaya girmesin: tarama panel tanımından
         // test modülüne kadar sürer.
@@ -390,18 +404,19 @@ mod testler {
             .split_once("#[cfg(test)]")
             .expect("test modülü panel tanımından sonra gelir")
             .0;
-        assert!(
-            gövde.contains(".cached(StyleRefinement"),
-            "sağ kolon önbellekli sarmalayıcıdan geçmiyor"
-        );
-        assert!(
-            gövde.contains("bağlam.observe(kök"),
-            "bölüm paneli kökü gözlemiyor: tercih değişimi kolona işlemez"
-        );
-        // Kolon alanı gözlemez: tuş vuruşu önbelleği patlatmamalı.
+        // Kolon kökün durumundan çizilir; alana bağlanması tuş vuruşunu
+        // yeniden kolona taşırdı — birinci turun kaldırdığı bağ budur.
         assert!(
             !gövde.contains("observe(alan") && !gövde.contains("subscribe(alan"),
             "bölüm paneli alana bağlanmış: tuş vuruşu kolonu kirletir"
+        );
+        // Önbellek geri gelirse davranış kapısı `tests/kolon_tazeligi.rs`
+        // olmalı: `cached` sınırı ölçümde geçersizleşmedi ve kolonu
+        // donduruyordu.
+        assert!(
+            !gövde.contains(".cached("),
+            "sağ kolon yeniden önbelleğe alınmış: `kolon_tazeligi` kapısı \
+             geçilmeden `cached` geri gelmemeli"
         );
     }
 

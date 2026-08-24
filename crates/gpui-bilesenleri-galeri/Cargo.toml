@@ -22,3 +22,10 @@ web-sys = { version = "0.3", features = ["Window", "Performance"] }
 # profilinde gerekir; WASM çalışma profiline transitif olarak giremez.
 [dev-dependencies]
 gpui = { workspace = true, features = ["test-support"] }
+
+# Kare ölçüm koşumu (`tests/kare_olcumu.rs`) gerçek metin sistemiyle koşar:
+# Noop shaping, kare maliyetinin metin payını sıfır gösterirdi. Cosmic saf
+# Rust'tır ve macOS ile Linux'ta aynı shaping'i verir — iki hedefin
+# sayıları karşılaştırılabilir kalır. Yalnız test profilinde bağlanır.
+[target.'cfg(not(target_family = "wasm"))'.dev-dependencies]
+gpui_wgpu = { path = "../../../gpui/crates/gpui_wgpu" }

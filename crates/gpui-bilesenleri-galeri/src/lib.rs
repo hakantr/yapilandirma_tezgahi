@@ -754,6 +754,36 @@ impl GaleriUygulaması {
         süreler
     }
 
+    /// Kare ölçümü: tezgâh alanının metnini gerçek giriş yolundan değiştirir.
+    ///
+    /// `tests/kare_olcumu.rs` tuş vuruşu senaryosunu bununla kurar: metin
+    /// bileşenin kendi `replace_text_in_range` yolundan geçer (maske,
+    /// politika, bildirim ve olay yayını dâhil), alan tutamacı dışarı
+    /// verilmez. Her çağrı tüm metni değiştirir ki tekrarlar arasında
+    /// metin uzunluğu kaymasın.
+    pub fn ölçüm_alanına_yaz(
+        &mut self,
+        metin: &str,
+        pencere: &mut Window,
+        bağlam: &mut Context<Self>,
+    ) {
+        let alan = self.tezgah_alanını_al(pencere, bağlam);
+        let metin = metin.to_owned();
+        alan.update(bağlam, |alan, bağlam| {
+            alan.durum.tümünü_seç();
+            let seçim = alan
+                .durum
+                .bayt_aralığını_utf16_çevir(alan.durum.seçim_baytları());
+            gpui::EntityInputHandler::replace_text_in_range(
+                alan,
+                Some(seçim),
+                &metin,
+                pencere,
+                bağlam,
+            );
+        });
+    }
+
     /// `ORT-018` toplu ölçüm: `tekrar` kabulün toplam süresi (ms).
     ///
     /// Tarayıcı `performance.now()`u güvenlik gerekçesiyle `0.1 ms`e
@@ -880,7 +910,7 @@ impl GaleriUygulaması {
                 };
                 let bölümler = {
                     let kök = bağlam.entity();
-                    bağlam.new(move |bağlam| BölümlerPaneli::yeni(&kök, bağlam))
+                    bağlam.new(move |_| BölümlerPaneli::yeni(&kök))
                 };
                 self.tezgah_panelleri = Some(TezgahPanelleri {
                     alan_durumu,
