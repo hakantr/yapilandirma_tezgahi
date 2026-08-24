@@ -28,6 +28,20 @@ gpui-bilesenleri = { path = "../gpui_bilesenleri/crates/gpui-bilesenleri" }
 gpui-bilesenleri-kabuk = { path = "../gpui_bilesenleri/crates/gpui-bilesenleri-kabuk" }
 gpui-bilesenleri-galeri = { path = "crates/gpui-bilesenleri-galeri" }
 
+# Akıcı geliştirme profili: tezgâhın elle denendiği koşumlar için.
+# `dev` profili GPUI çizim yolunu optimizasyonsuz bırakıyor ve etkileşim
+# yargısı (takılıyor mu?) yanlış çıkıyor; `release` ise derleme döngüsünü
+# uzatıyor. Bağımlılıklar (GPUI dâhil) tam optimize edilir, çalışma ağacı
+# hızlı derlenen hafif optimizasyonda kalır.
+#
+#     cargo run --profile akici-dev -p gpui-bilesenleri-galeri-masaustu
+[profile.akici-dev]
+inherits = "dev"
+opt-level = 1
+
+[profile.akici-dev.package."*"]
+opt-level = 3
+
 [workspace.lints.rust]
 unsafe_code = "forbid"
 

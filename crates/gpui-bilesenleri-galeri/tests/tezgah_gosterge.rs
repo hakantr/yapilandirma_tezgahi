@@ -151,6 +151,8 @@ fn panel_sonucu_saklamaz() {
             "metin_girisi_tezgahi.rs",
             include_str!("../src/metin_girisi_tezgahi.rs"),
         ),
+        // Gözlem panelleri ayrı entity'lere taşındı; kapı onları da kapsar.
+        ("paneller.rs", include_str!("../src/paneller.rs")),
     ] {
         // Yorumlar elenir: tipin **adını** anmak onu saklamak değildir ve
         // neden saklanmadığını açıklayan yorum testi tetiklememeli.

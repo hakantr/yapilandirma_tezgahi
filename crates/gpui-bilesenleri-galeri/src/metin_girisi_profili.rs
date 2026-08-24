@@ -29,6 +29,12 @@ pub struct MetinGirişiProfilGirdisi<'a> {
     pub tercih: &'a TezgahTercihleri,
     pub alanlar: &'a crate::MetinGirişiAlanları,
     pub alan: Entity<GirişKutusu>,
+    /// Alanı gözleyen panel entity'leri: `C` türetilmiş durumlar, `§13/§19`
+    /// değer üçlüsü ve `§26` olay akışı.
+    ///
+    /// Profil bu kartları kendisi çizmez; paneller alanın bildirimini kendi
+    /// dinler ve alan değiştiğinde yalnız kendileri kirlenir.
+    pub paneller: &'a crate::TezgahPanelleri,
     pub saat_dilimi: &'a ÇözülmüşSaatDilimi,
     pub doldurma_var: bool,
     /// `B` bölümü port kapıları. Her port ayrı bağlanır ve ayrı raporlanır:
@@ -39,9 +45,10 @@ pub struct MetinGirişiProfilGirdisi<'a> {
     ///
     /// Kart raporu **kurmaz**, hazır alır: yapılandırmayı ikinci kez kurmak
     /// ekranda gösterilenle uygulanan arasında sessiz bir fark açardı.
+    /// Rapor tercih sürümüne bağlıdır; kök yalnız tercih değişince kurar.
     pub rapor: &'a gpui_bilesenleri::GirişYapılandırmaRaporu,
-    /// `§26` alanın yayımladığı son olaylar; en yeni **başta**.
-    pub olaylar: &'a [crate::TezgahOlayı],
+    /// Kod panelinin metni; tercih sürümüne bağlı, kökten hazır gelir.
+    pub kod: gpui::SharedString,
     pub en_fazla_yarıçap: f32,
     pub köşe_izi: std::rc::Rc<std::cell::Cell<gpui::Bounds<gpui::Pixels>>>,
 }
@@ -89,23 +96,10 @@ fn önizleme_kabuğu(alan: &Entity<GirişKutusu>) -> gpui::Div {
 fn sol_kartlar(
     tercih: &TezgahTercihleri,
     alan: &Entity<GirişKutusu>,
-    olaylar: &[crate::TezgahOlayı],
+    paneller: &crate::TezgahPanelleri,
     bağlam: &mut Context<GaleriUygulaması>,
 ) -> Vec<gpui::AnyElement> {
-    use crate::sergiler::{
-        kabuk_yuvaları, parça_tipografisi, turetilmis_durum_satırı, yazı_biçimi_şeridi,
-    };
-
-    let çöz = |kimlik: &str| crate::tezgah_bölüm_adı(&bölüm_anahtarı(kimlik));
-    let kart = |başlık: gpui::SharedString, içerik: gpui::AnyElement| {
-        let g = crate::görünüm();
-        let t = crate::TezgahTokenları::paletten(crate::palet());
-        crate::kart(&g, &t)
-            .gap(g.kolonlar.kart_içi_aralık)
-            .child(crate::bölüm_başlığı(&g, &t, &başlık))
-            .child(içerik)
-            .into_any_element()
-    };
+    use crate::sergiler::{kabuk_yuvaları, parça_tipografisi, yazı_biçimi_şeridi};
 
     vec![
         // `§7.1` parça tipografisi ve kabukta bulunan yuvalar. Yaşayan
@@ -129,28 +123,11 @@ fn sol_kartlar(
         crate::sergiler::imleç_satırı(tercih, bağlam).into_any_element(),
         // `§16.2` ankraj ve açıklama yüzeyi; bunlar da kayar.
         gösterge_kutusu(tercih, bağlam).into_any_element(),
-        kart(
-            çöz("turetilmis_durum"),
-            turetilmis_durum_satırı(tercih, alan, bağlam).into_any_element(),
-        ),
-        // `§13`/`§19` değer üçlüsü: kutuda tek metin görünür ama alan üç
-        // ayrı şey tutar.
-        {
-            let g = crate::görünüm();
-            let t = crate::TezgahTokenları::paletten(crate::palet());
-            crate::kart(&g, &t)
-                .child(crate::sergiler::değer_durumu(alan, bağlam))
-                .into_any_element()
-        },
-        // `§26` olay akışı en altta: türetilmiş durum "alan şu an ne
-        // durumda"yı, akış "oraya nasıl geldi"yi söyler.
-        {
-            let g = crate::görünüm();
-            let t = crate::TezgahTokenları::paletten(crate::palet());
-            crate::kart(&g, &t)
-                .child(crate::sergiler::olay_akışı(olaylar, bağlam))
-                .into_any_element()
-        },
+        // `C` türetilmiş durumlar + `§13/§19` değer üçlüsü ve `§26` olay
+        // akışı kendi entity'lerinde: alanın durumunu onlar okur, alanın
+        // bildirimini onlar dinler. Kartların kendisi panellerin çizimidir.
+        paneller.alan_durumu.clone().into_any_element(),
+        paneller.olay_akışı.clone().into_any_element(),
     ]
 }
 
@@ -200,11 +177,12 @@ pub fn tezgah_içeriği(
         tercih,
         alanlar,
         alan,
+        paneller,
         saat_dilimi,
         doldurma_var,
         portlar,
         rapor,
-        olaylar,
+        kod,
         en_fazla_yarıçap,
         köşe_izi,
     } = girdi;
@@ -219,8 +197,8 @@ pub fn tezgah_içeriği(
         // durumlar → kod paneli` sırasını veriyor. `D` aile kataloğu da
         // önizleme bağlamıdır ve aynı kolonda durur; ikisi de sağ kolonun
         // yapılandırma eksenleri arasına karışmaz.
-        sol_ek: sol_kartlar(tercih, &alan, olaylar, bağlam),
-        kod: Some(crate::sergiler::kod_paneli(tercih).into_any_element()),
+        sol_ek: sol_kartlar(tercih, &alan, paneller, bağlam),
+        kod: Some(crate::sergiler::kod_paneli(kod).into_any_element()),
         bölümler: bölümler(
             BölümGirdisi {
                 tercih,
@@ -535,6 +513,9 @@ mod testler {
     fn bölüm_sözlüğünde_ölü_kayıt_yok() {
         let kaynak = include_str!("galeri.rs");
         let profil = include_str!("metin_girisi_profili.rs");
+        // Alan gözleyen kartların başlıkları panel entity'lerinde çözülür;
+        // oradaki kullanım da sözlük kaydını canlı tutar.
+        let paneller = include_str!("paneller.rs");
         let ön_ek = "\"galeri.tezgah.bölüm.";
         for satır in kaynak.lines() {
             let Some(kalan) = satır.split(ön_ek).nth(1) else {
@@ -545,7 +526,8 @@ mod testler {
             };
             assert!(
                 profil.contains(&format!("kimlik: \"{kimlik}\""))
-                    || profil.contains(&format!("çöz(\"{kimlik}\")")),
+                    || profil.contains(&format!("çöz(\"{kimlik}\")"))
+                    || paneller.contains(&format!("galeri.tezgah.bölüm.{kimlik}")),
                 "sözlükte ölü kayıt: {kimlik}"
             );
         }

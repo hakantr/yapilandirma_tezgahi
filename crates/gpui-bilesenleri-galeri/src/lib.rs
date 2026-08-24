@@ -23,6 +23,9 @@ mod metin_girisi_profili;
 mod metin_girisi_tezgahi;
 mod onboarding;
 mod palet;
+// Alanı gözleyen panel entity'leri: kök alanın durum değişimini dinlemez,
+// bu paneller dinler (performans mimarisi turu, Ağu 2026).
+mod paneller;
 mod sergiler;
 mod simgeler;
 // Bileşen-bağımsız tezgâh kabuğu. `BİL-010` onun ilk profilidir; kabuk
@@ -45,6 +48,7 @@ pub use metin_girisi_profili::*;
 pub use metin_girisi_tezgahi::*;
 pub use onboarding::*;
 pub use palet::*;
+pub use paneller::*;
 pub use simgeler::*;
 pub use tezgah::*;
 pub use yazi_tipleri::*;
@@ -220,12 +224,22 @@ pub struct GaleriUygulaması {
     /// seçici açık kalır — iki liste birden açıksa hangisinin seçimi
     /// uygulanacağı belirsizleşir.
     açık_seçici: Option<gpui::SharedString>,
-    /// `§26` alanın yayımladığı son olaylar; en yeni **başta**.
+    /// Alanı gözleyen panel entity'leri (`C` türetilmiş durumlar, `§13/§19`
+    /// değer üçlüsü, `§26` olay akışı).
     ///
-    /// Tezgâhın yapılandırma yüzeyi "alan nasıl kurulur"u gösteriyordu;
-    /// bu akış "kurulan alan ürüne ne söyler"i gösterir. İkisi ayrı
-    /// sorular ve ikincisinin ekranda karşılığı yoktu.
-    tezgah_olayları: Vec<TezgahOlayı>,
+    /// Kök alanın durum değişimini dinlemez: alan okuyan kartlar kendi
+    /// entity'lerinde yaşar ve alan bildirdiğinde yalnız onlar kirlenir.
+    /// Alanla birlikte kurulur, tür değişiminde alana yeniden bağlanır.
+    tezgah_panelleri: Option<TezgahPanelleri>,
+    /// Tercih her değiştiğinde artar; rapor ve kod önbelleğinin anahtarı.
+    tercih_sürümü: u64,
+    /// `§29` doğrulama raporu, tercih sürümüne bağlı.
+    ///
+    /// Rapor yalnız tercihten türer. Her çizimde yeniden kurmak doğrulamayı
+    /// ve kimlik fabrikasını kare hızında çalıştırıyordu.
+    rapor_önbelleği: Option<(u64, Rc<gpui_bilesenleri::GirişYapılandırmaRaporu>)>,
+    /// Kod paneli metni, tercih sürümüne bağlı; yalnız `A` bölümünü taşır.
+    kod_önbelleği: Option<(u64, gpui::SharedString)>,
     galeri_teması: GaleriTeması,
     galeri_kipi: gpui_bilesenleri::TemaKipi,
     sergi_düğme_sayacı: u32,
@@ -292,7 +306,10 @@ impl GaleriUygulaması {
             // temalarla nasıl göründüğü tek bakışta karşılaştırılabilsin.
             tezgah_ekranı: true,
             açık_seçici: None,
-            tezgah_olayları: Vec::new(),
+            tezgah_panelleri: None,
+            tercih_sürümü: 0,
+            rapor_önbelleği: None,
+            kod_önbelleği: None,
             galeri_teması: match hedef {
                 GaleriHedefi::Masaüstü => GaleriTeması::Kağıt,
                 GaleriHedefi::Wasm => GaleriTeması::Mürekkep,
@@ -342,34 +359,19 @@ impl GaleriUygulaması {
         pencere: &mut Window,
         bağlam: &mut Context<Self>,
     ) -> gpui::Div {
-        let alanlar = match self.sergi_girişleri.clone() {
-            Some(alanlar) => alanlar,
-            None => {
-                let alanlar = MetinGirişiAlanları::kur(&self.kimlik_fabrikası, pencere, bağlam);
-                self.sergi_girişleri = Some(alanlar.clone());
-                alanlar
-            }
-        };
-        let alan = self.tezgah_alanını_al(pencere, bağlam);
+        // Gövde içeriği test erişim noktasıyla **aynı** yoldan üretilir;
+        // iki kopya bir süre yan yana yaşadı ve sessizce ayrışıyordu.
+        let içerik = self.tezgah_profil_içeriği(pencere, bağlam);
         let kabuk = sergiler::TezgahKabukDurumu {
             tema: self.galeri_teması,
             kip: self.galeri_kipi,
             hedef: self.model.hedef,
         };
-        let platform = sergiler::TezgahPlatformu {
-            sistem_aileleri: self.sistem_ailelerini_al(bağlam),
-            saat_dilimi: self.çözülmüş_saat_dilimi(),
-            doldurma_var: self.otomatik_doldurma_kullanılabilir(bağlam),
-            portlar: self.port_durumu(bağlam),
-            rapor: self.tezgah.yapılandırma(&self.kimlik_fabrikası).doğrula(),
-            olaylar: self.tezgah_olayları.clone(),
-        };
+        let sistem_aileleri = self.sistem_ailelerini_al(bağlam);
         gpui::div().size_full().child(sergiler::tezgah_ekranı(
             self.tezgah.clone(),
-            alan,
-            &alanlar,
-            self.köşe_izi.clone(),
-            platform,
+            içerik,
+            sistem_aileleri,
             kabuk,
             bağlam,
         ))
@@ -536,6 +538,10 @@ impl GaleriUygulaması {
             alan.doğrulama_portu = Some(std::sync::Arc::new(GösterimDoğrulamaPortu(sorunlar)));
             alan.eşzamansız_doğrulamayı_başlat(bağlam);
         });
+        // Port kapıları kartı `doğrulama_portu.is_some()` okur ve kök
+        // çizimindedir. Kök artık alanı gözlemediği için buradaki değişim
+        // açıkça bildirilir; sorunların kendisi panellerin işidir.
+        bağlam.notify();
     }
 
     /// Tezgâh tercihine göre çözülmüş saat dilimi.
@@ -601,6 +607,9 @@ impl GaleriUygulaması {
         // burada kapanan yalnız seçimi izleyen liste.
         self.açık_seçici = None;
         değiştir(&mut self.tezgah);
+        // Rapor ve kod önbelleğinin anahtarı: tercih değişmiş olabilir,
+        // sürüm artar ve ikisi de bir sonraki okumada yeniden kurulur.
+        self.tercih_sürümü = self.tercih_sürümü.wrapping_add(1);
         // Tür değişince o türde kurulamayan tercihler kapanır; galeride
         // görünmeyen bir tercihin kodda etkili kalması yanıltıcı olur.
         self.tezgah.türe_uyarla();
@@ -796,52 +805,74 @@ impl GaleriUygulaması {
             alan
         });
         self.tezgah_yardımcı_kimlikleri = Some(yardımcı_kimlikleri);
-        // `§16.2` gözlem paneli sonucu **saklamaz**; her çizimde alandan
-        // ödünç okur. Ödünç okumanın işe yaraması için tezgâhın alanla
-        // birlikte yeniden çizilmesi gerekir: alan kendi durumunu
-        // güncellediğinde `notify` yayımlar, bu abonelik onu tezgâha taşır.
-        //
-        // `observe` **bildirim** kanalıdır; galerinin başka yerlerindeki
-        // `subscribe` deseni **olay** kanalıdır ve bunun yerine geçmez —
-        // ikisi ayrı kanallardır ve alan her durum değişikliğinde olay
-        // yayımlamaz.
-        bağlam
-            .observe(&alan, |_bu, _alan, bağlam| bağlam.notify())
-            .detach();
-        // `§26` olay kanalı. `observe` her durum değişiminde bildirir ama
-        // **hangi** olayın yayımlandığını taşımaz; akış paneli tam olarak
-        // onu soruyor.
-        bağlam
-            .subscribe(&alan, |bu, _alan, olay, bağlam| {
-                bu.tezgah_olayını_kaydet(crate::olay_özeti(olay), bağlam);
-            })
-            .detach();
+        // Alanı gözleyen paneller alanla birlikte kurulur. `§16.2` gözlem
+        // paneli sonucu **saklamaz**; her çizimde alandan ödünç okur ve
+        // ödünç okumanın tazelenmesi için alanın bildirimini dinler. Kök bu
+        // bildirimi dinlemez: GPUI'de bir view ancak kendisi (ya da bir alt
+        // view'ı) bildirdiğinde kirlenir ve ilerideki önbellekli bölgeler
+        // ancak okuma gözleyen panelde durursa doğru kalır.
+        match self.tezgah_panelleri.clone() {
+            Some(paneller) => {
+                // Tür değişiminde alan yeniden kuruldu; paneller yaşamaya
+                // devam eder, yalnız yeni alana bağlanır.
+                paneller.alan_durumu.update(bağlam, |panel, bağlam| {
+                    panel.alanı_bağla(alan.clone(), bağlam);
+                });
+                paneller.olay_akışı.update(bağlam, |panel, bağlam| {
+                    panel.alanı_bağla(alan.clone(), bağlam);
+                });
+            }
+            None => {
+                let kök = bağlam.weak_entity();
+                let alan_durumu = {
+                    let alan = alan.clone();
+                    bağlam.new(move |bağlam| AlanDurumPaneli::yeni(kök, alan, bağlam))
+                };
+                let olay_akışı = {
+                    let alan = alan.clone();
+                    bağlam.new(move |bağlam| OlayAkışıPaneli::yeni(alan, bağlam))
+                };
+                self.tezgah_panelleri = Some(TezgahPanelleri {
+                    alan_durumu,
+                    olay_akışı,
+                });
+            }
+        }
         self.tezgah_alanı = Some(alan.clone());
         alan
     }
 
-    /// `§26` akışa bir olay ekler.
-    ///
-    /// Art arda gelen aynı olay yeni satır açmaz, sayacı artırır: metin
-    /// yazarken alan her tuşta `DüzenlemeMetniDeğişti` yayımlıyor ve akış
-    /// tek bir tuş dizisiyle doluyordu.
-    fn tezgah_olayını_kaydet(&mut self, olay: TezgahOlayı, bağlam: &mut Context<Self>) {
-        match self.tezgah_olayları.first_mut() {
-            Some(baş) if baş.ad == olay.ad && baş.özet == olay.özet => {
-                baş.sayı = baş.sayı.saturating_add(1);
-            }
-            _ => {
-                self.tezgah_olayları.insert(0, olay);
-                self.tezgah_olayları.truncate(OLAY_AKIŞI_SINIRI);
-            }
-        }
-        bağlam.notify();
+    /// Tezgâhın yürürlükteki tercihleri; paneller çizimde buradan okur.
+    pub(crate) fn tezgah_tercihleri(&self) -> &TezgahTercihleri {
+        &self.tezgah
     }
 
-    /// `§26` akışı boşaltır.
-    pub fn tezgah_olaylarını_temizle(&mut self, bağlam: &mut Context<Self>) {
-        self.tezgah_olayları.clear();
-        bağlam.notify();
+    /// `§29` doğrulama raporu; tercih sürümüne bağlı.
+    ///
+    /// Rapor yalnız tercihten türer. Her çizimde yeniden kurmak hem
+    /// doğrulamayı hem kimlik fabrikasını kare hızında çalıştırıyordu;
+    /// şimdi yalnız tercih değişince kurulur.
+    fn tezgah_raporu(&mut self) -> Rc<gpui_bilesenleri::GirişYapılandırmaRaporu> {
+        if let Some((sürüm, rapor)) = &self.rapor_önbelleği
+            && *sürüm == self.tercih_sürümü
+        {
+            return Rc::clone(rapor);
+        }
+        let rapor = Rc::new(self.tezgah.yapılandırma(&self.kimlik_fabrikası).doğrula());
+        self.rapor_önbelleği = Some((self.tercih_sürümü, Rc::clone(&rapor)));
+        rapor
+    }
+
+    /// Kod paneli metni; tercih sürümüne bağlı.
+    fn tezgah_kodu(&mut self) -> gpui::SharedString {
+        if let Some((sürüm, kod)) = &self.kod_önbelleği
+            && *sürüm == self.tercih_sürümü
+        {
+            return kod.clone();
+        }
+        let kod = gpui::SharedString::from(self.tezgah.kod());
+        self.kod_önbelleği = Some((self.tercih_sürümü, kod.clone()));
+        kod
     }
 
     /// `BİL-010` profilinin ürettiği tezgâh içeriği.
@@ -863,13 +894,18 @@ impl GaleriUygulaması {
             }
         };
         let alan = self.tezgah_alanını_al(pencere, bağlam);
+        let paneller = self
+            .tezgah_panelleri
+            .clone()
+            .expect("paneller alanla birlikte kurulur");
         let tercih = self.tezgah.clone();
         let saat_dilimi = self.çözülmüş_saat_dilimi();
         let doldurma_var = self.otomatik_doldurma_kullanılabilir(bağlam);
         let portlar = self.port_durumu(bağlam);
-        // `§29` rapor bir kez kurulur: kart onu okur, yeniden hesaplamaz.
-        let rapor = tercih.yapılandırma(&self.kimlik_fabrikası).doğrula();
-        let olaylar = self.tezgah_olayları.clone();
+        // `§29` rapor ve kod paneli metni tercih sürümüne bağlıdır: kart
+        // sonucu okur, yeniden hesaplamaz.
+        let rapor = self.tezgah_raporu();
+        let kod = self.tezgah_kodu();
         // `ORT-003 §2` yarıçap kısa kenarın yarısını aşamaz; tek satırlı
         // alanda kısıtlayan kenar kutu yüksekliğidir.
         let en_fazla_yarıçap = f32::from(tezgah_teması(&tercih.tema).ölçüler.etkileşim_hedefi) / 2.;
@@ -879,11 +915,12 @@ impl GaleriUygulaması {
                 tercih: &tercih,
                 alanlar: &alanlar,
                 alan,
+                paneller: &paneller,
                 saat_dilimi: &saat_dilimi,
                 doldurma_var,
                 portlar,
                 rapor: &rapor,
-                olaylar: &olaylar,
+                kod,
                 en_fazla_yarıçap,
                 köşe_izi: self.köşe_izi.clone(),
             },
@@ -979,10 +1016,6 @@ impl Render for GaleriUygulaması {
             }
         };
         let tezgah_tercihi = self.tezgah.clone();
-        let tezgah_alanı = self.tezgah_alanını_al(pencere, bağlam);
-        let doldurma_var = self.otomatik_doldurma_kullanılabilir(bağlam);
-        let köşe_izi = self.köşe_izi.clone();
-        let saat_dilimi = self.çözülmüş_saat_dilimi();
         let dar = yerleşim == GaleriYerleşimKipi::Dar;
         let koyu_mu = self.galeri_kipi == gpui_bilesenleri::TemaKipi::Koyu;
         let hedef_etiketi = match self.model.hedef {
@@ -1200,19 +1233,19 @@ impl Render for GaleriUygulaması {
         let dar_aile_listesi_açık = self.dar_aile_listesi_açık;
         let orta_içerik = if let Some(seçili) = self.model.seçili_aile.clone() {
             let medya = medya_fallback_planı(true);
+            // Tezgâh içeriği yalnız `BİL-010` sergisi için gerekir; onu da
+            // ekran yolundaki profil üretir, katalog ikinci kez kurmaz.
+            let tezgah_içeriği = if seçili.as_ref() == "BİL-010" {
+                Some(self.tezgah_profil_içeriği(pencere, bağlam))
+            } else {
+                None
+            };
             let canlı_sergi = sergiler::aile_sergisi(
                 seçili.as_ref(),
                 sergiler::SergiDurumu {
                     girişi: sergi_girişi.clone(),
                     tezgah: tezgah_tercihi,
-                    tezgah_alanı: tezgah_alanı.clone(),
-                    doldurma_var,
-                    portlar: self.port_durumu(bağlam),
-                    rapor: self.tezgah.yapılandırma(&self.kimlik_fabrikası).doğrula(),
-                    olaylar: self.tezgah_olayları.clone(),
-                    köşe_izi: köşe_izi.clone(),
-                    sistem_aileleri: self.sistem_ailelerini_al(bağlam),
-                    saat_dilimi: saat_dilimi.clone(),
+                    tezgah_içeriği,
                     düğme_sayacı: self.sergi_düğme_sayacı,
                     seçili: self.sergi_seçimi,
                     onaylı: self.sergi_onaylı,
@@ -1366,16 +1399,10 @@ impl Render for GaleriUygulaması {
         } else {
             let öne_çıkan_sergiler = sergiler::öne_çıkan_sergiler(
                 sergiler::SergiDurumu {
-                    doldurma_var,
-                    portlar: self.port_durumu(bağlam),
-                    rapor: self.tezgah.yapılandırma(&self.kimlik_fabrikası).doğrula(),
-                    olaylar: self.tezgah_olayları.clone(),
                     girişi: sergi_girişi.clone(),
                     tezgah: tezgah_tercihi,
-                    tezgah_alanı: tezgah_alanı.clone(),
-                    köşe_izi: köşe_izi.clone(),
-                    sistem_aileleri: self.sistem_ailelerini_al(bağlam),
-                    saat_dilimi: saat_dilimi.clone(),
+                    // Genel bakış tezgâh gövdesini çizmez.
+                    tezgah_içeriği: None,
                     düğme_sayacı: self.sergi_düğme_sayacı,
                     seçili: self.sergi_seçimi,
                     onaylı: self.sergi_onaylı,

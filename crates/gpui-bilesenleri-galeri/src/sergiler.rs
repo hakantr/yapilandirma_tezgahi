@@ -97,24 +97,11 @@ pub(crate) struct SergiDurumu {
     pub girişi: crate::MetinGirişiAlanları,
     /// `BİL-010` tezgâh tercihleri ve yaşayan önizleme alanı.
     pub tezgah: crate::TezgahTercihleri,
-    pub tezgah_alanı: Entity<GirişKutusu>,
-    /// Açık yüzer tercih kutusu. `render` sırasında varlık okunamaz, bu
-    /// yüzden durum buradan taşınır.
-    /// `§25` platform otomatik doldurmayı sunuyor mu? Tercih yalnız o zaman
-    /// çizilir.
-    pub doldurma_var: bool,
-    /// `B` bölümünün port kapıları.
-    pub portlar: crate::PortDurumu,
-    /// `§29` kanonik doğrulama raporu.
-    pub rapor: gpui_bilesenleri::GirişYapılandırmaRaporu,
-    /// `§26` alanın yayımladığı son olaylar; en yeni **başta**.
-    pub olaylar: Vec<crate::TezgahOlayı>,
-    /// Köşe kaydırma çubuğunun izinin ekrandaki yeri.
-    pub köşe_izi: std::rc::Rc<std::cell::Cell<gpui::Bounds<gpui::Pixels>>>,
-    /// İşletim sisteminde kurulu yazı tipi aileleri; WASM'de boştur.
-    pub sistem_aileleri: std::rc::Rc<Vec<String>>,
-    /// `ORT-002 §5.2` çözülmüş saat dilimi ve kaynağı.
-    pub saat_dilimi: crate::ÇözülmüşSaatDilimi,
+    /// `BİL-010` sergisi için hazır tezgâh içeriği.
+    ///
+    /// Kökün profil yolunda üretilir; sergi onu yalnız gövdeye yerleştirir.
+    /// Genel bakış onu kullanmadığı için `None` taşıyabilir.
+    pub tezgah_içeriği: Option<crate::Tezgahİçeriği>,
     pub düğme_sayacı: u32,
     pub seçili: u8,
     pub onaylı: bool,
@@ -210,7 +197,7 @@ fn metin_girişi_özeti(alanlar: crate::MetinGirişiAlanları) -> Stateful<Div> 
 
 pub(crate) fn aile_sergisi(
     sözleşme: &str,
-    durum: SergiDurumu,
+    mut durum: SergiDurumu,
     bağlam: &mut Context<GaleriUygulaması>,
 ) -> AnyElement {
     match sözleşme {
@@ -226,21 +213,14 @@ pub(crate) fn aile_sergisi(
         }
         // `BİL-010` ekranı yalnız tezgâhtır: hazır örnek kartları kaldırıldı.
         // Alanın nasıl davrandığını sabit bir vitrin değil, programcının
-        // kendi kurduğu yapılandırma göstermeli.
-        "BİL-010" => tezgah_sergisi(
-            durum.tezgah.clone(),
-            durum.tezgah_alanı.clone(),
-            &durum.girişi,
-            durum.köşe_izi.clone(),
-            TezgahPlatformu {
-                sistem_aileleri: durum.sistem_aileleri.clone(),
-                saat_dilimi: durum.saat_dilimi.clone(),
-                doldurma_var: durum.doldurma_var,
-                portlar: durum.portlar,
-                rapor: durum.rapor.clone(),
-                olaylar: durum.olaylar.clone(),
-            },
-            bağlam,
+        // kendi kurduğu yapılandırma göstermeli. İçerik kökün profil
+        // yolundan hazır gelir; sergi onu yalnız gövdeye yerleştirir.
+        "BİL-010" => tezgah_gövde_bloğu(
+            durum
+                .tezgah_içeriği
+                .take()
+                .expect("BİL-010 sergisi tezgâh içeriğiyle çağrılır"),
+            durum.tezgah.tema.metin_ölçeği,
         )
         .into_any_element(),
         "BİL-020" => seçim_sergisi(durum.seçili, bağlam).into_any_element(),
@@ -804,23 +784,6 @@ fn düğme_renkleri(vurgu: DüğmeVurgusu, erişim: ErişimDurumu) -> (u32, u32,
     }
 }
 
-/// Tezgâhın platformdan okuduğu gerçekler.
-///
-/// Tercih değil bildirimdir: hangi yazı aileleri kurulu, hangi saat dilimi
-/// çözüldü, otomatik doldurma sunuluyor mu. Üçü de aynı yerden geldiği için
-/// tek bağlamda taşınır.
-pub(crate) struct TezgahPlatformu {
-    pub sistem_aileleri: std::rc::Rc<Vec<String>>,
-    pub saat_dilimi: crate::ÇözülmüşSaatDilimi,
-    pub doldurma_var: bool,
-    /// `B` bölümünün port kapıları.
-    pub portlar: crate::PortDurumu,
-    /// `§29` kanonik doğrulama raporu; kart onu okur, yeniden kurmaz.
-    pub rapor: gpui_bilesenleri::GirişYapılandırmaRaporu,
-    /// `§26` alanın yayımladığı son olaylar; en yeni **başta**.
-    pub olaylar: Vec<crate::TezgahOlayı>,
-}
-
 /// Tezgâh kabuğunun okuduğu uygulama durumu.
 ///
 /// Üçü de tercih değil **kabuk** durumudur: tema ailesi ve kip galeri
@@ -845,10 +808,8 @@ pub(crate) struct TezgahKabukDurumu {
 /// büyüyeceği gün yerleşimin değişmemesi.
 pub(crate) fn tezgah_ekranı(
     tercih: crate::TezgahTercihleri,
-    alan: Entity<GirişKutusu>,
-    alanlar: &crate::MetinGirişiAlanları,
-    durum_izi: std::rc::Rc<std::cell::Cell<gpui::Bounds<gpui::Pixels>>>,
-    platform: TezgahPlatformu,
+    içerik: crate::Tezgahİçeriği,
+    sistem_aileleri: std::rc::Rc<Vec<String>>,
     kabuk: TezgahKabukDurumu,
     bağlam: &mut Context<GaleriUygulaması>,
 ) -> Stateful<Div> {
@@ -911,13 +872,13 @@ pub(crate) fn tezgah_ekranı(
                         .child(tezgah_üst_şeridi(
                             &tercih,
                             kabuk,
-                            &platform.sistem_aileleri.clone(),
+                            &sistem_aileleri,
                             &g,
                             &t,
                             bağlam,
                         ))
                         .child(div().flex_1().min_h(px(0.)).mt(px(ölçü::BLOK_ARASI)).child(
-                            tezgah_sergisi(tercih, alan, alanlar, durum_izi, platform, bağlam),
+                            tezgah_gövde_bloğu(içerik, tercih.tema.metin_ölçeği),
                         )),
                 ),
         )
@@ -1327,57 +1288,16 @@ fn görünüm_ekseni(
         ))
 }
 
-/// `BİL-010` yapılandırma tezgâhı: ailenin tek ekranı.
+/// `BİL-010` yapılandırma tezgâhı gövdesi: ailenin tek ekranı.
 ///
 /// Bu aile hazır varyant vitrini göstermez; programcı alanı burada kurar ve
-/// karşılığı olan kodu altında görür. Yerleşim tek bir dar sütundur: üstte
-/// görünümü ve yardımcı eylemleri değiştiren simge grupları, ortada yaşayan
-/// önizleme kutusu, altında değer ve biçim tercihleri.
+/// karşılığı olan kodu altında görür.
 ///
-/// `BİL-010` tezgâhı.
-///
-/// Sergi artık düzeni kendisi kurmaz: profil `Tezgahİçeriği` üretir, tezgâh
-/// kabuğu onu iki kolonlu düzende çizer. Kabuk hiçbir `BİL-*` tipini
-/// tanımadığı için yeni bir aile yeniden yazıldığında yalnız kendi profilini
-/// verir (harita §7 · adım 5).
-fn tezgah_sergisi(
-    tercih: crate::TezgahTercihleri,
-    alan: Entity<GirişKutusu>,
-    alanlar: &crate::MetinGirişiAlanları,
-    durum_izi: std::rc::Rc<std::cell::Cell<gpui::Bounds<gpui::Pixels>>>,
-    platform: TezgahPlatformu,
-    bağlam: &mut Context<GaleriUygulaması>,
-) -> Div {
-    let TezgahPlatformu {
-        sistem_aileleri: _,
-        saat_dilimi,
-        doldurma_var,
-        portlar,
-        rapor,
-        olaylar,
-    } = platform;
-    // `ORT-003 §2` yarıçap kısa kenarın yarısını aşamaz; tek satırlı alanda
-    // kısıtlayan kenar kutu yüksekliğidir.
-    let en_fazla_yarıçap =
-        f32::from(crate::tezgah_teması(&tercih.tema).ölçüler.etkileşim_hedefi) / 2.;
-    let metin_ölçeği = tercih.tema.metin_ölçeği;
-
-    let içerik = crate::tezgah_içeriği(
-        crate::MetinGirişiProfilGirdisi {
-            tercih: &tercih,
-            alanlar,
-            alan,
-            saat_dilimi: &saat_dilimi,
-            doldurma_var,
-            portlar,
-            rapor: &rapor,
-            olaylar: &olaylar,
-            en_fazla_yarıçap,
-            köşe_izi: durum_izi,
-        },
-        bağlam,
-    );
-
+/// Sergi düzeni kendisi kurmaz: profil `Tezgahİçeriği` üretir (kökün
+/// `tezgah_profil_içeriği` yolu), tezgâh kabuğu onu iki kolonlu düzende
+/// çizer. Kabuk hiçbir `BİL-*` tipini tanımadığı için yeni bir aile yeniden
+/// yazıldığında yalnız kendi profilini verir (harita §7 · adım 5).
+fn tezgah_gövde_bloğu(içerik: crate::Tezgahİçeriği, metin_ölçeği: f32) -> Div {
     div().size_full().flex().flex_col().min_h(px(0.)).child(
         // Gövde kalan **bütün** yüksekliği alır. Sabit bir yükseklik
         // (720px) pencerenin altında boşluk bırakıyordu ve iki kolonun
@@ -1863,7 +1783,7 @@ pub(crate) fn yuva_görünürlük_notu(
 /// yan yana koyar.
 pub(crate) fn değer_durumu(
     alan: &Entity<GirişKutusu>,
-    bağlam: &mut Context<GaleriUygulaması>,
+    bağlam: &mut Context<crate::AlanDurumPaneli>,
 ) -> Div {
     let g = crate::görünüm();
     let t = crate::TezgahTokenları::paletten(crate::palet());
@@ -1954,7 +1874,7 @@ pub(crate) fn değer_durumu(
 /// adları burada olduğu gibi durur — tezgâh olayı yeniden adlandırmaz.
 pub(crate) fn olay_akışı(
     olaylar: &[crate::TezgahOlayı],
-    bağlam: &mut Context<GaleriUygulaması>,
+    bağlam: &mut Context<crate::OlayAkışıPaneli>,
 ) -> Div {
     let g = crate::görünüm();
     let t = crate::TezgahTokenları::paletten(crate::palet());
@@ -1965,11 +1885,18 @@ pub(crate) fn olay_akışı(
         .child(if olaylar.is_empty() {
             türetilmiş_rozet("akış boş").into_any_element()
         } else {
-            gösterge_düğmesi("olay-temizle", "Temizle", false, bağlam, |_| {})
-                .on_click(bağlam.listener(|bu, _, _, bağlam| {
-                    bu.tezgah_olaylarını_temizle(bağlam);
-                }))
-                .into_any_element()
+            // Akışın sahibi panel: temizleme kökü değil paneli günceller.
+            crate::gösterge_düğmesi(
+                SharedString::new_static("olay-temizle"),
+                &g,
+                &t,
+                "Temizle",
+                false,
+            )
+            .on_click(bağlam.listener(|panel, _, _, bağlam| {
+                panel.temizle(bağlam);
+            }))
+            .into_any_element()
         });
 
     let mut kök = div().child(başlık);
@@ -3233,7 +3160,7 @@ pub(crate) fn dogrulama_satırı(rapor: &gpui_bilesenleri::GirişYapılandırmaR
 pub(crate) fn turetilmis_durum_satırı(
     tercih: &crate::TezgahTercihleri,
     alan: &Entity<GirişKutusu>,
-    bağlam: &mut Context<GaleriUygulaması>,
+    bağlam: &mut Context<crate::AlanDurumPaneli>,
 ) -> Div {
     use gpui_bilesenleri::{ErişimDurumu as E, GirişÖzelDurumu as D};
 
@@ -3358,7 +3285,7 @@ pub(crate) fn turetilmis_durum_satırı(
                 .child(
                     div()
                         .mt_1()
-                        .child(ızgara_dörtlü().child(hücre(tercih_düğmesi(
+                        .child(ızgara_dörtlü().child(hücre(panel_tercih_düğmesi(
                             "önem-zemin",
                             "Zemine de uygula",
                             tercih.önem_zemini,
@@ -4428,7 +4355,10 @@ pub(crate) fn maske_tanımı(
 /// tercihi yapılandırma satırı gibi göstermek, kopyalayan kişiye çalışacağı
 /// sözünü verirdi. `salt_okunur` ve `etkin` C'de görünür ama yapılandırılabilir
 /// alanlardır ve bu yüzden yazılır.
-pub(crate) fn kod_paneli(tercih: &crate::TezgahTercihleri) -> Div {
+///
+/// Metin hazır gelir: kod tercih sürümüne bağlıdır ve kök onu yalnız tercih
+/// değişince üretir — her karede dize kurmak ölçülebilir bir israftı.
+pub(crate) fn kod_paneli(kod: SharedString) -> Div {
     let g = crate::görünüm();
     let t = crate::TezgahTokenları::paletten(crate::palet());
     div()
@@ -4449,7 +4379,7 @@ pub(crate) fn kod_paneli(tercih: &crate::TezgahTercihleri) -> Div {
                 .p(g.kart.yatay_dolgu)
                 .min_h(px(ölçü::KOD_YÜKSEKLİĞİ))
                 .text_color(t.kod_metin)
-                .child(tercih.kod()),
+                .child(kod),
         )
 }
 
@@ -4975,6 +4905,32 @@ fn geniş_seçenek(
     )
     .on_click(bağlam.listener(move |bu, _, _, bağlam| {
         bu.tezgahı_değiştir(&değiştir, bağlam);
+    }))
+}
+
+/// Alan durum panelinden köke yazan tercih düğmesi.
+///
+/// [`tercih_düğmesi`] ile aynı yüz; tek fark listener'ın panel bağlamında
+/// kurulup mutasyonu zayıf kök tutamacıyla `tezgahı_değiştir`e iletmesi.
+fn panel_tercih_düğmesi(
+    kimlik: impl Into<String>,
+    ad: &str,
+    seçili: bool,
+    bağlam: &mut Context<crate::AlanDurumPaneli>,
+    değiştir: impl Fn(&mut crate::TezgahTercihleri) + 'static,
+) -> Stateful<Div> {
+    let g = crate::görünüm();
+    let t = crate::TezgahTokenları::paletten(crate::palet());
+    crate::hap(
+        SharedString::new(kimlik.into()),
+        &g,
+        &t,
+        ad.to_owned(),
+        seçili,
+    )
+    .justify_center()
+    .on_click(bağlam.listener(move |panel, _, _, bağlam| {
+        panel.tercihi_değiştir(&değiştir, bağlam);
     }))
 }
 
