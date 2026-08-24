@@ -104,18 +104,24 @@ sahipliğinde — bu depoda iş yok.
    profili eklendi; (2) sağ kolon `BölümlerPaneli`ne çıkarıldı ve
    `yuva_görünürlük_notu` kendi gözleyen paneline taşındı; (3) açılır
    liste içerikleri tembelleşti (yalnız açıkken kurulur), çözülmüş görünüm
-   ve yarıçap tavanı tema sürümüne bağlandı; (4) **ölçüm turu ikinci turun
-   `Entity::cached` kararını çürüttü** — sayaç, kolonun açılıştan sonra hiç
-   yeniden kurulmadığını, yani hız kazancı değil bayat yüzey ürettiğini
-   gösterdi; önbellek geri alındı, `tests/kolon_tazeligi.rs` kapı olarak
-   kaldı. Ölçüm: `tests/kare_olcumu.rs` (`KARE_OLCUM=1`, `akici-dev`);
-   macOS'ta kare ~3 ms, senaryolar arası fark %2–5. Mekanik, sayılar ve
-   sıradaki işler: `raporlar/PERFORMANS_MIMARISI.md`. (Önceki devirde
-   anılan "TEZGAH_DEVIR_NOTU sonundaki performans raporu" hiç
-   yazılmamıştı; o boşluğu bu belge doldurur.) **Açık:** doğru
-   geçersizleme yolu (bulunursa ~%60 kazanç), Linux ölçümü, gerçek
-   input-to-present. **Bu depo için 120 FPS / "sıfıra yakın gecikme"
-   iddiası yoktur.**
+   ve yarıçap tavanı tema sürümüne bağlandı; (4) **ölçüm turu** (`tests/kare_olcumu.rs`,
+   `KARE_OLCUM=1` + `akici-dev`) önce ikinci turun `Entity::cached`
+   kararını çürüttü — sayaç, kolonun açılıştan sonra hiç yeniden
+   kurulmadığını, yani bayat yüzey ürettiğini gösterdi — sonra kök nedeni
+   buldu: GPUI'de `notify` bir `cached` sınırını patlatmaz (`App::notify`
+   yalnız pencerenin `tracked_entities` kümesindeki entity'ler için
+   `invalidate_view` çağırır; önbellekten dönen view o kümeye girmez),
+   **`refresh` patlatır**. Kök artık `kolonu_geçersizle` →
+   `refresh_windows` ile tercih/tema/seçici/dış bildirim değişimlerinde
+   kolonu tazeliyor. Ölçülen kazanç: tuş vuruşu **3,11 → 1,16 ms (%63)**,
+   temiz kare 3,03 → 1,06 ms; kolon tuş vuruşunda 0/200, tercihte 200/200
+   kurulur. Kapı: `tests/kolon_tazeligi.rs` (tazelik **ve** kazanç).
+   Mekanik, sayılar ve sıradaki işler:
+   `raporlar/PERFORMANS_MIMARISI.md`. (Önceki devirde anılan
+   "TEZGAH_DEVIR_NOTU sonundaki performans raporu" hiç yazılmamıştı; o
+   boşluğu bu belge doldurur.) **Açık:** aynı desenin sol kolon/üst şeride
+   uygulanması, Linux ölçümü, gerçek input-to-present. **Bu depo için
+   120 FPS / "sıfıra yakın gecikme" iddiası yoktur.**
 2. Crate/paket adlarının yeniden adlandırılması (kullanıcı kararı).
 3. Bu depoya CI kurmak (kaynak depodaki `uygulama-iskeleti` işinin
    uyarlaması; kardeş `gpui` **ve** `gpui_bilesenleri` checkout'ları gerekir).
