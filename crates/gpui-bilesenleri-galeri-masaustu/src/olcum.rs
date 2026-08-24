@@ -1,9 +1,9 @@
 //! Gerçek pencerede girdi gecikmesi ve kare maliyeti ölçümü.
 //!
 //! Headless kare ölçümü (`gpui-bilesenleri-galeri/tests/kare_olcumu.rs`)
-//! yalnız `render` gövdelerinin işini görür; yerleşim, prepaint, paint ve
-//! platform katmanı (shaping, rasterizasyon, sahne kodlama) orada yoktur.
-//! Bu modül eksik kalan yarıyı ölçer ve ancak `olcum` özelliğiyle derlenir.
+//! CPU tarafındaki element kuruluşu, yerleşim, prepaint ve sahne üretimini
+//! görür; yerel pencerenin platform/GPU sunum yolu orada yoktur. Bu modül
+//! gerçek pencere yolunu ölçer ve ancak `olcum` özelliğiyle derlenir.
 //!
 //! **Ölçüm penceresi.** Sayaç, pencere açılışıyla değil ilk gerçek metin
 //! **düzenlemesiyle** başlar (`düzenleme_sayısı`). Platformun girdi
@@ -158,6 +158,15 @@ const FAZ_SN: u64 = 5;
 /// kalmaz.
 const OTURMA_MS: u64 = 50;
 
+/// İstenen süreyi eksiksiz ABBA bloklarına indirger.
+///
+/// Yarım blok, A ve B'yi doğrusal zaman kaymasına karşı dengesiz bırakır.
+/// Dört fazdan kısa istek de tek tam blok olarak çalışır.
+fn abba_faz_sayısı(saniye: u64) -> u64 {
+    let ham = (saniye / FAZ_SN).max(4);
+    ham - ham % 4
+}
+
 /// Aynı koşum içinde önbellekli/önbelleksiz fazları sırayla ölçer.
 ///
 /// İki ayrı binary'yi arka arkaya koşturmak işe yaramadı: aynı binary'nin
@@ -165,8 +174,10 @@ const OTURMA_MS: u64 = 50;
 /// büyük çıktı. Baskın değişken derleme değil, koşum — termal durum, arka
 /// plan yükü ve elle yazma temposu. Fazları tek süreç içinde dönüşümlü
 /// koşturmak bu üçünü de iki kovaya eşit dağıtır.
-fn dönüşümlü_ölçümü_planla(pencere: gpui::AnyWindowHandle, saniye: u64, bağlam: &mut App) {
-    let faz_sayısı = (saniye / FAZ_SN).max(4);
+fn dönüşümlü_ölçümü_planla(
+    pencere: gpui::AnyWindowHandle, saniye: u64, bağlam: &mut App
+) {
+    let faz_sayısı = abba_faz_sayısı(saniye);
     eprintln!(
         "dönüşümlü ölçüm: alana tıklayıp **durmadan yazın** — sayaç ilk metin \
          düzenlemesiyle başlar, {faz_sayısı} faz × {FAZ_SN} sn sürer (ABBA sırası). \
@@ -177,6 +188,7 @@ fn dönüşümlü_ölçümü_planla(pencere: gpui::AnyWindowHandle, saniye: u64,
             let kapı_açıldı = kapıyı_bekle(bağlam).await;
             let mut kova: [Option<Histogram<u64>>; 2] = [None, None];
             let mut render_ns = [0u64; 2];
+            let mut faz_kareleri: [Vec<u64>; 2] = std::array::from_fn(|_| Vec::new());
             let mut eksik_faz = false;
             for sıra in 0..faz_sayısı {
                 // ABBA: doğrusal kayma (ısınma, termal kısma, arka plan
@@ -186,15 +198,18 @@ fn dönüşümlü_ölçümü_planla(pencere: gpui::AnyWindowHandle, saniye: u64,
                 let indis = usize::from(!önbellekli);
                 match faz_ölç(bağlam, pencere, önbellekli).await {
                     Some((fark, ns)) => {
-                        render_ns[indis] = render_ns[indis].saturating_add(ns);
+                        let kare_sayısı = fark.len();
                         match &mut kova[indis] {
                             Some(birikim) => {
                                 if birikim.add(&fark).is_err() {
                                     eksik_faz = true;
+                                    continue;
                                 }
                             }
                             None => kova[indis] = Some(fark),
                         }
+                        render_ns[indis] = render_ns[indis].saturating_add(ns);
+                        faz_kareleri[indis].push(kare_sayısı);
                     }
                     None => eksik_faz = true,
                 }
@@ -206,6 +221,7 @@ fn dönüşümlü_ölçümü_planla(pencere: gpui::AnyWindowHandle, saniye: u64,
                         faz_sayısı,
                         &kova,
                         &render_ns,
+                        &faz_kareleri,
                         Kuşku {
                             eksik_faz,
                             kapı_açılmadı: !kapı_açıldı,
@@ -232,7 +248,10 @@ async fn faz_ölç(
         .update_window(pencere, |_, pencere, _| {
             gpui_bilesenleri_galeri::önbelleği_ayarla(önbellekli);
             pencere.refresh();
-            pencere.frame_duration_snapshot().draw_duration_histogram.len()
+            pencere
+                .frame_duration_snapshot()
+                .draw_duration_histogram
+                .len()
         })
         .ok()?;
     // Geçiş karesi zorunlu ıskadır: bayrak değişince ağaç yeniden kurulur
@@ -240,6 +259,7 @@ async fn faz_ölç(
     // beklemek yetmez — yazma seyrekse o kare sabit bekleme bittikten
     // sonra gelir ve doğrudan ölçüme sızar; üstelik yalnız A kovasına,
     // çünkü pahalı olan geçiş odur. O yüzden kare sayarak beklenir.
+    let mut geçiş_görüldü = false;
     for _ in 0..60 {
         bağlam
             .background_executor()
@@ -247,12 +267,19 @@ async fn faz_ölç(
             .await;
         let şimdi = bağlam
             .update_window(pencere, |_, pencere, _| {
-                pencere.frame_duration_snapshot().draw_duration_histogram.len()
+                pencere
+                    .frame_duration_snapshot()
+                    .draw_duration_histogram
+                    .len()
             })
             .ok()?;
         if şimdi > geçiş_öncesi {
+            geçiş_görüldü = true;
             break;
         }
+    }
+    if !geçiş_görüldü {
+        return None;
     }
     let baş = bağlam
         .update_window(pencere, |_, pencere, _| {
@@ -291,12 +318,18 @@ struct Kuşku {
 /// Altında kalan bir kova ortalama üretir ama o ortalama gürültüdür;
 /// tek pahalı kare 20 karelik bir kovayı milisaniyelerce kaydırır.
 const EN_AZ_KARE: u64 = 100;
+/// Her beş saniyelik fazda aranacak en az kare.
+///
+/// Toplam kova eşiği tek bir yoğun fazla aşılabilir; bu alt kapı boş ya da
+/// neredeyse boş bir fazın ABBA dengesini sessizce bozmasını engeller.
+const EN_AZ_FAZ_KARESİ: u64 = 5;
 
 fn dönüşümlü_raporla(
     pencere: &gpui::Window,
     faz_sayısı: u64,
     kova: &[Option<Histogram<u64>>; 2],
     render_ns: &[u64; 2],
+    faz_kareleri: &[Vec<u64>; 2],
     kuşku: Kuşku,
 ) {
     const MS: f64 = 1_000_000.;
@@ -325,6 +358,7 @@ fn dönüşümlü_raporla(
         match &kova[indis] {
             Some(histogram) if !histogram.is_empty() => {
                 println!("{}", özet(ad, histogram, MS, "ms"));
+                println!("{:<24} faz kareleri {:?}", "", faz_kareleri[indis]);
                 let render = render_ns[indis] as f64 / histogram.len() as f64 / MS;
                 println!(
                     "{:<24} render gövdeleri {render:6.3} ms · render sonrası {:6.3} ms",
@@ -376,9 +410,41 @@ fn dönüşümlü_raporla(
     }
     if kuşku.eksik_faz {
         eprintln!(
-            "uyarı: en az bir faz sayılamadı; kovalar eşit sayıda faz \
-             taşımıyor olabilir ve karşılaştırma bu payla okunmalıdır."
+            "GEÇERSİZ: en az bir faz ya da geçiş karesi sayılamadı; kovalar \
+             eksiksiz ve dengeli bir ABBA bloğu taşımıyor."
         );
+    }
+    let beklenen_faz = (faz_sayısı / 2) as usize;
+    let zayıf_fazlar: Vec<String> = adlar
+        .iter()
+        .enumerate()
+        .filter_map(|(indis, ad)| {
+            let sayılar = &faz_kareleri[indis];
+            (sayılar.len() != beklenen_faz || sayılar.iter().any(|sayı| *sayı < EN_AZ_FAZ_KARESİ))
+                .then(|| format!("{ad}={sayılar:?}"))
+        })
+        .collect();
+    if !zayıf_fazlar.is_empty() {
+        eprintln!(
+            "GEÇERSİZ: her kova {beklenen_faz} faz taşımalı ve her fazda en az \
+             {EN_AZ_FAZ_KARESİ} kare olmalı; {}.",
+            zayıf_fazlar.join(", "),
+        );
+    }
+}
+
+#[cfg(test)]
+mod testler {
+    use super::*;
+
+    #[test]
+    fn faz_sayısı_yalnız_tam_abba_blokları_üretir() {
+        assert_eq!(abba_faz_sayısı(0), 4);
+        assert_eq!(abba_faz_sayısı(19), 4);
+        assert_eq!(abba_faz_sayısı(60), 12);
+        assert_eq!(abba_faz_sayısı(65), 12);
+        assert_eq!(abba_faz_sayısı(79), 12);
+        assert_eq!(abba_faz_sayısı(80), 16);
     }
 }
 

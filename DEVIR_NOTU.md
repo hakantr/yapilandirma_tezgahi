@@ -149,17 +149,21 @@ sahipliğinde — bu depoda iş yok.
    gerekliydi, çünkü ayrı binary'lerle A/B–B/A denemesi **geçersiz çıktı**
    (aynı binary'nin iki koşumu arası gürültü 4,42 ms, aranan etki
    0,86 ms). İki geçerli dönüşümlü koşumun sonucu: **önbellek kare
-   maliyetini ortalamada %16–19, p50'de 4,1–4,7 ms düşürüyor**; kazanç
-   `render` gövdelerinde toplanıyor, `render` sonrası aşamalar
-   küçülmüyor (§8.3.4). **Açık:** (b) Linux'ta headless CPU koşumunun
-   tekrarı (mutlak süreler platformlar arası yarıştırılmaz, aynı makinede
-   çift koşum); (c) Linux ürün hedefiyse orada da gerçek pencere ölçümü;
-   (d) `draw`ın render sonrası diliminin içi — kardeş depoların işi
+   maliyetini ortalamada %16–19, p50'de 4,1–4,7 ms düşürdü**; en büyük
+   ölçülen aşama farkı sarılmış tezgâh `render` gövdelerinde, `render`
+   sonrası kalıntı iki koşumda küçülmedi (§8.3.4). Bu iki koşum eski
+   toplam-kova kapısından geçti; araç artık eksiksiz ABBA bloğu, görülen
+   geçiş karesi ve faz başına en az beş kare de arıyor. **Açık:** (b)
+   faz-bazlı kapıyla bir macOS doğrulaması; (c) Linux'ta headless CPU
+   koşumunun tekrarı (mutlak süreler platformlar arası yarıştırılmaz, aynı
+   makinede çift koşum); (d) Linux ürün hedefiyse orada da gerçek pencere ölçümü;
+   (e) `draw`ın render sonrası diliminin içi — kardeş depoların işi
    (`gpui`, `gpui_apple`). **Bu depo için 120 FPS / "sıfıra yakın gecikme"
    iddiası yoktur ve gerçek ölçüm bu iddiayı çürütmüştür.** Elde iki ayrı
-   sayı var: headless CPU işi (p50 ~1,04 ms release, yalnız element ağacı
-   katmanı) ve gerçek pencerede girdi→draw sonu (p50 ~17 ms); ikisi aynı
-   şeyi ölçmez ve biri diğerinin yerine kullanılamaz.
+   sayı var: headless CPU `draw` işi (p50 ~1,04 ms release; element
+   kuruluşu + yerleşim/prepaint/paint sahne üretimi, yerel GPU/present yok)
+   ve gerçek pencerede girdi→draw sonu (p50 ~17 ms); ikisi aynı şeyi ölçmez
+   ve biri diğerinin yerine kullanılamaz.
 2. Crate/paket adlarının yeniden adlandırılması (kullanıcı kararı).
 3. Bu depoya CI kurmak (kaynak depodaki `uygulama-iskeleti` işinin
    uyarlaması; kardeş `gpui` **ve** `gpui_bilesenleri` checkout'ları gerekir).
