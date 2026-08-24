@@ -506,34 +506,36 @@ deponun işi değil.
 Ölçüm modu kullanıcı tarafından gerçek klavyeyle koşuldu. Sonuç, headless
 tablonun ürün gerçekliğini **temsil etmediğini** gösteriyor.
 
-### 8.1 Sayılar (macOS, `akici-dev`, 1600×1000, 40 sn, gerçek yazma)
+### 8.1 Sayılar (macOS, **release**, 1600×1000, 35 sn gerçek yazma)
+
+Düzeltilmiş ölçüm penceresiyle (§8.2.1) ve **optimize** derlemeyle alınan
+ilk geçerli koşum:
 
 ```
-ortam        1600×1000 px · ölçek 1,0× · erişilebilirlik kapalı
-girdi→kare   n=56   p50 32,44 ms · p95 44,93 ms · p99 71,37 ms
-çizim süresi n=114  p50 20,81 ms · p95 33,15 ms · en çok 268,70 ms
-sunum aralığı       örnek yok
-kare başına olay    n=56, hepsi 1,0 (birleştirme yok)
+ortam             1600×1000 px · ölçek 1,0× · a11y kapalı · derleme optimize
+girdi→draw sonu   n=478  p50 17,22 ms · p95 26,77 ms · p99 32,65 ms · ort 18,68 ms
+çizim (draw)      n=482  p50 16,89 ms · p95 19,37 ms · p99 27,77 ms · ort 16,84 ms
+sunum aralığı     örnek yok
+kare başına olay  n=478  p50 1,0 · p95 2,0 · p99 3,0 · ort 1,09
 çizim ortasında düşen olay: 0
+aşama (ortalama)  render gövdeleri 2,21 ms · render sonrası draw aşamaları
+                  14,63 ms · toplam draw 16,84 ms
 ```
 
 Okuma:
 
-- **Girdi→kare p50 32,4 ms.** 60 Hz ekranda bu ~2 kare; 120 Hz bütçesinin
-  (8,33 ms) yaklaşık **4 katı**, 60 Hz bütçesinin ~2 katı. Yani *"tuş
-  vuruşu 120 Hz bütçesine sığıyor"* iddiası gerçek pencerede **geçerli
-  değil**.
-- **Çizim p50 20,8 ms — headless ölçümün (~1,75 ms) 12 katı.** İki sayı
-  aynı şeyi ölçmüyor: headless `draw` yalnız element ağacı + yerleşim +
-  sahne üretimini içerir; gerçek `draw` bunlara platform katmanını
-  (CoreText shaping, glif rasterizasyonu, Metal atlas/sprite hazırlığı)
-  ekler ve o katman baskın çıktı.
-- **`mid_draw_events_dropped: 0` ve kare başına 1 olay:** gecikme rakamı
-  eksik değil ve olaylar birleştirilmemiş — sayılar okunabilir.
-- **Sunum aralığı örneksiz.** GPUI bu histogramı yalnız pencere
-  *animasyon* yaparken doldurur; tezgâh girdi başına kare üretir, boşta
-  çizmez. Bu davranışın kendisi doğrudur — ama "FPS" bu uygulamada
-  ölçülebilir bir büyüklük değil; doğru metrik girdi→kare gecikmesidir.
+- **Girdi→draw sonu p50 17,2 ms.** 60 Hz ekranda ~1 kare. Önceki
+  `debug_assertions` açık ölçüm 29–32 ms diyordu; **o rakamın yaklaşık
+  yarısı doğrulama maliyetiymiş** (§8.2.2). 120 Hz bütçesine (8,33 ms)
+  göre hâlâ ~2 kat, 60 Hz bütçesine (16,7 ms) göre sınırda.
+- `mid_draw_events_dropped: 0` ve kare başına ortalama 1,09 olay: sayılar
+  eksik değil, yalnız yoğun yazmada birkaç olay aynı karede birleşmiş.
+- **Sunum aralığı yine örneksiz.** GPUI bu histogramı yalnız pencere
+  animasyon yaparken doldurur; tezgâh girdi başına çizer, boşta çizmez.
+  "FPS" bu uygulamada ölçülebilir bir büyüklük değil — doğru metrik
+  girdi→kare gecikmesidir.
+- Örneklem güçlü (n≈478), yani bu tablo tek koşumluk gürültüden ibaret
+  değil. Yine de tek makine, tek koşum: A/B–B/A tekrarları §8.3'te.
 
 ### 8.2 Farkın kaynağı: elenenler ve kalan
 
