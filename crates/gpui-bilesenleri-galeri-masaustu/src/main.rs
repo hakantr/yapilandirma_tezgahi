@@ -8,6 +8,10 @@
 
 #[path = "platform.rs"]
 mod platform;
+// Gerçek pencere ölçümü; yalnız `olcum` özelliğiyle derlenir.
+#[cfg(feature = "olcum")]
+#[path = "olcum.rs"]
+mod olcum;
 
 use std::sync::Arc;
 
@@ -64,8 +68,11 @@ fn main() {
                 },
             );
 
-            if açıldı.is_ok() {
+            if let Ok(pencere) = açıldı {
                 bağlam.activate(true);
+                #[cfg(feature = "olcum")]
+                olcum::ölçümü_kur(&pencere, bağlam);
+                let _ = &pencere;
             }
         });
 }

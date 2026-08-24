@@ -541,28 +541,44 @@ Sıra bilinçli: **headless CPU ölçümünü başka bir platformda tekrarlamak
 aynı soruyu ikinci kez yanıtlar**; 120 FPS ve gecikme iddiasını
 kapatmaz. Onu kapatacak olan gerçek pencere ölçümüdür.
 
-1. **macOS'ta gerçek pencere ölçümü — `input-to-present`.** Şu an
-   ölçülmeyen her şey burada: sunum aralığı, düşen kare, fiziksel
-   girdiden ekrana geçen süre. **Bu adım tamamlanmadan hiçbir FPS/gecikme
-   iddiası kurulamaz.**
+1. **macOS'ta gerçek pencere ölçümü — `input-to-present`. Araç hazır,
+   ölçüm kullanıcıdan bekleniyor.**
 
-   Fizibilite doğrulandı: gereken ölçüm yüzeyi GPUI'de hazır ve public.
-   `gpui`'nin `profiler` özelliği açıkken `Window` şu iki anlık görüntüyü
-   veriyor (`window.rs:3048` ve `:3054`):
+   Masaüstü koşucusuna ölçüm modu eklendi (`--olcum <saniye>`, `olcum`
+   özelliği). Koşum penceresi dolunca GPUI'nin kendi pencere profilcisinden
+   dört histogram basılır ve uygulama kapanır:
 
-   - `input_latency_snapshot()` → `latency_histogram` (girdiden kareye,
-     ns), `events_per_frame_histogram` (kare başına birleştirilen olay),
-     `mid_draw_events_dropped` (çizim ortasında gelip ölçüm dışı kalan
-     olaylar — bu sayı büyükse gecikme rakamı eksik okunur).
-   - `frame_duration_snapshot()` → `draw_duration_histogram` ve
-     **`present_interval_histogram`** (sunulan kareler arası aralık; FPS
-     ve düşen kare buradan çıkar).
+   - **girdi→kare** (`input_latency_snapshot`): platform olayının geldiği
+     andan o olayın yol açtığı karenin çizildiği ana kadar.
+   - **çizim süresi**: headless koşumun ölçtüğü işin gerçek penceredeki
+     karşılığı — iki ölçüm ancak bu sütun üzerinden karşılaştırılabilir.
+   - **sunum aralığı** (`present_interval_histogram`): FPS ve düşen kare.
+   - **kare başına olay** ve **çizim ortasında düşen olay**: ikincisi
+     büyükse gecikme rakamı eksik okunmalıdır.
 
-   Yapılacak iş: masaüstü koşucusuna bir ölçüm modu eklemek (`akici-dev`
-   profili + `gpui/profiler` özelliği), uygulamayı açıp gerçek klavyeyle
-   yazmak ve çıkışta histogramları raporlamak. Sentetik girdi bu adımın
-   amacını boşa çıkarır — ölçülmek istenen tam olarak fiziksel giriş
-   yoludur.
+   ```bash
+   cargo run --profile akici-dev --features olcum \
+       -p gpui-bilesenleri-galeri-masaustu -- --geniş --olcum 40
+   ```
+
+   `--geniş` bilinçli: pencere 1600×1000 açılır, yani headless koşumla
+   **aynı boyut**. Süre boyunca pencerede gerçekten yazmak gerekir; alana
+   tıklayıp metin girilmezse rapor "örnek yok" der ve kendi uyarısını
+   basar.
+
+   **Neden otomatikleştirilmedi:** araç bu depodan koşturuldu ve rapor
+   ürettiği doğrulandı, ama **girdi örneği toplanamadı**. Bu ortamdan
+   pencereye hedefli girdi gönderilemiyor: uygulama erişilebilirlik
+   ağacında pencere göstermiyor (`count windows` → 0), öne getirilemiyor
+   ve sisteme gönderilen tuşlar öndeki başka uygulamaya gidiyor.
+   Otomatikleştirmek zaten amacı zayıflatırdı — ölçülmek istenen tam
+   olarak fiziksel giriş yoludur; sentetik olay o yolun bir bölümünü
+   atlar. Bu yüzden adım, koşumu elle yapacak kişiye bırakıldı.
+
+   Araç doğrulaması (girdisiz koşum, 8–40 sn): rapor basılıyor, uygulama
+   temiz çıkıyor, `çizim süresi` n=2 (yalnız açılış kareleri) ve girdiye
+   bağlı histogramlar boş — beklenen davranış.
+
 2. **Linux'ta headless CPU koşumunun tekrarı.** Amaç mimarinin başka bir
    işletim sistemi ve makinede de bütçe içinde kalıp kalmadığı. İki
    kural: (a) macOS ve Linux **mutlak süreleri doğrudan yarıştırılmaz**,

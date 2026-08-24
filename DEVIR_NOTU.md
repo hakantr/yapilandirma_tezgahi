@@ -131,7 +131,13 @@ sahipliğinde — bu depoda iş yok.
    "TEZGAH_DEVIR_NOTU sonundaki performans raporu" hiç yazılmamıştı; o
    boşluğu bu belge doldurur.) **Açık (bu sırayla):** (a) macOS'ta gerçek pencerede
    `input-to-present` / present interval / düşen kare — FPS ve gecikme
-   iddiasını ancak bu kapatır; (b) Linux'ta headless CPU koşumunun
+   iddiasını ancak bu kapatır. **Araç hazır:** masaüstü koşucusunda
+   `--olcum <saniye>` modu (`--features olcum`) GPUI profilcisinden dört
+   histogram basıyor; `cargo run --profile akici-dev --features olcum -p
+   gpui-bilesenleri-galeri-masaustu -- --geniş --olcum 40` ile koşulur ve
+   **süre boyunca pencerede gerçekten yazmak gerekir**. Bu ortamdan
+   hedefli girdi gönderilemediği için sayılar elle koşumu bekliyor
+   (gerekçe raporun §9.1'inde); (b) Linux'ta headless CPU koşumunun
    tekrarı (mutlak süreler platformlar arası yarıştırılmaz, aynı makinede
    çift koşum); (c) Linux ürün hedefiyse orada da gerçek pencere ölçümü. **Bu depo için
    120 FPS / "sıfıra yakın gecikme" iddiası yoktur.**

@@ -8,7 +8,19 @@ publish.workspace = true
 [lints]
 workspace = true
 
+[features]
+# Gerçek pencerede `input-to-present` ölçümü.
+#
+# `gpui/profiler` açılınca pencere girdi gecikmesi, çizim süresi ve sunum
+# aralığı histogramlarını toplar. Ürün profiline girmez: bayrak yalnız
+# ölçüm koşumunda verilir.
+#
+#     cargo run --profile akici-dev --features olcum \
+#         -p gpui-bilesenleri-galeri-masaustu -- --olcum 20
+olcum = ["gpui/profiler", "dep:hdrhistogram"]
+
 [dependencies]
+hdrhistogram = { version = "7", optional = true }
 gpui.workspace = true
 # `wayland`/`x11` Linux pencere arka uçlarıdır; onlarsız Linux'ta galeri
 # açılmıyor (kullanıcı kararı, Ağu 2026). macOS/Windows'ta hedef kapılı
