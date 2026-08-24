@@ -229,7 +229,41 @@ Bu turdan sonra tuş vuruşu karesinde kalan iş: kök kabuğu + sol kolonun
 paneller. Sağ kolon kurulmaz, hiçbir liste kurulmaz, hiçbir çözüm/rapor/
 kod yeniden hesaplanmaz.
 
-## 6. Kabul hedefleri ve ölçüm
+## 6. İnceleme düzeltmeleri (24 Ağu 2026, bağımsız salt-okunur inceleme)
+
+Üç turun ardından yapılan dış kaynak incelemesi dört noktayı düzeltti ya
+da kesinleştirdi; kayıt buraya işlenir ki rapor tek başına doğru resmi
+versin:
+
+1. **Sıcak metin yolu zaten kanonik katmanda özel `Element`tir.**
+   `GirişKutusu` dış kabuğunu `div` ile kurar; metin, seçim ve imleç
+   çizimini `MetinGirişiÖğesi` yapar
+   (`../gpui_bilesenleri/…/metin_girisi/bileşen.rs` — struct `2773`,
+   `impl Element` `2824`, kabuğa gömülme `2475`, shaping `3004`'te
+   `shape_line`). Zed'in "editör kanvası imperatif, chrome deklaratif"
+   hibrit deseninin tek satırlık karşılığı bu yığında kuruludur. Bu
+   raporun turları chrome tarafını daralttı; sıcak yola dokunmadı ve
+   dokunması da gerekmiyordu — o yol bileşenin kendi turlarının malıdır.
+2. **Shaping, glyph atlası ve batching GPUI tarafından sağlanır;
+   "bedava" değildir.** Satır yerleşimi önbelleği ve `reuse_layouts`
+   eşleşen metin/font için asıl shaping'i amorti eder; anahtar araması,
+   run kuruluşu, önbellek/atlas ıskası ve rasterizasyon maliyetleri
+   kalır. Atlas tek doku değildir (mono/subpixel/polychrome) ve sahne
+   tek draw call'a inmez.
+3. **İzolasyonun doğru tarifi yarıçaptır, sıklık değil.** Alan gözleyen
+   paneller her alan bildirimini alır ve gerçekleşen her çizimde yeniden
+   çizilir; kazanç, tuş vuruşunun kabuğun tamamına değil üç küçük panele
+   (ve alanın kendi öğesine) değmesidir.
+4. **ORT-007 gösterim beslemesi gecikme kanıtı değildir.** Tezgâhın
+   portu anında çözülen bir future döndürür; kanıtladığı şey sürüm
+   damgalı commit kapısının mekanizmasıdır. Gerçek arka plan yükü ve
+   gecikme davranışı ürün portlarının işidir.
+
+`§1`'deki çizim modeli cümlesi de şu kesinlikle okunmalı: kök render
+"her ekran yenilemesinde" değil, **gerçekleşen her GPUI çiziminde**
+koşar; hiçbir entity kirli değilse çizim de yoktur.
+
+## 7. Kabul hedefleri ve ölçüm
 
 Önceki turun sayısal hedefleri devirde kaybolduğu için hedefler yeniden,
 ölçüm yoluyla birlikte konur:
