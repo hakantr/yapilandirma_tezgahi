@@ -547,9 +547,31 @@ Teşhis satırı ölçüm moduna eklendi ve iki olağan şüpheli **elendi**:
 | `draw` içinde sunum/vsync beklemesi | **Elenmedi ama zayıf** — `Window::draw` present çağırmıyor (`needs_present` işaretliyor); yine de 20,8 ms, 60 Hz aralığına (16,7 ms) şüpheli yakın |
 | Platform metin ve GPU katmanı | **Kalan ana aday** — headless koşumda CoreText de Metal atlası da hiç çalışmıyor |
 
-Ayrıştırma yapılmadı: `draw` içindeki payların (shaping / rasterizasyon /
-sahne kodlama) dökümü GPUI'nin kendi profil izlerini gerektirir ve bu
-deponun işi değildir.
+### 8.2.1 Ayrıştırma: `draw`ın çoğu tezgâhın kendi işi
+
+Ölçüm moduna bir ayrıştırma satırı eklendi. Tezgâhın kendi `render`
+gövdeleri (kök + dört panel) sarmalanıp süreleri toplanıyor; `draw`
+toplamından çıkarılınca kalan, GPUI'nin yerleşim/prepaint/paint işi ile
+platform katmanının (shaping, rasterizasyon, sahne kodlama) payıdır.
+
+İlk koşum (girdisiz, açılış kareleri): **tezgâh render `draw`ın %74'ü.**
+
+Yani §8.2'nin "kalan ana aday platform katmanı" tahmini **yanlış çıktı**:
+ağırlık tezgâhın kendi element ağacı kurulumunda. Bu, üç turluk
+optimizasyonun doğru katmanda çalıştığı anlamına gelir — ama aynı zamanda
+o katmanın gerçek pencerede headless'takinden çok daha pahalı olduğunu
+gösterir (headless p50 ~1,75 ms; burada kare başına onlarca ms).
+
+Aradaki farkın en olası açıklaması **metin sistemi**: headless koşum
+`CosmicTextSystem`, gerçek pencere `MacTextSystem` (CoreText) kullanır ve
+`render` gövdelerinin içinde ölçüm/shaping çağrıları vardır. Bu, bir
+sonraki adımın hedefini de belirler (§10.1).
+
+**Uyarı — bu sayı ısınmamıştır.** İlk koşum yalnız açılış karelerini
+gördü (n=3) ve orada font yükleme ile ilk ağaç kurulumu ortalamayı
+domine eder. Ayrıştırma bu yüzden ölçüm penceresine sınırlandı: pencere
+başında sayaç sıfırlanıyor ve yalnız o penceredeki kareler sayılıyor.
+Sürekli kullanımı temsil eden sayı, gerçek yazma koşumundan gelecek.
 
 ### 8.3 Üç turluk optimizasyon bu tabloda nerede duruyor?
 

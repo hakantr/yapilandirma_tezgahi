@@ -93,6 +93,12 @@ impl AlanDurumPaneli {
 
 impl Render for AlanDurumPaneli {
     fn render(&mut self, _pencere: &mut Window, bağlam: &mut Context<Self>) -> impl IntoElement {
+        render_ölç(|| self.gövde(bağlam))
+    }
+}
+
+impl AlanDurumPaneli {
+    fn gövde(&mut self, bağlam: &mut Context<Self>) -> gpui::Div {
         let Ok(tercih) = self
             .kök
             .read_with(bağlam, |kök, _| kök.tezgah_tercihleri().clone())
@@ -187,9 +193,11 @@ impl OlayAkışıPaneli {
 
 impl Render for OlayAkışıPaneli {
     fn render(&mut self, _pencere: &mut Window, bağlam: &mut Context<Self>) -> impl IntoElement {
-        let g = crate::görünüm();
-        let t = crate::TezgahTokenları::paletten(crate::palet());
-        crate::kart(&g, &t).child(crate::sergiler::olay_akışı(&self.olaylar, bağlam))
+        render_ölç(|| {
+            let g = crate::görünüm();
+            let t = crate::TezgahTokenları::paletten(crate::palet());
+            crate::kart(&g, &t).child(crate::sergiler::olay_akışı(&self.olaylar, bağlam))
+        })
     }
 }
 
@@ -234,16 +242,18 @@ impl YuvaNotuPaneli {
 
 impl Render for YuvaNotuPaneli {
     fn render(&mut self, _pencere: &mut Window, bağlam: &mut Context<Self>) -> impl IntoElement {
-        let Ok(tercih) = self
-            .kök
-            .read_with(bağlam, |kök, _| kök.tezgah_tercihleri().clone())
-        else {
-            return div();
-        };
-        let alan = self.alan.clone();
-        // Not yokken boş `div` kalır: kart kendi aralarını kenar
-        // boşluklarıyla kurduğu için boş çocuk görünür iz bırakmaz.
-        crate::sergiler::yuva_görünürlük_notu(&tercih, &alan, bağlam).unwrap_or_else(div)
+        render_ölç(|| {
+            let Ok(tercih) = self
+                .kök
+                .read_with(bağlam, |kök, _| kök.tezgah_tercihleri().clone())
+            else {
+                return div();
+            };
+            let alan = self.alan.clone();
+            // Not yokken boş `div` kalır: kart kendi aralarını kenar
+            // boşluklarıyla kurduğu için boş çocuk görünür iz bırakmaz.
+            crate::sergiler::yuva_görünürlük_notu(&tercih, &alan, bağlam).unwrap_or_else(div)
+        })
     }
 }
 
@@ -289,6 +299,46 @@ pub fn bölüm_çizim_sayısı() -> u64 {
     BÖLÜM_ÇİZİMİ.with(std::cell::Cell::get)
 }
 
+thread_local! {
+    /// Tezgâhın kendi `render` gövdelerinde geçen toplam süre (ns).
+    ///
+    /// `Window::draw` bir karede şunları yapar: view'ların `render`
+    /// gövdeleri (element ağacının **kurulumu**), yerleşim, prepaint,
+    /// paint ve platform işi (metin shaping, glif rasterizasyonu, sahne
+    /// kodlama). Gerçek pencerede `draw` p50 ~20,8 ms ölçüldü ve bu,
+    /// headless koşumun 12 katıydı — ama hangi payın kimin olduğu
+    /// bilinmiyordu. Bu sayaç yalnız **tezgâhın kendi kurduğu** işi
+    /// ölçer; `draw` toplamından çıkarılınca kalan, GPUI ve platform
+    /// katmanının payıdır.
+    static RENDER_NS: std::cell::Cell<u64> = const { std::cell::Cell::new(0) };
+}
+
+/// Tezgâhın `render` gövdelerinde geçen toplam süre (nanosaniye).
+pub fn render_toplam_ns() -> u64 {
+    RENDER_NS.with(std::cell::Cell::get)
+}
+
+/// Sayacı sıfırlar; ölçüm penceresini açılış karelerinden ayırmak için.
+///
+/// Açılış kareleri (font yükleme, ilk ağaç kurulumu) ortalamayı domine
+/// eder ve sürekli kullanımı temsil etmez.
+pub fn render_sıfırla() {
+    RENDER_NS.with(|toplam| toplam.set(0));
+}
+
+/// Bir `render` gövdesini ölçer.
+///
+/// `Instant` çifti kare başına birkaç kez koşar (~25 ns), yani ölçtüğü
+/// büyüklüğün yanında görünmez; bu yüzden ölçüm bayrağına bağlanmadı ve
+/// her derlemede açık kalır.
+pub(crate) fn render_ölç<R>(gövde: impl FnOnce() -> R) -> R {
+    let başlangıç = std::time::Instant::now();
+    let sonuç = gövde();
+    let geçen = başlangıç.elapsed().as_nanos() as u64;
+    RENDER_NS.with(|toplam| toplam.set(toplam.get().saturating_add(geçen)));
+    sonuç
+}
+
 impl BölümlerPaneli {
     pub(crate) fn yeni(kök: &Entity<GaleriUygulaması>) -> Self {
         Self {
@@ -325,6 +375,12 @@ impl BölümlerPaneli {
 impl Render for BölümlerPaneli {
     fn render(&mut self, pencere: &mut Window, bağlam: &mut Context<Self>) -> impl IntoElement {
         BÖLÜM_ÇİZİMİ.with(|sayaç| sayaç.set(sayaç.get() + 1));
+        render_ölç(|| self.gövde(pencere, bağlam))
+    }
+}
+
+impl BölümlerPaneli {
+    fn gövde(&mut self, pencere: &mut Window, bağlam: &mut Context<Self>) -> gpui::AnyElement {
         // Bölümler kökün bağlamında üretilir: kart içeriklerindeki bütün
         // dinleyiciler `tezgahı_değiştir` ve akrabalarına, yani köke bağlı.
         let Ok(bölümler) = self

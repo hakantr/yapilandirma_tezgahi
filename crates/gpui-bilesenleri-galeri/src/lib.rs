@@ -1141,6 +1141,17 @@ impl Default for GaleriUygulaması {
 
 impl Render for GaleriUygulaması {
     fn render(&mut self, pencere: &mut Window, bağlam: &mut Context<Self>) -> impl IntoElement {
+        crate::render_ölç(|| self.kök_gövdesi(pencere, bağlam))
+    }
+}
+
+impl GaleriUygulaması {
+    /// Kökün çizim gövdesi; `render` yalnız onu ölçerek sarar.
+    fn kök_gövdesi(
+        &mut self,
+        pencere: &mut Window,
+        bağlam: &mut Context<Self>,
+    ) -> gpui::AnyElement {
         // Kare dikişleri **her iki yolda da** kurulur. Erken dönüşten sonra
         // kurmak, tezgâh ekranının onları hiç görmemesi demekti: palet ve
         // görünüm kendi fallback'leriyle ayakta kaldı ama açık seçici

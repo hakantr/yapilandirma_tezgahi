@@ -68,6 +68,17 @@ fn ölçümü_planla(pencere: gpui::AnyWindowHandle, saniye: u64, bağlam: &mut 
     );
     bağlam
         .spawn(async move |bağlam| {
+            // Ölçüm penceresi açılış karelerini dışarıda bırakır: ilk
+            // kareler font yükler ve bütün ağacı ilk kez kurar, yani
+            // sürekli kullanımı temsil etmez. Pencere başındaki kare
+            // sayısı ve sıfırlanan sayaç, ayrıştırmayı yalnız bu
+            // penceredeki karelere dayandırır.
+            let başlangıç_karesi = bağlam
+                .update_window(pencere, |_, pencere, _| {
+                    gpui_bilesenleri_galeri::render_sıfırla();
+                    pencere.frame_duration_snapshot().draw_duration_histogram.len()
+                })
+                .unwrap_or(0);
             bağlam
                 .background_executor()
                 .timer(Duration::from_secs(saniye))
@@ -114,6 +125,31 @@ fn ölçümü_planla(pencere: gpui::AnyWindowHandle, saniye: u64, bağlam: &mut 
                     "çizim ortasında düşen olay: {}",
                     girdi.mid_draw_events_dropped
                 );
+                // `draw` ayrıştırması: tezgâhın kendi `render` gövdeleri
+                // (element ağacının kurulumu) toplam çizimin ne kadarı?
+                // Kalan pay GPUI'nin yerleşim/prepaint/paint işi ile
+                // platform katmanına (metin shaping, glif rasterizasyonu,
+                // sahne kodlama) aittir.
+                let pencere_kareleri = kare
+                    .draw_duration_histogram
+                    .len()
+                    .saturating_sub(başlangıç_karesi);
+                if pencere_kareleri > 0 {
+                    let render_ms = gpui_bilesenleri_galeri::render_toplam_ns() as f64
+                        / pencere_kareleri as f64
+                        / MS;
+                    // Pencere içi ortalama çizim: toplam işten açılış
+                    // karelerinin payı düşülür.
+                    let toplam = kare.draw_duration_histogram.mean()
+                        * kare.draw_duration_histogram.len() as f64;
+                    let çizim_ms = (toplam / pencere_kareleri as f64) / MS;
+                    println!(
+                        "ayrıştırma             {pencere_kareleri} kare · kare başına \
+                         tezgâh render {render_ms:6.3} ms · çizim ≤{çizim_ms:6.3} ms · \
+                         tezgâh payı ≥%{:.0}",
+                        if çizim_ms > 0. { render_ms / çizim_ms * 100. } else { 0. },
+                    );
+                }
                 if girdi.latency_histogram.is_empty() {
                     eprintln!(
                         "uyarı: hiç girdi örneği yok — pencereye yazılmadıysa bu \
