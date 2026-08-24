@@ -576,6 +576,31 @@ Isınmış koşum (40 sn gerçek yazma, 58 kare):
 > tezgâh tarafında toplanır. Isınmış ölçüm oranı %74'ten %11'e indirdi.
 > Ders, §6.4'ün tekrarı: ısınmamış örneklem yön bile yanıltır.
 
+### 8.2.2 Ölçüm profili: sayılar `debug_assertions` **açıkken** alındı
+
+Gerçek pencere ölçümleri `akici-dev` profilinde koşuldu ve o profil
+`inherits = "dev"`, yani **`debug_assertions` açık** — ölçüm modunun
+teşhis satırı da bunu "derleme hata ayıklama" diye yazıyor. GPUI bu
+bayrakla element arenası, dispatch ağacı ve çizim fazı için ek
+doğrulamalar koşar.
+
+Headless koşum aynı kodu iki profille ölçtü (aynı makine, 200 tekrar):
+
+| Profil | K · tuş vuruşu p50 | Fark |
+|---|---|---|
+| `akici-dev` (`debug_assertions` açık) | 1,75 ms | — |
+| `release` (kapalı) | **1,04 ms** | **%40 daha ucuz** |
+
+Yani §8.1'in 21,7 ms'lik `draw` rakamı ürün derlemesini temsil etmiyor;
+üstündeki payın ne kadarının doğrulama olduğu **henüz ölçülmedi**, çünkü
+gerçek pencerede ısınmış bir `release` koşumu alınmadı (girdisiz koşum
+~20 ms verdi ama o yalnız açılış kareleriydi).
+
+Bu, dışarıyla karşılaştırma yaparken de belirleyici: bir başka GPUI
+uygulamasının yayımlanmış "8,4 ms" gibi bir kare süresi büyük olasılıkla
+`release`tir ve bizim 21,7 ms'lik `akici-dev` sayımızla **doğrudan
+kıyaslanamaz**.
+
 ### 8.3 Üç turluk optimizasyon bu tabloda nerede duruyor?
 
 Ayrıştırma (§8.2.1) sınırı çiziyor: üç tur, `draw`ın **%11'lik diliminde**
