@@ -132,28 +132,34 @@ sahipliğinde — bu depoda iş yok.
    boşluğu bu belge doldurur.) **Açık (bu sırayla):** (a) macOS'ta gerçek pencerede
    `input-to-present` / present interval / düşen kare — FPS ve gecikme
    iddiasını ancak bu kapatır. **Ölçüldü ve iddia çürüdü
-   (raporun §8'i):** masaüstü koşucusuna `--olcum <saniye>` modu eklendi
-   (`--features olcum`); gerçek klavyeyle 40 sn koşumda **girdi→kare p50
-   32,4 ms** (60 Hz ekranda ~2 kare, 120 Hz bütçesinin ~4 katı) ve
-   **çizim p50 20,8 ms** — headless ölçümün 12 katı. Retina, a11y ve
-   derleme profili hipotezleri elendi; kalan ana aday platform metin/GPU
-   katmanı (headless koşumda CoreText de Metal atlası da hiç çalışmıyor).
-   Sunum aralığı örneksiz çünkü tezgâh boşta çizmez — "FPS" bu uygulamada
-   ölçülebilir bir büyüklük değil, doğru metrik girdi→kare gecikmesi.
-   `draw` **ayrıştırıldı** (§8.2.1): ısınmış koşumda tezgâhın
-   kendi render işi 2,29 ms (%11), GPUI + platform katmanı 19,4 ms (%89).
-   Yani headless ölçüm yanlış değil **eksik**ti — ölçtüğü katman gerçek
-   maliyetin onda biri; üç tur da o %11'lik dilimde çalıştı ve toplam
-   gecikmeye yansıması ~%5 mertebesinde. Kalan %89 kardeş depoların
-   (`gpui`, `gpui_apple`) işi. **Sıradaki iş** optimizasyonun gerçek
-   penceredeki etkisini önbellekli/önbelleksiz çift koşumla ölçmek (ilk
-   denemede taban koşumunda yazılmadığı için boş çıktı; ölçüm modu
-   düzeltildi, sayaç artık ilk tuş vuruşuyla başlıyor); (b) Linux'ta headless CPU koşumunun
+   (raporun §8'i):** masaüstü koşucusuna iki ölçüm kipi eklendi
+   (`--features olcum`). `--olcum <sn>` mutlak sayıları verir: release
+   derlemede, 1600×1000 pencerede, gerçek klavyeyle **girdi→draw sonu p50
+   17,2 ms** (n=478) ve **çizim p50 16,9 ms**. Retina, a11y ve derleme
+   profili hipotezleri elendi — `debug_assertions` açıkken ölçülen eski
+   29–32 ms'lik rakamın yaklaşık yarısı doğrulama maliyetiymiş. Sunum
+   aralığı örneksiz çünkü tezgâh boşta çizmez; "FPS" bu uygulamada
+   ölçülebilir bir büyüklük değil, doğru metrik girdi→draw gecikmesi.
+   `draw`ın **aşama** dağılımı ortalamada 2,21 ms render gövdeleri /
+   14,63 ms render sonrası aşamalar — bu bir **sahiplik** ayrımı değildir
+   ve daha önce buraya yazılmış `%11/%89` ile `~%5` sayıları
+   **geri çekildi** (§8.2.1).
+   `--olcum-ab <sn>` ise üç turluk çalışmanın kazancını ölçer: önbelleği
+   koşum içinde beşer saniyelik ABBA fazlarıyla açıp kapatır. Bu düzenek
+   gerekliydi, çünkü ayrı binary'lerle A/B–B/A denemesi **geçersiz çıktı**
+   (aynı binary'nin iki koşumu arası gürültü 4,42 ms, aranan etki
+   0,86 ms). İki geçerli dönüşümlü koşumun sonucu: **önbellek kare
+   maliyetini ortalamada %16–19, p50'de 4,1–4,7 ms düşürüyor**; kazanç
+   `render` gövdelerinde toplanıyor, `render` sonrası aşamalar
+   küçülmüyor (§8.3.4). **Açık:** (b) Linux'ta headless CPU koşumunun
    tekrarı (mutlak süreler platformlar arası yarıştırılmaz, aynı makinede
-   çift koşum); (c) Linux ürün hedefiyse orada da gerçek pencere ölçümü. **Bu depo için 120 FPS / "sıfıra yakın gecikme"
+   çift koşum); (c) Linux ürün hedefiyse orada da gerçek pencere ölçümü;
+   (d) `draw`ın render sonrası diliminin içi — kardeş depoların işi
+   (`gpui`, `gpui_apple`). **Bu depo için 120 FPS / "sıfıra yakın gecikme"
    iddiası yoktur ve gerçek ölçüm bu iddiayı çürütmüştür.** Elde iki ayrı
-   sayı var: headless CPU işi (p50 ~1,75 ms, yalnız element ağacı katmanı)
-   ve gerçek pencerede girdi→kare (p50 ~32 ms); ikisi aynı şeyi ölçmez.
+   sayı var: headless CPU işi (p50 ~1,04 ms release, yalnız element ağacı
+   katmanı) ve gerçek pencerede girdi→draw sonu (p50 ~17 ms); ikisi aynı
+   şeyi ölçmez ve biri diğerinin yerine kullanılamaz.
 2. Crate/paket adlarının yeniden adlandırılması (kullanıcı kararı).
 3. Bu depoya CI kurmak (kaynak depodaki `uygulama-iskeleti` işinin
    uyarlaması; kardeş `gpui` **ve** `gpui_bilesenleri` checkout'ları gerekir).

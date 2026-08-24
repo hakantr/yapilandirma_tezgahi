@@ -567,10 +567,18 @@ buldu ve hepsi geçerli:
    sıfırlanmadığı için sonuçlar pencere açılışından veri taşıyor.
 3. **Kalan pay "GPUI'nin malı" değil.** O dilimin içinde **tezgâhın
    ürettiği ağacın** yerleşim, prepaint, paint ve shaping maliyeti var.
-   Sağ kolon önbelleği tam da o aşamaları — `reuse_prepaint` /
-   `reuse_paint` — yeniden kullanıyor. Yani "üç tur yalnız kendi %11'ine
-   dokundu" cümlesi yanlış: önbellek `render` gövdesinin dışındaki işi de
-   kesiyor.
+   Sağ kolon önbelleği tam da o aşamaların kayıtlarını — `reuse_prepaint`
+   / `reuse_paint` — yeniden kullanıyor. Yani "üç tur yalnız kendi
+   %11'ine dokundu" cümlesi yanlış.
+
+   **Sonradan düzeltildi (§8.3.4).** Bu maddenin son cümlesi "önbellek
+   `render` gövdesinin dışındaki işi de **kesiyor**" diyordu. Ölçüm bunu
+   doğrulamadı: iki geçerli koşumda da `render sonrası` dilimi
+   küçülmüyor, düz kalıyor ya da hafif artıyor (+0,45 ms, +2,58 ms).
+   Aralıkları yeniden kullanmak bedava değil — kaydedilmiş sahne,
+   dispatch alt ağacı ve metin yerleşimleri kareye kopyalanıyor ve bu
+   kopyalama, atlanan işin yerine geçiyor. Maddenin **ayakta kalan**
+   kısmı ilk iki cümlesidir: dilim sahiplik değil aşamadır.
 4. **`girdi→kare` ekran pikseli değil.** Ölçüm `present_end`e, yani
    platformun `draw` çağrısının tamamlanmasına kadar. "Ekrana yansıma"
    ifadesi bundan daha kesin bir şey iddia ediyordu.
@@ -683,25 +691,128 @@ Bunun üstüne ikinci bir ölçüm kipi kuruldu: `--olcum-ab <saniye>`.
 
 - Koşum beşer saniyelik fazlara bölünür, sıra **ABBA** (doğrusal kayma —
   ısınma, termal kısma — iki kovaya eşit dağılsın diye).
-- Her faz başında bayrak çevrilir, `refresh` edilir ve **300 ms
-  oturulur**: geçiş karesi zorunlu ıskadır, hiçbir kovaya girmez.
+- Her faz başında bayrak çevrilir ve `refresh` edilir. Geçiş karesi
+  zorunlu ıskadır (ağaç yeniden kurulur, önbellekli hâle geçişte önbellek
+  de o karede dolar), bu yüzden **kare sayarak** dışlanır: `draw`
+  histogramının uzunluğu okunur ve ölçüm ancak o sayı arttıktan sonra
+  başlar. Süreyle beklemek yetmiyor — gerekçesi §8.3.3'te.
 - Sonra `draw` histogramının ve `render` toplamının anlık görüntüsü
   alınır; faz sonunda fark hesaplanıp ilgili kovaya eklenir.
 - Termal durum, arka plan yükü ve yazma temposu artık iki kovaya da eşit
   dağılır — çünkü aynı dakikanın içindedirler.
+- Kapı iki dakikada açılmazsa ya da bir kova 100 karenin altında kalırsa
+  rapor **`GEÇERSİZ`** basar. Yazılmamış bir koşumun sayıları dolu
+  görünür ve bu, en tehlikeli hata biçimidir.
 
 ```bash
 cargo run --release --features olcum \
-    -p gpui-bilesenleri-galeri-masaustu -- --geniş --olcum-ab 80
+    -p gpui-bilesenleri-galeri-masaustu -- --geniş --olcum-ab 60
 ```
 
 Mutlak sayılar (gecikme, kare maliyeti, aşama ayrımı) için `--olcum <sn>`
 kipi olduğu gibi duruyor; iki kip iki ayrı soruya bakar ve birbirinin
 yerine geçmez.
 
+#### 8.3.3 İlk dönüşümlü koşum — GEÇERSİZ, ama düzenekteki kusuru buldu
+
+İlk `--olcum-ab 80` koşumu şu sayıları verdi:
+
+```
+A önbellekli   n=38  p50 19,42 ms · p95 49,84 ms · ort 23,32 ms
+               render gövdeleri 0,660 ms · render sonrası 22,659 ms
+B taban        n=27  p50 17,38 ms · p95 26,02 ms · ort 19,95 ms
+               render gövdeleri 5,104 ms · render sonrası 14,841 ms
+```
+
+80 saniyede **toplam 65 kare** — faz başına ~4. Nedeni koşumcu tarafından
+bildirildi: pencereye yazmaya son anda başlanmış. Kapı iki dakikalık
+zaman aşımına uğrayıp kendiliğinden açılmış ve ölçüm yazma evresini hiç
+görmemiş. Sayılar bu yüzden **geçersiz**.
+
+Ama bu koşum düzenekte gerçek bir kusuru açığa çıkardı. Faz geçişinde
+bayrak çevrilip `refresh` ediliyor ve **sabit 300 ms** bekleniyordu;
+geçiş karesi böylece dışarıda kalacaktı. Yazma seyrek olduğunda o kare
+300 ms dolmadan gelmiyor ve doğrudan ölçüme sızıyor — üstelik
+**asimetrik olarak**: önbellekli hâle geçiş karesi hem kolonu render
+eder hem önbelleği doldurur, tabana geçiş karesi ise yalnız render eder.
+Yani sızıntı yalnız A kovasını cezalandırır. `render sonrası` diliminin
+A'da 7,8 ms yüksek çıkması büyük olasılıkla budur.
+
+Üç düzeltme yapıldı:
+
+- Geçiş karesi artık **süreyle değil kare sayarak** dışlanıyor: bayrak
+  çevrildiğinde `draw` histogramının uzunluğu okunur ve ölçüm ancak o
+  sayı arttıktan sonra başlar (en çok 3 sn yoklanır).
+- Kapı zaman aşımına uğrarsa rapor **`GEÇERSİZ`** basıyor; sessizce dolu
+  görünen bir tablo üretmiyor.
+- Kovalardan biri 100 karenin altındaysa yine **`GEÇERSİZ`** basıyor.
+
+Yine de dört koşumluk denemede olduğu gibi burada da `render gövdeleri`
+ayrımı temiz: **A 0,66 ms · B 5,10 ms**. Bu, üç bağımsız veri kümesinde
+(dört koşum + bu koşum) aynı yönde çıkan tek büyüklük.
+
+#### 8.3.4 Geçerli sonuç: önbellek kare maliyetini %16–19 düşürüyor
+
+Düzeltilmiş düzenekle iki koşum alındı. İkisinde de kovalar eşik üstünde
+ve araç hiçbir geçersizlik uyarısı basmadı. macOS, release, 1600×1000,
+12 faz × 5 sn, ABBA, kesintisiz yazma.
+
+| | Koşum 1 | Koşum 2 |
+|---|---|---|
+| A önbellekli · n | 167 | 126 |
+| A · çizim p50 | 19,53 ms | 15,68 ms |
+| A · çizim ort | 18,86 ms | 17,56 ms |
+| A · render gövdeleri | 0,42 ms | 0,21 ms |
+| A · render sonrası | 18,45 ms | 17,35 ms |
+| B taban · n | 148 | 165 |
+| B · çizim p50 | 24,22 ms | 19,79 ms |
+| B · çizim ort | 23,33 ms | 20,90 ms |
+| B · render gövdeleri | 7,46 ms | 4,00 ms |
+| B · render sonrası | 15,87 ms | 16,90 ms |
+| **fark · çizim p50** | **−4,69 ms** | **−4,11 ms** |
+| **fark · çizim ort** | **−4,47 ms (%−19,2)** | **−3,34 ms (%−16,0)** |
+| fark · render gövdeleri | −7,05 ms | −3,78 ms |
+| fark · render sonrası | +2,58 ms | +0,45 ms |
+
+Üç şey **iki koşumda da aynı yönde** çıktı ve kayda geçer:
+
+1. **Önbellek kare maliyetini gerçekten düşürüyor.** Ortalamada %16–19,
+   p50'de 4,1–4,7 ms. Bu, üç turluk çalışmanın gerçek pencerede ölçülmüş
+   ilk ve tek kazancıdır.
+2. **Kazanç `render` gövdelerinde toplanıyor.** Kolon çizilmediğinde kare
+   başına render gövdesi maliyeti 4,0–7,5 ms'ten 0,2–0,4 ms'e iniyor.
+3. **`render sonrası` dilimi küçülmüyor.** İki koşumda da düz ya da hafif
+   **yüksek** (+0,45 ms, +2,58 ms).
+
+Üçüncü madde §9'un 3. maddesini **kısmen düzeltiyor**. Orada, önbelleğin
+`reuse_prepaint`/`reuse_paint` üzerinden render dışındaki işi de kestiği
+söylenmişti. Ölçüm bunu göstermiyor: o dilim ya sabit kalıyor ya artıyor.
+Makul okuma, aralıkların yeniden kullanılmasının **bedava olmadığı** —
+kaydedilmiş sahne, dispatch alt ağacı ve metin yerleşimleri kareye
+kopyalanıyor ve bu kopyalama, atlanan yerleşim/prepaint/paint işinin
+yerine geçiyor. Net etki hâlâ kazanç, ama kazanç render gövdesinden
+geliyor. Bedelin büyüklüğü **ölçülmedi**: +0,45 ile +2,58 ms arasındaki
+aralık bir sayı vermek için fazla geniş.
+
+Okuma notları:
+
+- Mutlak süreler iki koşum arasında topluca kaymış (koşum 2'nin bütün
+  rakamları daha düşük). Dönüşümlü tasarımın amacı tam da buydu: kayma
+  iki kovaya da eşit bindiği için **fark** ayakta kalıyor.
+- Kare sayıları dengesizliği yön değiştiriyor (koşum 1'de A çok, koşum
+  2'de B çok), yani sonucu sürükleyen şey bu değil.
+- Ölçülen büyüklük **kare maliyetidir**, girdi→draw gecikmesi değil. Bir
+  tuş vuruşunun kullanıcıya yansıması bir kareden fazlasını içerir
+  (§8.1).
+- Bayrağın gerçekten iş gördüğü ayrı bir kapıyla sabitlendi
+  (`tests/kolon_tazeligi.rs::çalışma_zamanı_bayrağı_önbelleği_açıp_kapatır`):
+  bayrak sessizce çalışmasaydı ölçüm iki kez aynı şeyi ölçer ve
+  inandırıcı bir "fark yok" üretirdi.
+
 ### 8.4 Kayıtlı sonuç
 
-Bu ölçümden sonra depo için geçerli tek cümle şudur:
+Bu ölçümlerden sonra depo için geçerli iki cümle var. Birincisi mutlak
+gecikme üzerine:
 
 > 1600×1000 pencerede, 60 Hz ekranlı bir macOS makinesinde, **optimize**
 > derlemede, bir metin düzenlemesinden o düzenlemenin yol açtığı `draw`
@@ -711,6 +822,13 @@ Bu ölçümden sonra depo için geçerli tek cümle şudur:
 > Sürenin `draw` içi **aşama** dağılımı ortalamada 2,21 ms render
 > gövdeleri / 14,63 ms render sonrası aşamalar — ama bu bir **sahiplik**
 > ayrımı değildir (§8.2.1, madde 3).
+
+İkinci cümle, üç turluk çalışmanın kazancı üzerine:
+
+> Sağ kolonun `Entity::cached` sınırı, gerçek pencerede **kare maliyetini
+> ortalamada %16–19, p50'de 4,1–4,7 ms düşürüyor** (iki geçerli koşum,
+> aynı süreç içinde dönüşümlü ABBA fazları). Kazanç `render`
+> gövdelerinde toplanıyor; `render` sonrası aşamalar küçülmüyor.
 
 `debug_assertions` açıkken ölçülen eski 29–32 ms'lik rakam ürünü temsil
 etmiyordu; farkın yaklaşık yarısı doğrulama maliyetiymiş (§8.2.2).
@@ -758,12 +876,7 @@ Gerçek pencere ölçümü (§8) sırayı değiştirdi: artık en değerli iş, 
 ms'lik `draw`ın içini ayrıştırmak. Platformlar arası tekrar ondan sonra
 gelir — yanlış katmanı optimize etmemek için.
 
-1. **Optimizasyonun gerçek penceredeki etkisi** (§8.3): ayrı binary'lerle
-   A/B–B/A denendi ve **geçersiz çıktı** — koşumlar arası gürültü (4,42 ms)
-   aranan etkiden (0,86 ms) beş kat büyüktü. Düzenek değiştirildi: önbellek
-   artık çalışma zamanı bayrağı ve `--olcum-ab` kipi iki hâli tek süreç
-   içinde dönüşümlü ölçüyor (§8.3.2). Koşum bekliyor.
-2. **`draw`ın render sonrası diliminin içi.** Ağırlığın orada olduğu
+1. **`draw`ın render sonrası diliminin içi.** Ağırlığın orada olduğu
    ölçüldü (§8.1: ort 14,63 ms / 16,84 ms) ama o dilimin içi
    (yerleşim / prepaint / paint / shaping / rasterizasyon / sahne kodlama)
    ayrılmadı. Dilim **sahiplik değil aşamadır**: içinde hem GPUI'nin hem

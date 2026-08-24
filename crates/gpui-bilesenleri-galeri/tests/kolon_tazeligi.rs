@@ -27,6 +27,7 @@
 use gpui::{AnyWindowHandle, Context, TestApp, TestAppWindow, Window};
 use gpui_bilesenleri_galeri::{
     GaleriUygulaması, TezgahDeğerKipi, bileşen_tuş_bağlarını_kur, bölüm_çizim_sayısı,
+    önbelleği_ayarla,
 };
 
 fn kur() -> (TestApp, TestAppWindow<GaleriUygulaması>) {
@@ -169,5 +170,56 @@ fn tuş_vuruşu_ve_temiz_kare_kolonu_kurmaz() {
         temiz_kare(&mut uygulama, tutamaç),
         0,
         "tuş vuruşlarından sonra önbellek bozulmuş"
+    );
+}
+
+/// Çalışma zamanı bayrağı önbelleği gerçekten açıp kapatıyor mu.
+///
+/// Gerçek pencere ölçümü (`--olcum-ab`, `raporlar/PERFORMANS_MIMARISI.md`
+/// §8.3.2) tamamen bu bayrağa dayanır: iki hâli aynı süreç içinde
+/// dönüşümlü koşturur ve iki ayrı kova doldurur. Bayrak sessizce
+/// çalışmazsa ölçüm iki kez aynı şeyi ölçer, "fark yok" der ve bu
+/// **inandırıcı** görünür — aranan etki zaten küçük. O sessiz hatayı
+/// imkânsız kılmak bu kapının işi.
+///
+/// Bayrak açıkça kurulur, varsayılana güvenilmez: `olcum-onbelleksiz`
+/// özelliği varsayılanı ters çevirir ve bu kapı iki koşumda da geçerli
+/// olmalıdır.
+#[test]
+fn çalışma_zamanı_bayrağı_önbelleği_açıp_kapatır() {
+    let (mut uygulama, pencere) = kur();
+    let tutamaç: AnyWindowHandle = pencere.handle().into();
+
+    önbelleği_ayarla(true);
+    // Odak karesi `refresh` çağırır ve önbellekleri atlar; ondan sonraki
+    // kare önbelleği doldurur. Ölçüm de aynı sırayı izler.
+    değişimden_sonra(&mut uygulama, tutamaç, |uygulama, pencere, bağlam| {
+        uygulama.ölçüm_alanına_yaz("ısınma", pencere, bağlam);
+    });
+    temiz_kare(&mut uygulama, tutamaç);
+    assert_eq!(
+        temiz_kare(&mut uygulama, tutamaç),
+        0,
+        "bayrak açıkken kolon her karede kuruluyor: önbellek hiç isabet etmiyor"
+    );
+
+    önbelleği_ayarla(false);
+    for sıra in 0..2 {
+        assert!(
+            temiz_kare(&mut uygulama, tutamaç) > 0,
+            "bayrak kapalıyken kolon kurulmuyor (kare #{sıra}): ölçüm tabanı \
+             önbellekli hâlle aynı şeyi ölçer ve fark sıfır çıkar"
+        );
+    }
+
+    önbelleği_ayarla(true);
+    // Geçiş karesi: önbellek bu karede yeniden dolar, yani kolonu bir kez
+    // daha kurar. Ölçümde de bu kare kovaya alınmaz.
+    temiz_kare(&mut uygulama, tutamaç);
+    assert_eq!(
+        temiz_kare(&mut uygulama, tutamaç),
+        0,
+        "bayrak geri açıldığında önbellek geri gelmiyor: dönüşümlü ölçümün \
+         A fazları taban gibi davranır"
     );
 }

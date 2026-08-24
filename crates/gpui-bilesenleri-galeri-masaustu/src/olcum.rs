@@ -96,17 +96,20 @@ fn argüman_saniyesi(ad: &str) -> Option<u64> {
 ///
 /// Fare tıklaması da platformun girdi histogramını doldurur; ölçülmek
 /// istenen ise yazma evresidir. En çok iki dakika beklenir, sonra ölçüm
-/// yine de başlar ve rapor kendi uyarısını basar.
-async fn kapıyı_bekle(bağlam: &mut gpui::AsyncApp) {
+/// yine de başlar — ama `false` döner ve rapor bunu **yazar**. Sessizce
+/// yazılmamış bir koşumu ölçmek, hiç ölçmemekten kötüdür: sayılar dolu
+/// görünür ama neyi ölçtükleri belirsizdir.
+async fn kapıyı_bekle(bağlam: &mut gpui::AsyncApp) -> bool {
     for _ in 0..600 {
         if gpui_bilesenleri_galeri::düzenleme_sayısı() > 0 {
-            return;
+            return true;
         }
         bağlam
             .background_executor()
             .timer(Duration::from_millis(200))
             .await;
     }
+    false
 }
 
 /// Ölçüm penceresi dolunca raporu basar ve uygulamadan çıkar.
@@ -148,11 +151,12 @@ fn ölçümü_planla(pencere: gpui::AnyWindowHandle, saniye: u64, bağlam: &mut 
 /// Daha kısa fazlarda geçiş karesinin payı büyür; daha uzunda makine
 /// durumu fazın içinde kayar ve dönüşümlü tasarımın bütün amacı budur.
 const FAZ_SN: u64 = 5;
-/// Bayrak değiştikten sonra ölçüme başlamadan beklenen süre.
+/// Geçiş karesi beklenirken iki yoklama arasındaki süre.
 ///
-/// Önbellek açılıp kapandığında ağaç yeniden kurulur ve o kare zorunlu
-/// ıskadır; hiçbir kovaya girmemelidir.
-const OTURMA_MS: u64 = 300;
+/// Toplam bekleme bunun 60 katıyla sınırlıdır (3 sn): kare hiç gelmezse
+/// faz yine de ölçülür, yalnız geçiş karesini dışarıda bırakma güvencesi
+/// kalmaz.
+const OTURMA_MS: u64 = 50;
 
 /// Aynı koşum içinde önbellekli/önbelleksiz fazları sırayla ölçer.
 ///
@@ -170,7 +174,7 @@ fn dönüşümlü_ölçümü_planla(pencere: gpui::AnyWindowHandle, saniye: u64,
     );
     bağlam
         .spawn(async move |bağlam| {
-            kapıyı_bekle(bağlam).await;
+            let kapı_açıldı = kapıyı_bekle(bağlam).await;
             let mut kova: [Option<Histogram<u64>>; 2] = [None, None];
             let mut render_ns = [0u64; 2];
             let mut eksik_faz = false;
@@ -197,7 +201,16 @@ fn dönüşümlü_ölçümü_planla(pencere: gpui::AnyWindowHandle, saniye: u64,
             }
             bağlam
                 .update_window(pencere, |_, pencere, _| {
-                    dönüşümlü_raporla(pencere, faz_sayısı, &kova, &render_ns, eksik_faz);
+                    dönüşümlü_raporla(
+                        pencere,
+                        faz_sayısı,
+                        &kova,
+                        &render_ns,
+                        Kuşku {
+                            eksik_faz,
+                            kapı_açılmadı: !kapı_açıldı,
+                        },
+                    );
                 })
                 .ok();
             bağlam.update(|bağlam| bağlam.quit());
@@ -215,16 +228,32 @@ async fn faz_ölç(
     pencere: gpui::AnyWindowHandle,
     önbellekli: bool,
 ) -> Option<(Histogram<u64>, u64)> {
-    bağlam
+    let geçiş_öncesi = bağlam
         .update_window(pencere, |_, pencere, _| {
             gpui_bilesenleri_galeri::önbelleği_ayarla(önbellekli);
             pencere.refresh();
+            pencere.frame_duration_snapshot().draw_duration_histogram.len()
         })
         .ok()?;
-    bağlam
-        .background_executor()
-        .timer(Duration::from_millis(OTURMA_MS))
-        .await;
+    // Geçiş karesi zorunlu ıskadır: bayrak değişince ağaç yeniden kurulur
+    // ve önbellekli hâle geçişte önbellek de o karede dolar. **Süreyle**
+    // beklemek yetmez — yazma seyrekse o kare sabit bekleme bittikten
+    // sonra gelir ve doğrudan ölçüme sızar; üstelik yalnız A kovasına,
+    // çünkü pahalı olan geçiş odur. O yüzden kare sayarak beklenir.
+    for _ in 0..60 {
+        bağlam
+            .background_executor()
+            .timer(Duration::from_millis(OTURMA_MS))
+            .await;
+        let şimdi = bağlam
+            .update_window(pencere, |_, pencere, _| {
+                pencere.frame_duration_snapshot().draw_duration_histogram.len()
+            })
+            .ok()?;
+        if şimdi > geçiş_öncesi {
+            break;
+        }
+    }
     let baş = bağlam
         .update_window(pencere, |_, pencere, _| {
             gpui_bilesenleri_galeri::render_sıfırla();
@@ -247,12 +276,28 @@ async fn faz_ölç(
     tam.then_some((fark, ns))
 }
 
+/// Raporun sonuna basılacak şüpheler.
+///
+/// Ayrı bayraklar tek `bool`a indirgenmedi çünkü okuyanın hangisinin
+/// gerçekleştiğini bilmesi gerekir: eksik faz sayıları dengesizleştirir,
+/// açılmamış kapı ise koşumun tamamını geçersiz kılar.
+struct Kuşku {
+    eksik_faz: bool,
+    kapı_açılmadı: bool,
+}
+
+/// Kovanın anlamlı sayılması için gereken en az kare sayısı.
+///
+/// Altında kalan bir kova ortalama üretir ama o ortalama gürültüdür;
+/// tek pahalı kare 20 karelik bir kovayı milisaniyelerce kaydırır.
+const EN_AZ_KARE: u64 = 100;
+
 fn dönüşümlü_raporla(
     pencere: &gpui::Window,
     faz_sayısı: u64,
     kova: &[Option<Histogram<u64>>; 2],
     render_ns: &[u64; 2],
-    eksik_faz: bool,
+    kuşku: Kuşku,
 ) {
     const MS: f64 = 1_000_000.;
     println!("\n— dönüşümlü A/B ölçümü · {faz_sayısı} faz × {FAZ_SN} sn · sıra ABBA —");
@@ -302,7 +347,34 @@ fn dönüşümlü_raporla(
             (a_draw - a_render) - (b_draw - b_render),
         );
     }
-    if eksik_faz {
+
+    if kuşku.kapı_açılmadı {
+        eprintln!(
+            "GEÇERSİZ: ölçüm kapısı iki dakikada açılmadı — pencereye hiç \
+             metin yazılmadı ve ölçüm yine de başladı. Bu koşumun sayıları \
+             yazma evresini temsil etmez; koşum tekrarlanmalıdır."
+        );
+    }
+    let az_örnek: Vec<&str> = adlar
+        .iter()
+        .enumerate()
+        .filter(|(indis, _)| {
+            kova[*indis]
+                .as_ref()
+                .is_none_or(|histogram| histogram.len() < EN_AZ_KARE)
+        })
+        .map(|(_, ad)| *ad)
+        .collect();
+    if !az_örnek.is_empty() {
+        eprintln!(
+            "GEÇERSİZ: {} kovası {EN_AZ_KARE} karenin altında. Fazlar \
+             boyunca kesintisiz ve hızlı yazılmalı; seyrek yazmada faz \
+             başına birkaç kare düşer ve ortalama tek bir pahalı kareyle \
+             savrulur.",
+            az_örnek.join(" ve "),
+        );
+    }
+    if kuşku.eksik_faz {
         eprintln!(
             "uyarı: en az bir faz sayılamadı; kovalar eşit sayıda faz \
              taşımıyor olabilir ve karşılaştırma bu payla okunmalıdır."
