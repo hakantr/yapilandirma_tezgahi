@@ -543,10 +543,26 @@ kapatmaz. Onu kapatacak olan gerçek pencere ölçümüdür.
 
 1. **macOS'ta gerçek pencere ölçümü — `input-to-present`.** Şu an
    ölçülmeyen her şey burada: sunum aralığı, düşen kare, fiziksel
-   girdiden ekrana geçen süre. `gpui`'nin `profiler` özelliği
-   (`window_profiler`, `debug_frame_overlay`) ve `akici-dev` profili
-   zemin; koşum masaüstü ikilisiyle yapılır. **Bu adım tamamlanmadan
-   hiçbir FPS/gecikme iddiası kurulamaz.**
+   girdiden ekrana geçen süre. **Bu adım tamamlanmadan hiçbir FPS/gecikme
+   iddiası kurulamaz.**
+
+   Fizibilite doğrulandı: gereken ölçüm yüzeyi GPUI'de hazır ve public.
+   `gpui`'nin `profiler` özelliği açıkken `Window` şu iki anlık görüntüyü
+   veriyor (`window.rs:3048` ve `:3054`):
+
+   - `input_latency_snapshot()` → `latency_histogram` (girdiden kareye,
+     ns), `events_per_frame_histogram` (kare başına birleştirilen olay),
+     `mid_draw_events_dropped` (çizim ortasında gelip ölçüm dışı kalan
+     olaylar — bu sayı büyükse gecikme rakamı eksik okunur).
+   - `frame_duration_snapshot()` → `draw_duration_histogram` ve
+     **`present_interval_histogram`** (sunulan kareler arası aralık; FPS
+     ve düşen kare buradan çıkar).
+
+   Yapılacak iş: masaüstü koşucusuna bir ölçüm modu eklemek (`akici-dev`
+   profili + `gpui/profiler` özelliği), uygulamayı açıp gerçek klavyeyle
+   yazmak ve çıkışta histogramları raporlamak. Sentetik girdi bu adımın
+   amacını boşa çıkarır — ölçülmek istenen tam olarak fiziksel giriş
+   yoludur.
 2. **Linux'ta headless CPU koşumunun tekrarı.** Amaç mimarinin başka bir
    işletim sistemi ve makinede de bütçe içinde kalıp kalmadığı. İki
    kural: (a) macOS ve Linux **mutlak süreleri doğrudan yarıştırılmaz**,

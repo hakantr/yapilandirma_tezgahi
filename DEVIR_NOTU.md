@@ -117,10 +117,11 @@ sahipliğinde — bu depoda iş yok.
    yanlış kareyi ölçtüğünü yakaladı (S/T'de kolon kurulumu ölçüm dışında
    kalıyordu); pencere girdiden ekrana kadar geçen bütün CPU işini
    kapsayacak biçimde düzeltildi ve geçersizleme hedefli hâle getirildi
-   (`defer` + `Window::refresh`, yalnız kendi penceresi). Düzeltilmiş
-   kazanç: tuş vuruşu **3,50 → 1,24 ms (%65)**, temiz kare 3,43 → 1,13 ms,
-   seçici/tercih %18; kolon tuş vuruşunda 0/200, seçici ve tercihte
-   200/200. Kapı: `tests/kolon_tazeligi.rs` (tazelik **ve** kazanç).
+   (`defer` + `Window::refresh`, yalnız kendi penceresi). Taban beş bağımsız
+   koşumla mühürlendi (tek koşum ~%50 iyimserdi): tuş vuruşu p50
+   **3,70 → 1,75 ms (%53)**, temiz kare 3,55 → 1,55 ms (%56); kolon tuş
+   vuruşunda 0/200, seçici ve tercihte 200/200. Karşılaştırma tabanı
+   `--features olcum-onbelleksiz` ile yeniden üretilebilir. Kapı: `tests/kolon_tazeligi.rs` (tazelik **ve** kazanç).
    **Sol kolon ve üst şerit için aynı desen denendi, ölçüldü ve
    uygulanmadı** (raporun §7'si): üst şerit `cached`in boyut kısıtına
    takılıyor (payı ~0,15 ms), sol kolonun kayan bloğu ise alan gözleyen
@@ -128,8 +129,11 @@ sahipliğinde — bu depoda iş yok.
    çalışıyor çünkü o panellerin kardeşi, atası değil. Mekanik, sayılar ve
    sıradaki işler: `raporlar/PERFORMANS_MIMARISI.md`. (Önceki devirde anılan
    "TEZGAH_DEVIR_NOTU sonundaki performans raporu" hiç yazılmamıştı; o
-   boşluğu bu belge doldurur.) **Açık:** Linux ölçümü ve gerçek
-   input-to-present (sunum/vsync/fiziksel girdi). **Bu depo için
+   boşluğu bu belge doldurur.) **Açık (bu sırayla):** (a) macOS'ta gerçek pencerede
+   `input-to-present` / present interval / düşen kare — FPS ve gecikme
+   iddiasını ancak bu kapatır; (b) Linux'ta headless CPU koşumunun
+   tekrarı (mutlak süreler platformlar arası yarıştırılmaz, aynı makinede
+   çift koşum); (c) Linux ürün hedefiyse orada da gerçek pencere ölçümü. **Bu depo için
    120 FPS / "sıfıra yakın gecikme" iddiası yoktur.**
 2. Crate/paket adlarının yeniden adlandırılması (kullanıcı kararı).
 3. Bu depoya CI kurmak (kaynak depodaki `uygulama-iskeleti` işinin
