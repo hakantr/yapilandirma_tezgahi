@@ -24,13 +24,13 @@ def calistir(*komut: str) -> None:
 def main() -> int:
     arac = shutil.which("wasm-bindgen")
     if arac is None:
-        print("HATA: wasm-bindgen CLI bulunamadı (beklenen sürüm: 0.2.126)")
+        print("HATA: wasm-bindgen CLI bulunamadı (beklenen sürüm: 0.2.127)")
         return 1
     surum = subprocess.run(
         (arac, "--version"), check=True, text=True, stdout=subprocess.PIPE
     ).stdout
-    if "0.2.126" not in surum:
-        print(f"HATA: {surum.strip()}; beklenen wasm-bindgen 0.2.126")
+    if "0.2.127" not in surum:
+        print(f"HATA: {surum.strip()}; beklenen wasm-bindgen 0.2.127")
         return 1
 
     calistir(
