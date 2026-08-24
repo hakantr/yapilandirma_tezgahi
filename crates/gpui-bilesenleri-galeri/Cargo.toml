@@ -8,6 +8,21 @@ publish.workspace = true
 [lints]
 workspace = true
 
+[features]
+# Ölçüm tabanı: sağ kolonun önbelleğini kapatır.
+#
+# Önbellekli/önbelleksiz karşılaştırması elle düzenlemeyle değil bu
+# bayrakla alınır — aynı makinede iki koşum, aynı kod:
+#
+#     KARE_OLCUM=1 cargo test --profile akici-dev -p gpui-bilesenleri-galeri \
+#         --test kare_olcumu -- --nocapture
+#     KARE_OLCUM=1 cargo test --profile akici-dev -p gpui-bilesenleri-galeri \
+#         --features olcum-onbelleksiz --test kare_olcumu -- --nocapture
+#
+# Bayrak yalnız ölçüm içindir; ürün profiline girmez ve açıkken
+# `kolon_tazeligi` kazanç kapıları bilinçli olarak atlanır.
+olcum-onbelleksiz = []
+
 [dependencies]
 gpui.workspace = true
 gpui-bilesenleri.workspace = true

@@ -9,6 +9,10 @@
 //!
 //! Profil önemlidir: `dev` (optimizasyonsuz) sayıları birkaç kat şişirir.
 //!
+//! Karşılaştırma tabanı (kolon önbelleği kapalı) aynı komuta
+//! `--features olcum-onbelleksiz` eklenerek alınır; elle düzenleme
+//! gerekmez, iki koşum aynı kodu paylaşır.
+//!
 //! Her senaryo, kolonun o karede gerçekten kurulduğunu da sayar ve
 //! sayılar ancak o kapı geçilirse yorumlanır (`kolon N/N`).
 //!
@@ -233,14 +237,27 @@ fn kare_maliyeti() {
     // sayıları olduğundan ucuz gösterirdi — üçüncü turda tam da bu oldu.
     // Kolon önbelleklidir: D ve K'de kurulmamalı (kazanç), T'de kurulmalı
     // (tazelik). Sayı bu yüzden sürelerin nasıl okunacağını da söyler.
-    assert_eq!(
-        d.kolon_çizimi, 0,
-        "temiz karede kolon kuruluyor: önbellek isabet etmiyor"
-    );
-    assert_eq!(
-        k.kolon_çizimi, 0,
-        "tuş vuruşunda kolon kuruluyor: alan bildirimi kolona sızıyor"
-    );
+    #[cfg(not(feature = "olcum-onbelleksiz"))]
+    {
+        assert_eq!(
+            d.kolon_çizimi, 0,
+            "temiz karede kolon kuruluyor: önbellek isabet etmiyor"
+        );
+        assert_eq!(
+            k.kolon_çizimi, 0,
+            "tuş vuruşunda kolon kuruluyor: alan bildirimi kolona sızıyor"
+        );
+    }
+    // Taban koşumunda kolon her karede kurulur; karşılaştırmanın anlamı da
+    // budur.
+    #[cfg(feature = "olcum-onbelleksiz")]
+    for (ad, sonuç) in [("D", &d), ("K", &k)] {
+        assert!(
+            sonuç.kolon_çizimi >= TEKRAR as u64,
+            "{ad}: taban koşumunda kolon {}/{TEKRAR} kuruldu",
+            sonuç.kolon_çizimi
+        );
+    }
     // S ve T ölçülen işin **içinde** kolonu kurar: geçersizleme efekt
     // döngüsünde koşar ve o döngü ölçüm penceresinin içindedir. Tekrar
     // başına en az bir kurulum yoksa süreler yanlış kareyi ölçüyordur.

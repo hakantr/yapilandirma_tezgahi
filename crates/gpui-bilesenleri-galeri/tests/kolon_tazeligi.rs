@@ -129,6 +129,10 @@ fn kök_değişimleri_kolonu_tazeler() {
 }
 
 #[test]
+#[cfg_attr(
+    feature = "olcum-onbelleksiz",
+    ignore = "ölçüm tabanı bayrağı önbelleği kapatır; kazanç kapısı o koşumda anlamsız"
+)]
 fn tuş_vuruşu_ve_temiz_kare_kolonu_kurmaz() {
     let (mut uygulama, pencere) = kur();
     let tutamaç: AnyWindowHandle = pencere.handle().into();

@@ -287,38 +287,53 @@ mutasyonla çizimin sırası (efekt döngüsü araya girince ölçüm mutasyonda
 yaptığı ek çizimin sayıma karışması. İkisi de düzeltildi; ölçüm artık
 kendi geçerlilik kapısını taşıyor (`kolon N/N`).
 
-### 6.2 Sayılar (macOS, `akici-dev`, 1600×1000, 200 tekrar)
+### 6.2 Sayılar (macOS, `akici-dev`, 1600×1000, 200 tekrar × 5 koşum)
+
+**Tek koşum güvenilir değil.** İlk ölçüm tek koşumdan alınmıştı ve
+belirgin biçimde iyimserdi; beş ardışık koşum aynı sayıyı ~%50 yukarı
+taşıdı (K: 1,24 → ~1,75 ms p50). Makine yükü ve ısınma bu ölçekte
+görünür. Aşağıdaki taban **beş bağımsız koşumun** p50 medyanıdır;
+köşeli parantez koşumlar arası aralıktır.
 
 Önbellekli (bugünkü hâl):
 
-| Senaryo | ort | p50 | p95 | en az | kolon kurulumu |
+| Senaryo | p50 medyan | koşum aralığı (p50) | ort medyan | p95 medyan | kolon |
 |---|---|---|---|---|---|
-| D · temiz kare | 1,13 ms | 1,11 ms | 1,33 ms | 1,03 ms | 0/200 |
-| K · tuş vuruşu | 1,24 ms | 1,22 ms | 1,41 ms | 1,15 ms | 0/200 |
-| S · seçici | 2,86 ms | 2,83 ms | 3,27 ms | 2,57 ms | 200/200 |
-| T · tercih | 2,77 ms | 2,69 ms | 3,10 ms | 2,54 ms | 200/200 |
+| D · temiz kare | 1,55 ms | [1,54 – 1,61] | 1,76 ms | 3,16 ms | 0/200 |
+| K · tuş vuruşu | 1,75 ms | [1,72 – 1,79] | 1,96 ms | 3,44 ms | 0/200 |
+| S · seçici | 4,38 ms | [4,10 – 4,58] | 4,55 ms | 6,13 ms | 200/200 |
+| T · tercih | 4,36 ms | [4,26 – 5,20] | 4,47 ms | 6,15 ms | 200/200 |
 
-Aynı koşum, kolon önbelleği kapalıyken (karşılaştırma tabanı):
+Taban — aynı makine, aynı koşum, `--features olcum-onbelleksiz`:
 
-| Senaryo | önbelleksiz | önbellekli | kazanç |
+| Senaryo | p50 medyan | koşum aralığı (p50) | kolon |
 |---|---|---|---|
-| D · temiz kare | 3,43 ms | 1,13 ms | %67 |
-| K · tuş vuruşu | 3,50 ms | 1,24 ms | **%65** |
-| S · seçici | 3,47 ms | 2,86 ms | %18 |
-| T · tercih | 3,36 ms | 2,77 ms | %18 |
+| D · temiz kare | 3,55 ms | [3,23 – 4,40] | 200/200 |
+| K · tuş vuruşu | 3,70 ms | [3,32 – 4,59] | 200/200 |
+
+Kazanç (p50 medyanları): **D %56, K %53.**
 
 Okuma:
 
-- **Tuş vuruşu ~1,24 ms** ve o işin içinde kolon hiç kurulmuyor (0/200).
-  Kazanç burada: %65.
-- S ve T'de kolon her tekrarda kuruluyor (200/200) — tazelik korunuyor ve
-  ölçülen iş kurulumu **içeriyor**. Oradaki %18, kolon dışındaki
-  önbelleklerden (rapor, kod, çözülmüş görünüm) gelir.
-- 120 Hz CPU bütçesi (8,33 ms) karşısında tuş vuruşu ~%15, 60 Hz
-  (16,7 ms) karşısında ~%7.
+- **Tuş vuruşu p50 ~1,75 ms**, o işin içinde kolon hiç kurulmuyor
+  (0/200). 120 Hz CPU bütçesine (8,33 ms) göre ~%21; p95 (3,44 ms) ile
+  ~%41. 60 Hz'e göre ~%10 ve ~%21.
+- Önbellekli koşumun p50'si koşumdan koşuma çok kararlı (±0,04 ms),
+  tabanınki değil (±0,6 ms). Karşılaştırma bu yüzden medyan üzerinden
+  yapılır; tek koşum sayısı raporlanmaz.
+- Önbellekli koşumda p95, p50'nin ~2 katı — uzun bir kuyruk var ve
+  kaynağı henüz ayrıştırılmadı (aynı süreçte koşan S/T senaryolarının
+  ısınma etkisi olabilir).
+- S ve T'de kolon her tekrarda kuruluyor (200/200): tazelik korunuyor ve
+  ölçülen iş kurulumu içeriyor. Oradaki fark kolon dışı önbelleklerden
+  (rapor, kod, çözülmüş görünüm) gelir.
 - Bu sayılar **headless CPU'dur ve gerçek gecikme değildir**; sunum
-  (present/vsync), giriş kuyruğu ve fiziksel girdi eklenmemiştir. Tek
+  (present/vsync), giriş kuyruğu ve fiziksel girdi dışarıdadır. Tek
   makine, tek pencere boyutu.
+
+Taban koşumu elle düzenleme istemez: `olcum-onbelleksiz` bayrağı aynı
+kodu önbelleksiz derler (`Cargo.toml`), böylece iki koşum yeniden
+üretilebilir ve karşılaştırılabilir kalır.
 
 ### 6.3 Bulgu: `Entity::cached` sessizce donuyordu
 
@@ -439,8 +454,11 @@ Bölgeler geçici olarak boşaltılıp kare süresi yeniden alındı:
 | Üst şerit | 0,98 ms | 1,21 ms | ~0,15 ms (D'de %13) |
 | Alan gözleyen iki panel | 1,00 ms | 1,01 ms | ~0,24 ms (K'de %19) |
 
-Ölçüm gürültüsü bu ölçekte belirgin (p95–p50 farkı ~0,2 ms), yani
-paylar "birkaç yüzde onda milisaniye" düzeyinde okunmalı.
+Bu ablation tek koşumdan alındı ve §6.2'deki mühürlü tabandan **önce**
+yapıldı; mutlak sayıları değil **büyüklük sırasını** okuyun. Beş koşumlu
+taban, tek koşumun ~%50 iyimser olduğunu gösterdi — buradaki paylar da
+aynı yönde kayıyor olabilir. Kararı değiştirmiyor: her iki bölge de
+kare maliyetinin küçük bir dilimi.
 
 ### 7.2 Üst şerit: `cached` boyut kısıtına takılıyor
 
@@ -517,28 +535,37 @@ versin:
 "her ekran yenilemesinde" değil, **gerçekleşen her GPUI çiziminde**
 koşar; hiçbir entity kirli değilse çizim de yoktur.
 
-## 9. Sıradaki işler
+## 9. Sıradaki işler (öncelik sırasıyla)
 
-1. **Sol kolon ve üst şerit — kapandı (§7).** Desen denendi, payları
-   ölçüldü ve uygulanmadı: üst şerit `cached`in boyut kısıtına takılıyor,
-   sol kolonun kayan bloğu ise canlı panelleri **içerdiği** için her tuş
-   vuruşunda kirlenir. Yeniden açmak için GPUI tarafında bir değişiklik
-   gerekir.
-2. **Linux ölçümü:** aynı koşum kullanıcının Linux düğümünde
-   (`CosmicTextSystem` iki hedefte de aynı olduğu için sayılar
-   karşılaştırılabilir).
-3. **Gerçek input-to-present:** headless CPU ölçümü sunum ve vsync
-   içermez; uçtan uca gecikme ancak gerçek pencerede, platform
-   profiler'ıyla (`gpui` `profiler` özelliği / `debug_frame_overlay`)
-   ölçülür.
+Sıra bilinçli: **headless CPU ölçümünü başka bir platformda tekrarlamak
+aynı soruyu ikinci kez yanıtlar**; 120 FPS ve gecikme iddiasını
+kapatmaz. Onu kapatacak olan gerçek pencere ölçümüdür.
+
+1. **macOS'ta gerçek pencere ölçümü — `input-to-present`.** Şu an
+   ölçülmeyen her şey burada: sunum aralığı, düşen kare, fiziksel
+   girdiden ekrana geçen süre. `gpui`'nin `profiler` özelliği
+   (`window_profiler`, `debug_frame_overlay`) ve `akici-dev` profili
+   zemin; koşum masaüstü ikilisiyle yapılır. **Bu adım tamamlanmadan
+   hiçbir FPS/gecikme iddiası kurulamaz.**
+2. **Linux'ta headless CPU koşumunun tekrarı.** Amaç mimarinin başka bir
+   işletim sistemi ve makinede de bütçe içinde kalıp kalmadığı. İki
+   kural: (a) macOS ve Linux **mutlak süreleri doğrudan yarıştırılmaz**,
+   donanım farkı sonucu kirletir; (b) karşılaştırma aynı Linux
+   makinesinde önbellekli/önbelleksiz **çift koşumla** yapılır —
+   `--features olcum-onbelleksiz` bunun için var.
+3. **Linux ürün hedefiyse, Linux'ta gerçek pencere/present ölçümü.**
+   Adım 1'in Linux karşılığı.
 4. **`ORT-018 bil-010.input.commit`:** tezgâhtaki yerleşik ölçüm
    (`ölçüm_toplu_ms`) kabul motorunu ölçer; bu turlardan etkilenmedi,
    sayı gerilememeli.
+5. **Önbellekli koşumdaki p95 kuyruğu** (§6.2): p50'nin ~2 katı ve
+   kaynağı ayrıştırılmadı. Gerçek pencere ölçümünde takip edilmeli —
+   düşen kare olarak görünüyorsa önemlidir.
 
-Kayıtlı sınır: bu depo için **120 FPS ya da "sıfıra yakın gecikme" iddiası
-yoktur**. Ölçülen tek şey headless CPU işidir — odak sonrası tuş vuruşu
-için ~1,24 ms (120 Hz bütçesinin ~%15'i) — ve o da tek makinede, tek
-pencere boyutunda, sunum/vsync ve fiziksel girdi dışarıda bırakılarak
-alınmıştır. Yapılabilecek en geniş iddia şudur: *1600×1000 headless macOS
-ölçümünde, odak sonrası bir tuş vuruşunun CPU çizim aşaması 120 Hz kare
-bütçesine sığıyor.*
+Kayıtlı sınır: bu depo için **120 FPS ya da "sıfıra yakın gecikme"
+iddiası yoktur**. Ölçülen tek şey headless CPU işidir — odak sonrası tuş
+vuruşu için p50 ~1,75 ms, p95 ~3,44 ms (120 Hz bütçesinin ~%21 ve ~%41'i)
+— ve o da tek makinede, tek pencere boyutunda, sunum/vsync ve fiziksel
+girdi dışarıda bırakılarak alınmıştır. Yapılabilecek en geniş iddia
+şudur: *1600×1000 headless macOS ölçümünde, odak sonrası bir tuş
+vuruşunun CPU çizim aşaması 120 Hz kare bütçesine sığıyor.*

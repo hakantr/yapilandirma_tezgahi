@@ -303,6 +303,18 @@ impl BölümlerPaneli {
     /// çapraz ekseninden çözülür — kolon kaydıran bir kap olduğu için bu
     /// kısıt sorun değildir.
     pub(crate) fn öğe(panel: &Entity<Self>) -> AnyElement {
+        #[cfg(feature = "olcum-onbelleksiz")]
+        {
+            // Ölçüm tabanı: aynı ağaç, önbelleksiz. Karşılaştırmanın elle
+            // düzenlemeye değil bayrağa dayanması için (`Cargo.toml`).
+            return div()
+                .flex_1()
+                .min_w(px(0.))
+                .min_h(px(0.))
+                .child(panel.clone())
+                .into_any_element();
+        }
+        #[cfg(not(feature = "olcum-onbelleksiz"))]
         panel
             .clone()
             .cached(gpui::StyleRefinement::default().flex_1().min_w(px(0.)).min_h(px(0.)))
@@ -421,6 +433,8 @@ mod testler {
         // (§6.3). Biri varken diğeri yoksa kolon donar ve bayat
         // yapılandırma gösterir.
         let lib = include_str!("lib.rs");
+        // Ölçüm tabanı bayrağı önbelleği kapatır; kapı yalnız açıkken
+        // anlamlıdır ama kaynakta `.cached(` her iki hâlde de durur.
         if gövde.contains(".cached(") {
             assert!(
                 lib.contains("bağlam.refresh_windows()"),
