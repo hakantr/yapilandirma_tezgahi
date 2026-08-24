@@ -240,6 +240,16 @@ pub struct GaleriUygulaması {
     rapor_önbelleği: Option<(u64, Rc<gpui_bilesenleri::GirişYapılandırmaRaporu>)>,
     /// Kod paneli metni, tercih sürümüne bağlı; yalnız `A` bölümünü taşır.
     kod_önbelleği: Option<(u64, gpui::SharedString)>,
+    /// Çözülmüş tasarım görünümü, tema sürümüne bağlı.
+    ///
+    /// Çözüm yalnız temaya (ve temayla birlikte sürümü artan palete) göre
+    /// değişir; kare dikişi onu her karede yeniden çözmez.
+    görünüm_önbelleği: Option<(u64, std::sync::Arc<ÇözülmüşTezgahGörünümü>)>,
+    /// `ORT-003 §2` yarıçap tavanı, tema sürümüne bağlı.
+    ///
+    /// Değer yalnız temadan türer; tek ölçü için her karede tam bir tema
+    /// anlık görüntüsü kurmak kare hızında israftı.
+    yarıçap_önbelleği: Option<(u64, f32)>,
     galeri_teması: GaleriTeması,
     galeri_kipi: gpui_bilesenleri::TemaKipi,
     sergi_düğme_sayacı: u32,
@@ -310,6 +320,8 @@ impl GaleriUygulaması {
             tercih_sürümü: 0,
             rapor_önbelleği: None,
             kod_önbelleği: None,
+            görünüm_önbelleği: None,
+            yarıçap_önbelleği: None,
             galeri_teması: match hedef {
                 GaleriHedefi::Masaüstü => GaleriTeması::Kağıt,
                 GaleriHedefi::Wasm => GaleriTeması::Mürekkep,
@@ -430,12 +442,17 @@ impl GaleriUygulaması {
         self.temayı_tazele(bağlam);
     }
 
-    /// Yeni paleti canlı alanlara da uygular.
+    /// Kare dikişlerini kurar: palet, kabuk görünümü, çözülmüş görünüm ve
+    /// açık seçici.
     ///
-    /// Palet kare başında kurulur ama `GirişKutusu` kendi anlık görüntüsünü
-    /// saklar; tazelenmezse tezgâh kutusu eski renklerde kalırdı.
-    fn temayı_tazele(&mut self, bağlam: &mut Context<Self>) {
+    /// Çözülmüş görünüm tema sürümüne bağlıdır: çözüm yalnız temaya (ve
+    /// temayla birlikte sürümü artan palete) göre değişir. Her karede
+    /// yeniden çözmek, profil çözümünü ve tam bir tema anlık görüntüsü
+    /// kuruluşunu kare hızında koşturuyordu.
+    fn kare_dikişlerini_kur(&mut self) {
         paleti_kur(galeri_paleti(self.galeri_teması, self.galeri_kipi));
+        // Kabuk görünümü çözümden **önce** kurulur: `tasarım_görünümünü_çöz`
+        // tema anlık görüntüsünü okur ve tipografi ile yoğunluk oradan gelir.
         kabuk_görünümünü_kur(
             &self.tezgah.tema.yazı_ailesi,
             self.tezgah.tema.punto,
@@ -443,10 +460,29 @@ impl GaleriUygulaması {
             self.tezgah.tema.yoğunluk,
             self.tezgah.tema.hareket,
         );
-        görünümü_kur(tasarım_görünümünü_çöz());
+        let görünüm = if let Some((sürüm, görünüm)) = &self.görünüm_önbelleği
+            && *sürüm == self.tezgah.tema.sürüm
+        {
+            Arc::clone(görünüm)
+        } else {
+            let çözüm = Arc::new(tasarım_görünümünü_çöz());
+            self.görünüm_önbelleği = Some((self.tezgah.tema.sürüm, Arc::clone(&çözüm)));
+            çözüm
+        };
+        görünümü_paylaşımlı_kur(görünüm);
         açık_seçiciyi_kur(self.açık_seçici.clone());
+    }
+
+    /// Yeni paleti canlı alanlara da uygular.
+    ///
+    /// Palet kare başında kurulur ama `GirişKutusu` kendi anlık görüntüsünü
+    /// saklar; tazelenmezse tezgâh kutusu eski renklerde kalırdı.
+    fn temayı_tazele(&mut self, bağlam: &mut Context<Self>) {
+        // Sürüm dikişten **önce** artar: görünüm önbelleğinin anahtarı odur
+        // ve eski sürümle kurulan dikiş bayat çözüm döndürürdü.
         self.tezgah.tema.kip = self.galeri_kipi;
         self.tezgah.tema.sürümü_artır();
+        self.kare_dikişlerini_kur();
         if let Some(alan) = self.tezgah_alanı.clone() {
             let tema = tezgah_teması(&self.tezgah.kutu_teması());
             alan.update(bağlam, |alan, bağlam| {
@@ -879,6 +915,20 @@ impl GaleriUygulaması {
         rapor
     }
 
+    /// `ORT-003 §2` yarıçap tavanı: kısa kenarın yarısı; tema sürümüne bağlı.
+    ///
+    /// Tek satırlı alanda kısıtlayan kenar kutu yüksekliğidir.
+    fn en_fazla_yarıçap(&mut self) -> f32 {
+        if let Some((sürüm, değer)) = self.yarıçap_önbelleği
+            && sürüm == self.tezgah.tema.sürüm
+        {
+            return değer;
+        }
+        let değer = f32::from(tezgah_teması(&self.tezgah.tema).ölçüler.etkileşim_hedefi) / 2.;
+        self.yarıçap_önbelleği = Some((self.tezgah.tema.sürüm, değer));
+        değer
+    }
+
     /// Kod paneli metni; tercih sürümüne bağlı.
     fn tezgah_kodu(&mut self) -> gpui::SharedString {
         if let Some((sürüm, kod)) = &self.kod_önbelleği
@@ -911,9 +961,7 @@ impl GaleriUygulaması {
         // yeniden hesaplamaz. `§29` raporu da öyledir ama artık bu yolun
         // değil, bölüm panelinin girdisidir (`tezgah_bölümleri`).
         let kod = self.tezgah_kodu();
-        // `ORT-003 §2` yarıçap kısa kenarın yarısını aşamaz; tek satırlı
-        // alanda kısıtlayan kenar kutu yüksekliğidir.
-        let en_fazla_yarıçap = f32::from(tezgah_teması(&tercih.tema).ölçüler.etkileşim_hedefi) / 2.;
+        let en_fazla_yarıçap = self.en_fazla_yarıçap();
 
         metin_girisi_profili::tezgah_içeriği(
             metin_girisi_profili::MetinGirişiProfilGirdisi {
@@ -1014,19 +1062,7 @@ impl Render for GaleriUygulaması {
         // kurmak, tezgâh ekranının onları hiç görmemesi demekti: palet ve
         // görünüm kendi fallback'leriyle ayakta kaldı ama açık seçici
         // fallback'siz olduğu için hiçbir liste açılmıyordu.
-        paleti_kur(galeri_paleti(self.galeri_teması, self.galeri_kipi));
-        // Kabuk görünümü `görünümü_kur`dan **önce** kurulur:
-        // `tasarım_görünümünü_çöz` tema anlık görüntüsünü okur ve tipografi
-        // ile yoğunluk oradan gelir.
-        kabuk_görünümünü_kur(
-            &self.tezgah.tema.yazı_ailesi,
-            self.tezgah.tema.punto,
-            self.tezgah.tema.metin_ölçeği,
-            self.tezgah.tema.yoğunluk,
-            self.tezgah.tema.hareket,
-        );
-        görünümü_kur(tasarım_görünümünü_çöz());
-        açık_seçiciyi_kur(self.açık_seçici.clone());
+        self.kare_dikişlerini_kur();
 
         // Uygulama tezgâh ekranıyla açılır. Tezgâh, galeri bilgi mimarisinin
         // içine gömülü bir aile sayfası **değildir**: tasarımın `§5`/`§6`

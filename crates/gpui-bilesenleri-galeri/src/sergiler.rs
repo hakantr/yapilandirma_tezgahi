@@ -953,10 +953,15 @@ fn bileşen_seçicisi(bağlam: &mut Context<GaleriUygulaması>) -> Stateful<Div>
 ///
 /// Tetikleyiciye basmak listeyi açar; açıkken yeniden basmak kapatır.
 /// Seçili değer kapalıyken de görünür — `<select>` böyle davranır.
+///
+/// Liste içeriği **tembel** gelir ve yalnız seçici açıkken kurulur.
+/// İçerik hazır element olarak alınırken kapalı seçicilerin listeleri de
+/// — yüzlerce öğelik yazı ailesi listeleri dâhil — her karede kuruluyor
+/// ve hiç çizilmeden atılıyordu.
 fn şerit_seçicisi(
     kimlik: &'static str,
     etiket: &str,
-    içerik: impl IntoElement + 'static,
+    içerik: impl FnOnce(&mut Context<GaleriUygulaması>) -> AnyElement,
     bağlam: &mut Context<GaleriUygulaması>,
 ) -> Stateful<Div> {
     // Tetikleyici ile tıklama **aynı** öğede. Dış bir sarmalayıcıya
@@ -965,6 +970,7 @@ fn şerit_seçicisi(
     let g = crate::görünüm();
     let t = crate::TezgahTokenları::paletten(crate::palet());
     let açık = crate::seçici_açık_mı(kimlik);
+    let liste = açık.then(|| içerik(bağlam));
 
     crate::stili_uygula(div(), &g.eksen_etiketi)
         .id(SharedString::new_static(kimlik))
@@ -989,7 +995,7 @@ fn şerit_seçicisi(
         }))
         .child(etiket.to_owned())
         .child(tezgah_simgesi("acilir.svg").size(px(10.)))
-        .when(açık, |tetikleyici| {
+        .when_some(liste, |tetikleyici, liste| {
             // Liste **üste biner**, akışa girmez: akışa giren liste
             // açıldığında altındaki her şeyi aşağı itiyordu ve kullanıcı
             // seçim yaparken baktığı yer kayıyordu. `<select>` böyle
@@ -1021,7 +1027,7 @@ fn şerit_seçicisi(
                     .border_1()
                     .border_color(t.kenarlık)
                     .bg(t.kağıt)
-                    .child(içerik),
+                    .child(liste),
             ))
         })
 }
@@ -1034,21 +1040,23 @@ fn tema_otoritesi(
 ) -> Div {
     use gpui_bilesenleri::TemaKipi as K;
 
-    let aile_listesi = crate::GaleriTeması::TÜMÜ
-        .iter()
-        .map(|tema| {
-            let tema = *tema;
-            liste_öğesi(
-                format!("tema-{}", tema.adı()),
-                tema.adı(),
-                kabuk.tema == tema,
-            )
-            .child(tema.adı())
-            .on_click(bağlam.listener(move |bu, _, _, bağlam| {
-                bu.galeri_temasını_seç(tema, bağlam);
+    let seçili_tema = kabuk.tema;
+    let aile_listesi = move |bağlam: &mut Context<GaleriUygulaması>| {
+        div()
+            .children(crate::GaleriTeması::TÜMÜ.iter().map(|tema| {
+                let tema = *tema;
+                liste_öğesi(
+                    format!("tema-{}", tema.adı()),
+                    tema.adı(),
+                    seçili_tema == tema,
+                )
+                .child(tema.adı())
+                .on_click(bağlam.listener(move |bu, _, _, bağlam| {
+                    bu.galeri_temasını_seç(tema, bağlam);
+                }))
             }))
-        })
-        .collect::<Vec<_>>();
+            .into_any_element()
+    };
 
     // Kip simgeyle seçilir: dört kipin adı ("YüksekKarşıtlıkAçık") şeride
     // sığmaz ve kısaltmak ("YK") ne olduğunu söylemez. Ad `aria_label`da
@@ -1100,37 +1108,34 @@ fn tema_otoritesi(
         .child(tezgah_simgesi("kip-sistem.svg")),
     );
 
-    let ölçek_listesi = [1.0_f32, 1.25, 1.5, 2.0]
-        .into_iter()
-        .map(|ölçek| {
-            let ad = SharedString::new(format!("{ölçek:.2}×").replace('.', ","));
-            let seçili = (tercih.tema.metin_ölçeği - ölçek).abs() < f32::EPSILON;
-            liste_öğesi(format!("ölçek-{ölçek}"), ad.clone(), seçili)
-                .child(ad)
-                .on_click(bağlam.listener(move |bu, _, _, bağlam| {
-                    bu.tezgahı_değiştir(move |k| k.tema.metin_ölçeği = ölçek, bağlam);
-                }))
-        })
-        .collect::<Vec<_>>();
+    let metin_ölçeği = tercih.tema.metin_ölçeği;
+    let ölçek_listesi = move |bağlam: &mut Context<GaleriUygulaması>| {
+        div()
+            .children([1.0_f32, 1.25, 1.5, 2.0].into_iter().map(|ölçek| {
+                let ad = SharedString::new(format!("{ölçek:.2}×").replace('.', ","));
+                let seçili = (metin_ölçeği - ölçek).abs() < f32::EPSILON;
+                liste_öğesi(format!("ölçek-{ölçek}"), ad.clone(), seçili)
+                    .child(ad)
+                    .on_click(bağlam.listener(move |bu, _, _, bağlam| {
+                        bu.tezgahı_değiştir(move |k| k.tema.metin_ölçeği = ölçek, bağlam);
+                    }))
+            }))
+            .into_any_element()
+    };
 
     şerit_satırı()
         .justify_end()
         .gap(px(ölçü::ARALIK))
         .child(
-            şerit_seçicisi(
-                "tema-ailesi",
-                kabuk.tema.adı(),
-                div().children(aile_listesi),
-                bağlam,
-            )
-            .min_w(px(ölçü::SEÇİCİ_ASGARİSİ)),
+            şerit_seçicisi("tema-ailesi", kabuk.tema.adı(), aile_listesi, bağlam)
+                .min_w(px(ölçü::SEÇİCİ_ASGARİSİ)),
         )
         .child(kip_simgeleri)
         .child(hedef_kuşağı(kabuk, bağlam))
         .child(şerit_seçicisi(
             "metin-ölçeği",
             &format!("{:.2}×", tercih.tema.metin_ölçeği).replace('.', ","),
-            div().children(ölçek_listesi),
+            ölçek_listesi,
             bağlam,
         ))
 }
@@ -1188,35 +1193,47 @@ fn görünüm_ekseni(
 ) -> Div {
     use gpui_bilesenleri::{ArayüzYoğunluğu as Y, HareketTercihi as H};
 
-    let yoğunluk_listesi = [
-        ("Kompakt", Y::Kompakt),
-        ("Normal", Y::Normal),
-        ("Geniş", Y::Geniş),
-    ]
-    .into_iter()
-    .map(|(ad, değer)| {
-        liste_öğesi(format!("yoğunluk-{ad}"), ad, tercih.tema.yoğunluk == değer)
-            .child(ad)
-            .on_click(bağlam.listener(move |bu, _, _, bağlam| {
-                bu.tezgahı_değiştir(move |k| k.tema.yoğunluk = değer, bağlam);
-            }))
-    })
-    .collect::<Vec<_>>();
+    let yoğunluk = tercih.tema.yoğunluk;
+    let yoğunluk_listesi = move |bağlam: &mut Context<GaleriUygulaması>| {
+        div()
+            .children(
+                [
+                    ("Kompakt", Y::Kompakt),
+                    ("Normal", Y::Normal),
+                    ("Geniş", Y::Geniş),
+                ]
+                .into_iter()
+                .map(|(ad, değer)| {
+                    liste_öğesi(format!("yoğunluk-{ad}"), ad, yoğunluk == değer)
+                        .child(ad)
+                        .on_click(bağlam.listener(move |bu, _, _, bağlam| {
+                            bu.tezgahı_değiştir(move |k| k.tema.yoğunluk = değer, bağlam);
+                        }))
+                }),
+            )
+            .into_any_element()
+    };
 
-    let hareket_listesi = [
-        ("Hareket · Tam", H::Tam),
-        ("Hareket · Azaltılmış", H::Azaltılmış),
-        ("Hareket · Kapalı", H::Kapalı),
-    ]
-    .into_iter()
-    .map(|(ad, değer)| {
-        liste_öğesi(format!("hareket-{ad}"), ad, tercih.tema.hareket == değer)
-            .child(ad)
-            .on_click(bağlam.listener(move |bu, _, _, bağlam| {
-                bu.tezgahı_değiştir(move |k| k.tema.hareket = değer, bağlam);
-            }))
-    })
-    .collect::<Vec<_>>();
+    let hareket = tercih.tema.hareket;
+    let hareket_listesi = move |bağlam: &mut Context<GaleriUygulaması>| {
+        div()
+            .children(
+                [
+                    ("Hareket · Tam", H::Tam),
+                    ("Hareket · Azaltılmış", H::Azaltılmış),
+                    ("Hareket · Kapalı", H::Kapalı),
+                ]
+                .into_iter()
+                .map(|(ad, değer)| {
+                    liste_öğesi(format!("hareket-{ad}"), ad, hareket == değer)
+                        .child(ad)
+                        .on_click(bağlam.listener(move |bu, _, _, bağlam| {
+                            bu.tezgahı_değiştir(move |k| k.tema.hareket = değer, bağlam);
+                        }))
+                }),
+            )
+            .into_any_element()
+    };
 
     let yoğunluk_adı = match tercih.tema.yoğunluk {
         Y::Kompakt => "Kompakt",
@@ -1236,7 +1253,7 @@ fn görünüm_ekseni(
             şerit_seçicisi(
                 "yazı-ailesi",
                 &tercih.tema.yazı_ailesi.clone(),
-                aile_listesi(tercih, sistem_aileleri, bağlam),
+                |bağlam| aile_listesi(tercih, sistem_aileleri, bağlam).into_any_element(),
                 bağlam,
             )
             .min_w(px(ölçü::SEÇİCİ_ASGARİSİ)),
@@ -1252,13 +1269,13 @@ fn görünüm_ekseni(
         .child(şerit_seçicisi(
             "punto",
             &format!("{:.0} px", tercih.tema.punto),
-            punto_listesi(tercih, bağlam),
+            |bağlam| punto_listesi(tercih, bağlam).into_any_element(),
             bağlam,
         ))
         .child(şerit_seçicisi(
             "yoğunluk",
             yoğunluk_adı,
-            div().children(yoğunluk_listesi),
+            yoğunluk_listesi,
             bağlam,
         ))
         // `ORT-004` metin düzenleme iç boşluğu. Tema alanı `None`
@@ -1267,25 +1284,27 @@ fn görünüm_ekseni(
         .child(şerit_seçicisi(
             "iç-boşluk",
             &format!("İç boşluk · {}", tercih.tema.iç_boşluk.adı()),
-            div().children(crate::TezgahİçBoşluğu::TÜMÜ.map(|değer| {
-                liste_öğesi(
-                    format!("iç-boşluk-{}", değer.adı()),
-                    değer.adı(),
-                    tercih.tema.iç_boşluk == değer,
-                )
-                .child(değer.adı())
-                .on_click(bağlam.listener(move |bu, _, _, bağlam| {
-                    bu.tezgahı_değiştir(move |k| k.tema.iç_boşluk = değer, bağlam);
-                }))
-            })),
+            {
+                let iç_boşluk = tercih.tema.iç_boşluk;
+                move |bağlam: &mut Context<GaleriUygulaması>| {
+                    div()
+                        .children(crate::TezgahİçBoşluğu::TÜMÜ.map(|değer| {
+                            liste_öğesi(
+                                format!("iç-boşluk-{}", değer.adı()),
+                                değer.adı(),
+                                iç_boşluk == değer,
+                            )
+                            .child(değer.adı())
+                            .on_click(bağlam.listener(move |bu, _, _, bağlam| {
+                                bu.tezgahı_değiştir(move |k| k.tema.iç_boşluk = değer, bağlam);
+                            }))
+                        }))
+                        .into_any_element()
+                }
+            },
             bağlam,
         ))
-        .child(şerit_seçicisi(
-            "hareket",
-            hareket_adı,
-            div().children(hareket_listesi),
-            bağlam,
-        ))
+        .child(şerit_seçicisi("hareket", hareket_adı, hareket_listesi, bağlam))
 }
 
 /// `BİL-010` yapılandırma tezgâhı gövdesi: ailenin tek ekranı.
@@ -1978,48 +1997,53 @@ pub(crate) fn kabuk_yuvaları(
                     G::HerZaman => "her zaman",
                 }
             );
-            let içerik = div()
-                .child(kutu_başlığı("Ne zaman görünür", true))
-                .children(
-                    [
-                        ("Değer varken kademeli", G::DeğerVarkenKademeli),
-                        ("Değer varken", G::DeğerVarken),
-                        ("Etkileşimde kademeli", G::EtkileşimdeKademeli),
-                        ("Her zaman", G::HerZaman),
-                    ]
-                    .into_iter()
-                    .map(|(ad, kip)| {
-                        div().mt_1().child(tercih_düğmesi(
-                            format!("yuva-kip-{ad}"),
-                            ad,
-                            tercih.yuva_görünürlüğü == kip,
-                            bağlam,
-                            move |t| t.yuva_görünürlüğü = kip,
-                        ))
-                    }),
-                )
-                .child(
-                    div().mt_2().child(
-                        crate::stili_uygula(div(), &crate::görünüm().gövde)
-                            .text_color(crate::TezgahTokenları::paletten(crate::palet()).soluk)
-                            .child(
-                                "Kip tüm yuvalara birlikte uygulanır. Kanonikte her yuva \
-                                 kendi kipini taşır; ürün onları ayrı ayrı kurabilir.",
-                            ),
-                    ),
-                )
-                .child(
-                    div()
-                        .mt_2()
-                        .child(kutu_başlığı("Etkinleştirme kapısı", true))
-                        .child(div().mt_1().child(tercih_düğmesi(
-                            "yuva-etkin",
-                            "Yuvalar etkin",
-                            tercih.yuvalar_etkin,
-                            bağlam,
-                            |t| t.yuvalar_etkin = !t.yuvalar_etkin,
-                        ))),
-                );
+            let içerik = |bağlam: &mut Context<GaleriUygulaması>| {
+                div()
+                    .child(kutu_başlığı("Ne zaman görünür", true))
+                    .children(
+                        [
+                            ("Değer varken kademeli", G::DeğerVarkenKademeli),
+                            ("Değer varken", G::DeğerVarken),
+                            ("Etkileşimde kademeli", G::EtkileşimdeKademeli),
+                            ("Her zaman", G::HerZaman),
+                        ]
+                        .into_iter()
+                        .map(|(ad, kip)| {
+                            div().mt_1().child(tercih_düğmesi(
+                                format!("yuva-kip-{ad}"),
+                                ad,
+                                tercih.yuva_görünürlüğü == kip,
+                                bağlam,
+                                move |t| t.yuva_görünürlüğü = kip,
+                            ))
+                        }),
+                    )
+                    .child(
+                        div().mt_2().child(
+                            crate::stili_uygula(div(), &crate::görünüm().gövde)
+                                .text_color(
+                                    crate::TezgahTokenları::paletten(crate::palet()).soluk,
+                                )
+                                .child(
+                                    "Kip tüm yuvalara birlikte uygulanır. Kanonikte her yuva \
+                                     kendi kipini taşır; ürün onları ayrı ayrı kurabilir.",
+                                ),
+                        ),
+                    )
+                    .child(
+                        div()
+                            .mt_2()
+                            .child(kutu_başlığı("Etkinleştirme kapısı", true))
+                            .child(div().mt_1().child(tercih_düğmesi(
+                                "yuva-etkin",
+                                "Yuvalar etkin",
+                                tercih.yuvalar_etkin,
+                                bağlam,
+                                |t| t.yuvalar_etkin = !t.yuvalar_etkin,
+                            ))),
+                    )
+                    .into_any_element()
+            };
             şerit_seçicisi("yuva-kipi", &etiket, içerik, bağlam)
         })
 }
@@ -2037,29 +2061,32 @@ pub(crate) fn parça_tipografisi(
         .parça_ailesi
         .clone()
         .unwrap_or_else(|| "Rolden devral".to_owned());
-    let liste = div()
-        .child(
-            liste_öğesi(
-                "parça-devral",
-                "Rolden devral",
-                tercih.parça_ailesi.is_none(),
+    let liste = |bağlam: &mut Context<GaleriUygulaması>| {
+        div()
+            .child(
+                liste_öğesi(
+                    "parça-devral",
+                    "Rolden devral",
+                    tercih.parça_ailesi.is_none(),
+                )
+                .child("Rolden devral")
+                .on_click(bağlam.listener(|bu, _, _, bağlam| {
+                    bu.tezgahı_değiştir(|t| t.parça_ailesi = None, bağlam);
+                })),
             )
-            .child("Rolden devral")
-            .on_click(bağlam.listener(|bu, _, _, bağlam| {
-                bu.tezgahı_değiştir(|t| t.parça_ailesi = None, bağlam);
-            })),
-        )
-        .children(crate::KİTAPLIK_AİLELERİ.map(|ad| {
-            liste_öğesi(
-                format!("parça-{ad}"),
-                ad,
-                tercih.parça_ailesi.as_deref() == Some(ad),
-            )
-            .child(ad)
-            .on_click(bağlam.listener(move |bu, _, _, bağlam| {
-                bu.tezgahı_değiştir(move |t| t.parça_ailesi = Some(ad.to_owned()), bağlam);
+            .children(crate::KİTAPLIK_AİLELERİ.map(|ad| {
+                liste_öğesi(
+                    format!("parça-{ad}"),
+                    ad,
+                    tercih.parça_ailesi.as_deref() == Some(ad),
+                )
+                .child(ad)
+                .on_click(bağlam.listener(move |bu, _, _, bağlam| {
+                    bu.tezgahı_değiştir(move |t| t.parça_ailesi = Some(ad.to_owned()), bağlam);
+                }))
             }))
-        }));
+            .into_any_element()
+    };
 
     şerit_satırı().child(şerit_seçicisi("parça-ailesi", &seçili, liste, bağlam))
 }
@@ -2136,8 +2163,6 @@ pub(crate) fn biçim_satırı(
     tercih: &crate::TezgahTercihleri,
     bağlam: &mut Context<GaleriUygulaması>,
 ) -> Div {
-    // Blok içeriği önce kurulur: `eksen_bloğu` hem içeriği hem bağlamı alır.
-    let liste = biçim_listesi(tercih, bağlam);
     let mut kök = div().mt(px(ölçü::BLOK_ARASI)).child(
         şerit_satırı()
             .gap(px(ölçü::BLOK_ARASI))
@@ -2152,7 +2177,7 @@ pub(crate) fn biçim_satırı(
                     .child(şerit_seçicisi(
                         "biçim",
                         tercih.seçili_biçim().etiket,
-                        liste,
+                        |bağlam| biçim_listesi(tercih, bağlam).into_any_element(),
                         bağlam,
                     )),
             )
@@ -2820,7 +2845,7 @@ pub(crate) fn imleç_satırı(
     let kalınlık = tercih.tema.imleç_kalınlığı;
     let etiket = format!("İmleç · {} · {kalınlık:.1} px", hız.adı());
 
-    let içerik =
+    let içerik = move |bağlam: &mut Context<GaleriUygulaması>| {
         div()
             .child(kutu_başlığı("İmleç hızı", hız != İmleçHızı::Platform))
             .children(İmleçHızı::TÜMÜ.map(|aday| {
@@ -2842,7 +2867,9 @@ pub(crate) fn imleç_satırı(
                         move |t| t.tema.imleç_kalınlığı = aday,
                     ))
                 })),
-            ));
+            ))
+            .into_any_element()
+    };
 
     div()
         .mt(px(ölçü::ARALIK))
@@ -2876,7 +2903,8 @@ pub(crate) fn adım_satırı(
         .filter(|ölçek| !(tamsayı && ölçek.kesirli_mi()))
         .collect();
 
-    let içerik = div()
+    let içerik = move |bağlam: &mut Context<GaleriUygulaması>| {
+        div()
         .child(kutu_başlığı("Sayısal adım", açıkmı))
         .child(tercih_düğmesi(
             "adim-etkin",
@@ -2934,7 +2962,9 @@ pub(crate) fn adım_satırı(
                 "Tekerlekle adım",
                 "GPUI tekerlek olayı cihaz/kaynak alanı taşımıyor (AÇK-015)",
             )))
-        });
+        })
+        .into_any_element()
+    };
 
     div()
         .mt(px(ölçü::ARALIK))
@@ -3847,36 +3877,39 @@ pub(crate) fn varsayılan_satırı(
     } else {
         "Varsayılan · kapalı".to_owned()
     };
-    let içerik = div()
-        .child(kutu_başlığı(
-            "Varsayılan değer",
-            tercih.varsayılan_değer,
-        ))
-        .child(tercih_düğmesi(
-            "varsayilan-etkin",
-            "Türe göre varsayılan",
-            tercih.varsayılan_değer,
-            bağlam,
-            |t| t.varsayılan_değer = !t.varsayılan_değer,
-        ))
-        .child(div().mt_2().child(kutu_başlığı("Sıfırlama", true)))
-        .children(
-            [
-                ("Boşa dön", S::BoşaDön),
-                ("Varsayılana dön", S::VarsayılanaDön),
-                ("Üst bileşene bırak", S::ÜstBileşeneBırak),
-            ]
-            .into_iter()
-            .map(|(ad, davranış)| {
-                div().mt_1().child(tercih_düğmesi(
-                    format!("sifirlama-{ad}"),
-                    ad,
-                    tercih.sıfırlama == davranış,
-                    bağlam,
-                    move |t| t.sıfırlama = davranış,
-                ))
-            }),
-        );
+    let içerik = |bağlam: &mut Context<GaleriUygulaması>| {
+        div()
+            .child(kutu_başlığı(
+                "Varsayılan değer",
+                tercih.varsayılan_değer,
+            ))
+            .child(tercih_düğmesi(
+                "varsayilan-etkin",
+                "Türe göre varsayılan",
+                tercih.varsayılan_değer,
+                bağlam,
+                |t| t.varsayılan_değer = !t.varsayılan_değer,
+            ))
+            .child(div().mt_2().child(kutu_başlığı("Sıfırlama", true)))
+            .children(
+                [
+                    ("Boşa dön", S::BoşaDön),
+                    ("Varsayılana dön", S::VarsayılanaDön),
+                    ("Üst bileşene bırak", S::ÜstBileşeneBırak),
+                ]
+                .into_iter()
+                .map(|(ad, davranış)| {
+                    div().mt_1().child(tercih_düğmesi(
+                        format!("sifirlama-{ad}"),
+                        ad,
+                        tercih.sıfırlama == davranış,
+                        bağlam,
+                        move |t| t.sıfırlama = davranış,
+                    ))
+                }),
+            )
+            .into_any_element()
+    };
 
     div()
         .mt(px(ölçü::ARALIK))
@@ -3897,55 +3930,58 @@ pub(crate) fn bölüm_satırı(
     } else {
         "Bölüm gezinimi · kapalı".to_owned()
     };
-    let içerik = div()
-        .child(kutu_başlığı("Bölüm gezinimi", açıkmı))
-        .child(tercih_düğmesi(
-            "bolum-etkin",
-            "Bölümlere ayır",
-            açıkmı,
-            bağlam,
-            |t| t.bölüm_gezinimi = !t.bölüm_gezinimi,
-        ))
-        .when(açıkmı, |k| {
-            k.child(div().mt_2().child(tercih_düğmesi(
-                "bolum-atla",
-                "Yön tuşu bölüm atlar",
-                tercih.bölüm_atla,
+    let içerik = |bağlam: &mut Context<GaleriUygulaması>| {
+        div()
+            .child(kutu_başlığı("Bölüm gezinimi", açıkmı))
+            .child(tercih_düğmesi(
+                "bolum-etkin",
+                "Bölümlere ayır",
+                açıkmı,
                 bağlam,
-                |t| t.bölüm_atla = !t.bölüm_atla,
-            )))
-            .child(div().mt_1().child(tercih_düğmesi(
-                "bolum-dolunca",
-                "Dolunca ilerle",
-                tercih.bölüm_dolunca_ilerle,
-                bağlam,
-                |t| t.bölüm_dolunca_ilerle = !t.bölüm_dolunca_ilerle,
-            )))
-            .child(div().mt_1().child(tercih_düğmesi(
-                "bolum-artir",
-                "Yön tuşu artırır",
-                tercih.bölüm_artır,
-                bağlam,
-                |t| t.bölüm_artır = !t.bölüm_artır,
-            )))
-            // Taşma yalnız artırma açıkken iş yapar.
-            .when(tercih.bölüm_artır, |k| {
-                k.child(div().mt_1().child(tercih_düğmesi(
-                    "bolum-tasar",
-                    "Artırma taşar",
-                    tercih.bölüm_taşar,
+                |t| t.bölüm_gezinimi = !t.bölüm_gezinimi,
+            ))
+            .when(açıkmı, |k| {
+                k.child(div().mt_2().child(tercih_düğmesi(
+                    "bolum-atla",
+                    "Yön tuşu bölüm atlar",
+                    tercih.bölüm_atla,
                     bağlam,
-                    |t| t.bölüm_taşar = !t.bölüm_taşar,
+                    |t| t.bölüm_atla = !t.bölüm_atla,
+                )))
+                .child(div().mt_1().child(tercih_düğmesi(
+                    "bolum-dolunca",
+                    "Dolunca ilerle",
+                    tercih.bölüm_dolunca_ilerle,
+                    bağlam,
+                    |t| t.bölüm_dolunca_ilerle = !t.bölüm_dolunca_ilerle,
+                )))
+                .child(div().mt_1().child(tercih_düğmesi(
+                    "bolum-artir",
+                    "Yön tuşu artırır",
+                    tercih.bölüm_artır,
+                    bağlam,
+                    |t| t.bölüm_artır = !t.bölüm_artır,
+                )))
+                // Taşma yalnız artırma açıkken iş yapar.
+                .when(tercih.bölüm_artır, |k| {
+                    k.child(div().mt_1().child(tercih_düğmesi(
+                        "bolum-tasar",
+                        "Artırma taşar",
+                        tercih.bölüm_taşar,
+                        bağlam,
+                        |t| t.bölüm_taşar = !t.bölüm_taşar,
+                    )))
+                })
+                .child(div().mt_1().child(tercih_düğmesi(
+                    "bolum-ayrac",
+                    "Ayraç yazımı ilerletir",
+                    tercih.bölüm_ayraç,
+                    bağlam,
+                    |t| t.bölüm_ayraç = !t.bölüm_ayraç,
                 )))
             })
-            .child(div().mt_1().child(tercih_düğmesi(
-                "bolum-ayrac",
-                "Ayraç yazımı ilerletir",
-                tercih.bölüm_ayraç,
-                bağlam,
-                |t| t.bölüm_ayraç = !t.bölüm_ayraç,
-            )))
-        });
+            .into_any_element()
+    };
 
     div()
         .mt(px(ölçü::ARALIK))
@@ -3972,36 +4008,39 @@ pub(crate) fn doldurma_satırı(
     } else {
         "Otomatik doldurma · kapalı".to_owned()
     };
-    let içerik = div()
-        .child(kutu_başlığı("Otomatik doldurma", açıkmı))
-        .child(tercih_düğmesi(
-            "doldurma-etkin",
-            "Platforma ipucu ver",
-            açıkmı,
-            bağlam,
-            |t| t.otomatik_doldurma = !t.otomatik_doldurma,
-        ))
-        .when(açıkmı, |k| {
-            k.child(div().mt_2().child(kutu_başlığı("Amaç", true)))
-                .children(
-                    [
-                        A::KullanıcıAdı,
-                        A::GeçerliParola,
-                        A::EPosta,
-                        A::TekKullanımlıkKod,
-                    ]
-                    .into_iter()
-                    .map(|amaç| {
-                        div().mt_1().child(tercih_düğmesi(
-                            format!("doldurma-{}", doldurma_amacı_adı(amaç)),
-                            doldurma_amacı_adı(amaç),
-                            tercih.doldurma_amacı == amaç,
-                            bağlam,
-                            move |t| t.doldurma_amacı = amaç,
-                        ))
-                    }),
-                )
-        });
+    let içerik = |bağlam: &mut Context<GaleriUygulaması>| {
+        div()
+            .child(kutu_başlığı("Otomatik doldurma", açıkmı))
+            .child(tercih_düğmesi(
+                "doldurma-etkin",
+                "Platforma ipucu ver",
+                açıkmı,
+                bağlam,
+                |t| t.otomatik_doldurma = !t.otomatik_doldurma,
+            ))
+            .when(açıkmı, |k| {
+                k.child(div().mt_2().child(kutu_başlığı("Amaç", true)))
+                    .children(
+                        [
+                            A::KullanıcıAdı,
+                            A::GeçerliParola,
+                            A::EPosta,
+                            A::TekKullanımlıkKod,
+                        ]
+                        .into_iter()
+                        .map(|amaç| {
+                            div().mt_1().child(tercih_düğmesi(
+                                format!("doldurma-{}", doldurma_amacı_adı(amaç)),
+                                doldurma_amacı_adı(amaç),
+                                tercih.doldurma_amacı == amaç,
+                                bağlam,
+                                move |t| t.doldurma_amacı = amaç,
+                            ))
+                        }),
+                    )
+            })
+            .into_any_element()
+    };
 
     div()
         .mt(px(ölçü::ARALIK))
@@ -4064,43 +4103,48 @@ pub(crate) fn saat_dilimi_satırı(
         ))
     };
     let şimdiki = tercih.saat_dilimi_tercihi.clone();
-    let içerik = div()
-        .child(kutu_başlığı("Saat dilimi kaynağı", true))
-        .child(satır(
-            "Platform",
-            şimdiki == SaatDilimiTercihi::Platform,
-            SaatDilimiTercihi::Platform,
-            bağlam,
-        ))
-        .children(
-            ["Europe/Istanbul", "Europe/London", "America/New_York"].map(|ad| {
-                let kimlik = SaatDilimiKimliği(ad.into());
-                let seçili = şimdiki == SaatDilimiTercihi::Kullanıcı(kimlik.clone());
-                div().mt_1().child(tercih_düğmesi(
-                    format!("dilim-kullanıcı-{ad}"),
-                    ad,
-                    seçili,
-                    bağlam,
-                    move |t| t.saat_dilimi_tercihi = SaatDilimiTercihi::Kullanıcı(kimlik.clone()),
-                ))
-            }),
-        )
-        .child(
-            div()
-                .mt_2()
-                .child(kutu_başlığı("Ürün sabiti", false))
-                .child(
-                    crate::stili_uygula(div(), &crate::görünüm().eksen_etiketi)
-                        .text_color(crate::TezgahTokenları::paletten(crate::palet()).soluk)
-                        .child("Kullanıcı seçimini de ezer."),
-                ),
-        )
-        .child(satır(
-            "UTC · ürün sabiti",
-            matches!(şimdiki, SaatDilimiTercihi::Ürün(_)),
-            SaatDilimiTercihi::Ürün(SaatDilimiKimliği("UTC".into())),
-            bağlam,
-        ));
+    let içerik = move |bağlam: &mut Context<GaleriUygulaması>| {
+        div()
+            .child(kutu_başlığı("Saat dilimi kaynağı", true))
+            .child(satır(
+                "Platform",
+                şimdiki == SaatDilimiTercihi::Platform,
+                SaatDilimiTercihi::Platform,
+                bağlam,
+            ))
+            .children(
+                ["Europe/Istanbul", "Europe/London", "America/New_York"].map(|ad| {
+                    let kimlik = SaatDilimiKimliği(ad.into());
+                    let seçili = şimdiki == SaatDilimiTercihi::Kullanıcı(kimlik.clone());
+                    div().mt_1().child(tercih_düğmesi(
+                        format!("dilim-kullanıcı-{ad}"),
+                        ad,
+                        seçili,
+                        bağlam,
+                        move |t| {
+                            t.saat_dilimi_tercihi = SaatDilimiTercihi::Kullanıcı(kimlik.clone())
+                        },
+                    ))
+                }),
+            )
+            .child(
+                div()
+                    .mt_2()
+                    .child(kutu_başlığı("Ürün sabiti", false))
+                    .child(
+                        crate::stili_uygula(div(), &crate::görünüm().eksen_etiketi)
+                            .text_color(crate::TezgahTokenları::paletten(crate::palet()).soluk)
+                            .child("Kullanıcı seçimini de ezer."),
+                    ),
+            )
+            .child(satır(
+                "UTC · ürün sabiti",
+                matches!(şimdiki, SaatDilimiTercihi::Ürün(_)),
+                SaatDilimiTercihi::Ürün(SaatDilimiKimliği("UTC".into())),
+                bağlam,
+            ))
+            .into_any_element()
+    };
 
     div()
         .mt(px(ölçü::ARALIK))
@@ -6821,6 +6865,28 @@ mod testler {
             yinelenen.is_empty(),
             "aynı kimliği paylaşan seçiciler birlikte açılır: {}",
             yinelenen.join(", ")
+        );
+    }
+
+    /// Açılır liste içeriği tembel gelir; yalnız açıkken kurulur.
+    ///
+    /// İçerik hazır element olarak alınırken kapalı seçicilerin listeleri
+    /// de — yüzlerce öğelik yazı ailesi listeleri dâhil — her karede
+    /// kuruluyor ve hiç çizilmeden atılıyordu. İmza `FnOnce`ye döndü; bu
+    /// bekçi geri dönüşü kapıda tutar.
+    #[test]
+    fn şerit_seçicisi_içeriği_tembel_alır() {
+        let kaynak = include_str!("sergiler.rs");
+        let imza = kaynak
+            .split_once("fn şerit_seçicisi(\n")
+            .expect("seçici tanımlı")
+            .1
+            .split_once(") ->")
+            .expect("imza kapanır")
+            .0;
+        assert!(
+            imza.contains("içerik: impl FnOnce"),
+            "seçici içeriği hazır element almış: kapalı listeler her karede kurulur"
         );
     }
 }

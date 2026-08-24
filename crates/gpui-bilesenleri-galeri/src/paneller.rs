@@ -347,6 +347,21 @@ mod testler {
         );
     }
 
+    /// Görünüm çözümü çizim başına koşmaz.
+    ///
+    /// `tasarım_görünümünü_çöz` kökte tek yerde — tema sürümüne bağlı
+    /// önbelleğin ıskasında — çağrılır. Kare başına çözüm, tam bir tema
+    /// anlık görüntüsü kuruluşunu da beraberinde koşturuyordu.
+    #[test]
+    fn görünüm_çözümü_tek_yerden_koşar() {
+        let lib = include_str!("lib.rs");
+        assert_eq!(
+            lib.matches("tasarım_görünümünü_çöz()").count(),
+            1,
+            "görünüm çözümü önbellek ıskası dışında da koşuyor"
+        );
+    }
+
     /// Olay aboneliği ve alan gözlemi panellerde yaşar.
     ///
     /// Akışın sahibi `OlayAkışıPaneli`, durum gözleminin sahibi

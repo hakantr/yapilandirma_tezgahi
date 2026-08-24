@@ -348,8 +348,16 @@ pub fn seçici_açık_mı(kimlik: &str) -> bool {
 
 /// Kare başında çözülmüş görünümü kurar.
 pub fn görünümü_kur(görünüm: ÇözülmüşTezgahGörünümü) {
+    görünümü_paylaşımlı_kur(std::sync::Arc::new(görünüm));
+}
+
+/// Hazır (paylaşımlı) çözümü kurar.
+///
+/// Çözüm tema sürümüne bağlı önbellekten geliyorsa yeniden sarmalanmaz;
+/// aynı `Arc` kare kare paylaşılır.
+pub fn görünümü_paylaşımlı_kur(görünüm: std::sync::Arc<ÇözülmüşTezgahGörünümü>) {
     ETKİN_GÖRÜNÜM.with(|hücre| {
-        *hücre.borrow_mut() = Some(std::sync::Arc::new(görünüm));
+        *hücre.borrow_mut() = Some(görünüm);
     });
 }
 
