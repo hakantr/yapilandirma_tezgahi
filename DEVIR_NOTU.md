@@ -74,12 +74,15 @@ Taşınma uyarlamaları:
 
 ## 5. Sıradaki işler (yeni sohbetin gündemi)
 
-1. **Performans mimarisi turu** — kullanıcı onaylı plan: kök
-   `observe(&alan) → notify()` köprüsünü kaldırıp `AlanDurumPaneli` +
-   `OlayAkışıPaneli` entity'lerine taşımak; yapılandırma raporu ve kod
-   panelini tercih sürümüne bağlamak; sonra sağ kolon bölüm entity'leri.
-   Kabul hedefleri ve ölçümler `TEZGAH_DEVIR_NOTU` sonundaki performans
-   raporunda; `akici-dev` profili eklenip Linux'ta ölçülecek.
+1. **Performans mimarisi turu** — kullanıcı onaylı plan. **Birinci tur
+   tamamlandı (24 Ağu 2026):** kök `observe(&alan)`/`subscribe` köprüleri
+   kaldırılıp gözlem `AlanDurumPaneli` + `OlayAkışıPaneli` entity'lerine
+   taşındı; `§29` raporu ve kod paneli tercih sürümüne bağlandı;
+   `akici-dev` profili eklendi. Mekanik, kazançlar, ikinci turun işleri
+   (sağ kolon bölüm entity'leri + `cached` bölgeler + `yuva_görünürlük_notu`
+   taşınması) ve ölçüm hedefleri: `raporlar/PERFORMANS_MIMARISI.md`.
+   (Önceki devirde anılan "TEZGAH_DEVIR_NOTU sonundaki performans raporu"
+   hiç yazılmamıştı; o boşluğu bu belge doldurur.) Linux ölçümü bekliyor.
 2. Crate/paket adlarının yeniden adlandırılması (kullanıcı kararı).
 3. Bu depoya CI kurmak (kaynak depodaki `uygulama-iskeleti` işinin
    uyarlaması; kardeş `gpui` **ve** `gpui_bilesenleri` checkout'ları gerekir).
