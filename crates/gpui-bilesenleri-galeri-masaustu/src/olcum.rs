@@ -1,24 +1,30 @@
-//! Gerçek pencerede `input-to-present` ölçümü.
+//! Gerçek pencerede girdi gecikmesi ve kare maliyeti ölçümü.
 //!
 //! Headless kare ölçümü (`gpui-bilesenleri-galeri/tests/kare_olcumu.rs`)
-//! yalnız CPU çizim işini görür: sunum, vsync ve giriş kuyruğu orada yoktur.
+//! yalnız `render` gövdelerinin işini görür; yerleşim, prepaint, paint ve
+//! platform katmanı (shaping, rasterizasyon, sahne kodlama) orada yoktur.
 //! Bu modül eksik kalan yarıyı ölçer ve ancak `olcum` özelliğiyle derlenir.
 //!
-//! Ölçülen değerler GPUI'nin kendi pencere profilcisinden gelir; tezgâh
-//! kendi zamanlayıcısını kurmaz:
+//! **Ölçüm penceresi.** Sayaç, pencere açılışıyla değil ilk gerçek metin
+//! **düzenlemesiyle** başlar (`düzenleme_sayısı`). Platformun girdi
+//! histogramı her geçersizleştiren olayı sayar — alana yapılan bir fare
+//! tıklaması da oraya girer — oysa ölçülmek istenen yazma evresidir.
+//! Pencerenin başında histogramların anlık görüntüsü alınır ve sonda fark
+//! hesaplanır; böylece açılış kareleri ile odaklanma sırasındaki olaylar
+//! sonuca karışmaz.
 //!
-//! - **Girdi gecikmesi** (`input_latency_snapshot`): platform olayının
-//!   geldiği andan, o olayın yol açtığı karenin çizildiği ana kadar.
-//!   `mid_draw_events_dropped` çizim sürerken gelip ölçüme giremeyen
-//!   olayları sayar — büyükse gecikme rakamı eksik okunmalıdır.
-//! - **Sunum aralığı** (`frame_duration_snapshot`): art arda sunulan iki
-//!   kare arasındaki süre. FPS ve düşen kare buradan çıkar; yalnız pencere
-//!   canlıyken örneklenir.
-//! - **Çizim süresi**: headless koşumun ölçtüğü işin gerçek penceredeki
-//!   karşılığı; iki ölçüm ancak bu sütun üzerinden karşılaştırılabilir.
+//! **Ne ölçülüyor, ne ölçülmüyor.**
 //!
-//! Koşum penceresi boyunca **gerçekten yazmak gerekir**: ölçülen şey
-//! kullanıcı girdisidir, uygulamanın kendi kendine çizmesi değil.
+//! - `girdi→draw sonu`: platform olayının gelişinden, o olayın yol açtığı
+//!   karenin platform `draw` çağrısının **tamamlanmasına** kadar. Bu,
+//!   pikselin ekranda değiştiği an **değildir**; sunum kuyruğu ve panel
+//!   gecikmesi bunun dışındadır.
+//! - `render gövdeleri` / `render sonrası draw aşamaları`: bu ayrım
+//!   **sahiplik değil, aşamadır**. İkinci dilim "GPUI'nin işi" sanılmamalı
+//!   — içinde tezgâhın ürettiği ağacın yerleşimi, prepaint'i, paint'i ve
+//!   metin shaping'i vardır; sağ kolon önbelleği tam da o aşamaların
+//!   aralıklarını (`reuse_prepaint` / `reuse_paint`) yeniden kullanır.
+//! - `mid_draw_events_dropped` büyükse gecikme rakamı eksik okunmalıdır.
 
 use std::time::Duration;
 
@@ -28,21 +34,34 @@ use hdrhistogram::Histogram;
 /// Histogramı okunur tek satıra indirger.
 ///
 /// Örneklem sayısı da yazılır: iki örnekle alınmış bir p95 sayı değil
-/// gürültüdür ve okuyan bunu görmelidir.
+/// gürültüdür ve okuyan bunu görmelidir. Ortalama da basılır çünkü aşama
+/// ayrımı ortalamalar üzerinden yapılır ve p50 ile karıştırılmamalıdır.
 fn özet(ad: &str, histogram: &Histogram<u64>, bölen: f64, birim: &str) -> String {
     if histogram.is_empty() {
-        return format!("{ad:<22} örnek yok");
+        return format!("{ad:<24} örnek yok");
     }
     let çevir = |değer: u64| değer as f64 / bölen;
     format!(
-        "{ad:<22} n={:<5} p50 {:7.3} {birim} · p95 {:7.3} {birim} · \
-         p99 {:7.3} {birim} · en çok {:7.3} {birim}",
+        "{ad:<24} n={:<5} p50 {:7.3} {birim} · p95 {:7.3} {birim} · \
+         p99 {:7.3} {birim} · ort {:7.3} {birim}",
         histogram.len(),
         çevir(histogram.value_at_quantile(0.50)),
         çevir(histogram.value_at_quantile(0.95)),
         çevir(histogram.value_at_quantile(0.99)),
-        çevir(histogram.max()),
+        histogram.mean() / bölen,
     )
+}
+
+/// Sondaki histogramdan ölçüm penceresine düşen payı ayıklar.
+///
+/// Çıkarma başarısız olursa ham histogram döner ve rapor bunu **yazar**:
+/// sessizce yanlış sayı üretmek, eksik sayı üretmekten kötüdür.
+fn pencere_payı(son: &Histogram<u64>, baş: &Histogram<u64>) -> (Histogram<u64>, bool) {
+    let mut fark = son.clone();
+    match fark.subtract(baş) {
+        Ok(()) => (fark, true),
+        Err(_) => (son.clone(), false),
+    }
 }
 
 /// `--olcum <saniye>` verildiyse ölçümü kurar.
@@ -63,27 +82,16 @@ pub fn ölçümü_kur<T: 'static>(pencere: &WindowHandle<T>, bağlam: &mut App) 
 /// Ölçüm penceresi dolunca raporu basar ve uygulamadan çıkar.
 fn ölçümü_planla(pencere: gpui::AnyWindowHandle, saniye: u64, bağlam: &mut App) {
     eprintln!(
-        "ölçüm modu: alana tıklayıp yazmaya başlayın — sayaç **ilk tuş \
-         vuruşuyla** başlar ve {saniye} sn sürer, sonra rapor basılır."
+        "ölçüm modu: alana tıklayıp **yazmaya başlayın** — sayaç ilk metin \
+         düzenlemesiyle başlar ve {saniye} sn sürer, sonra rapor basılır."
     );
     bağlam
         .spawn(async move |bağlam| {
-            // Sayaç **ilk tuş vuruşuyla** başlar, pencere açılışıyla
-            // değil. Ardışık iki koşum yapılırken ikincisi kaçırılıp boş
-            // rapor üretmişti; kullanıcının pencereyi bulup odaklanması
-            // için geçen süre ölçümü yemiyor artık. En çok iki dakika
-            // beklenir, sonra ölçüm yine de başlar (rapor kendi uyarısını
-            // basar).
+            // Kapı: ilk gerçek düzenleme (fare tıklaması değil).
+            // En çok iki dakika beklenir; sonra ölçüm yine de başlar ve
+            // rapor kendi uyarısını basar.
             for _ in 0..600 {
-                let girdi_var = bağlam
-                    .update_window(pencere, |_, pencere, _| {
-                        !pencere
-                            .input_latency_snapshot()
-                            .latency_histogram
-                            .is_empty()
-                    })
-                    .unwrap_or(false);
-                if girdi_var {
+                if gpui_bilesenleri_galeri::düzenleme_sayısı() > 0 {
                     break;
                 }
                 bağlam
@@ -91,96 +99,108 @@ fn ölçümü_planla(pencere: gpui::AnyWindowHandle, saniye: u64, bağlam: &mut 
                     .timer(Duration::from_millis(200))
                     .await;
             }
-            // Ölçüm penceresi açılış karelerini dışarıda bırakır: ilk
-            // kareler font yükler ve bütün ağacı ilk kez kurar, yani
-            // sürekli kullanımı temsil etmez. Pencere başındaki kare
-            // sayısı ve sıfırlanan sayaç, ayrıştırmayı yalnız bu
-            // penceredeki karelere dayandırır.
-            let başlangıç_karesi = bağlam
+            // Pencere başlangıcı: histogramların tam anlık görüntüsü.
+            let başlangıç = bağlam
                 .update_window(pencere, |_, pencere, _| {
                     gpui_bilesenleri_galeri::render_sıfırla();
-                    pencere.frame_duration_snapshot().draw_duration_histogram.len()
+                    (
+                        pencere.input_latency_snapshot(),
+                        pencere.frame_duration_snapshot(),
+                    )
                 })
-                .unwrap_or(0);
+                .ok();
             bağlam
                 .background_executor()
                 .timer(Duration::from_secs(saniye))
                 .await;
-            let _ = bağlam.update_window(pencere, |_, pencere, _| {
-                let girdi = pencere.input_latency_snapshot();
-                let kare = pencere.frame_duration_snapshot();
-                // Nanosaniyeden milisaniyeye; sunum aralığı da ms.
-                const MS: f64 = 1_000_000.;
-                // Teşhis: headless koşumla arasındaki farkı ayrıştırmak
-                // için ortam. Ölçek çarpanı 2 ise piksel işi dört katıdır;
-                // erişilebilirlik ağacı etkinse her kare bir de AX
-                // güncellemesi taşır ve ikisi de headless koşumda yoktur.
-                let boyut = pencere.viewport_size();
-                println!("\n— gerçek pencere ölçümü · {saniye} sn —");
-                println!(
-                    "ortam                  {:.0}×{:.0} px · ölçek {:.1}× · \
-                     erişilebilirlik {} · derleme {}",
-                    f32::from(boyut.width),
-                    f32::from(boyut.height),
-                    pencere.scale_factor(),
-                    if pencere.is_a11y_active() { "etkin" } else { "kapalı" },
-                    if cfg!(debug_assertions) { "hata ayıklama" } else { "optimize" },
-                );
-                println!("{}", özet("girdi→kare", &girdi.latency_histogram, MS, "ms"));
-                println!(
-                    "{}",
-                    özet("çizim süresi", &kare.draw_duration_histogram, MS, "ms")
-                );
-                println!(
-                    "{}",
-                    özet("sunum aralığı", &kare.present_interval_histogram, MS, "ms")
-                );
-                println!(
-                    "{}",
-                    özet(
-                        "kare başına olay",
-                        &girdi.events_per_frame_histogram,
-                        1.,
-                        "olay"
-                    )
-                );
-                println!(
-                    "çizim ortasında düşen olay: {}",
-                    girdi.mid_draw_events_dropped
-                );
-                // `draw` ayrıştırması: tezgâhın kendi `render` gövdeleri
-                // (element ağacının kurulumu) toplam çizimin ne kadarı?
-                // Kalan pay GPUI'nin yerleşim/prepaint/paint işi ile
-                // platform katmanına (metin shaping, glif rasterizasyonu,
-                // sahne kodlama) aittir.
-                let pencere_kareleri = kare
-                    .draw_duration_histogram
-                    .len()
-                    .saturating_sub(başlangıç_karesi);
-                if pencere_kareleri > 0 {
-                    let render_ms = gpui_bilesenleri_galeri::render_toplam_ns() as f64
-                        / pencere_kareleri as f64
-                        / MS;
-                    // Pencere içi ortalama çizim: toplam işten açılış
-                    // karelerinin payı düşülür.
-                    let toplam = kare.draw_duration_histogram.mean()
-                        * kare.draw_duration_histogram.len() as f64;
-                    let çizim_ms = (toplam / pencere_kareleri as f64) / MS;
-                    println!(
-                        "ayrıştırma             {pencere_kareleri} kare · kare başına \
-                         tezgâh render {render_ms:6.3} ms · çizim ≤{çizim_ms:6.3} ms · \
-                         tezgâh payı ≥%{:.0}",
-                        if çizim_ms > 0. { render_ms / çizim_ms * 100. } else { 0. },
-                    );
-                }
-                if girdi.latency_histogram.is_empty() {
-                    eprintln!(
-                        "uyarı: hiç girdi örneği yok — pencereye yazılmadıysa bu \
-                         rapor gecikme hakkında bir şey söylemez."
-                    );
-                }
-            });
+            bağlam
+                .update_window(pencere, |_, pencere, _| {
+                    raporla(pencere, saniye, başlangıç);
+                })
+                .ok();
             bağlam.update(|bağlam| bağlam.quit());
         })
         .detach();
+}
+
+type Başlangıç = (
+    gpui::profiler::InputLatencySnapshot,
+    gpui::profiler::FrameDurationSnapshot,
+);
+
+fn raporla(pencere: &gpui::Window, saniye: u64, başlangıç: Option<Başlangıç>) {
+    const MS: f64 = 1_000_000.;
+    let girdi = pencere.input_latency_snapshot();
+    let kare = pencere.frame_duration_snapshot();
+    let Some((baş_girdi, baş_kare)) = başlangıç else {
+        eprintln!("ölçüm penceresi kurulamadı; rapor atlandı");
+        return;
+    };
+
+    let (gecikme, g_tam) = pencere_payı(&girdi.latency_histogram, &baş_girdi.latency_histogram);
+    let (çizim, ç_tam) = pencere_payı(
+        &kare.draw_duration_histogram,
+        &baş_kare.draw_duration_histogram,
+    );
+    let (sunum, _) = pencere_payı(
+        &kare.present_interval_histogram,
+        &baş_kare.present_interval_histogram,
+    );
+    let (olaylar, _) = pencere_payı(
+        &girdi.events_per_frame_histogram,
+        &baş_girdi.events_per_frame_histogram,
+    );
+
+    println!("\n— gerçek pencere ölçümü · {saniye} sn (yalnız ölçüm penceresi) —");
+    println!(
+        "ortam                    {:.0}×{:.0} px · ölçek {:.1}× · \
+         erişilebilirlik {} · derleme {}",
+        f32::from(pencere.viewport_size().width),
+        f32::from(pencere.viewport_size().height),
+        pencere.scale_factor(),
+        if pencere.is_a11y_active() {
+            "etkin"
+        } else {
+            "kapalı"
+        },
+        if cfg!(debug_assertions) {
+            "hata ayıklama"
+        } else {
+            "optimize"
+        },
+    );
+    println!("{}", özet("girdi→draw sonu", &gecikme, MS, "ms"));
+    println!("{}", özet("çizim (draw)", &çizim, MS, "ms"));
+    println!("{}", özet("sunum aralığı", &sunum, MS, "ms"));
+    println!("{}", özet("kare başına olay", &olaylar, 1., "olay"));
+    println!(
+        "çizim ortasında düşen olay: {}",
+        girdi
+            .mid_draw_events_dropped
+            .saturating_sub(baş_girdi.mid_draw_events_dropped)
+    );
+
+    // Aşama ayrımı — **sahiplik değil**. İkinci dilim GPUI'nin malı
+    // değildir: içinde tezgâhın ürettiği ağacın yerleşimi, prepaint'i,
+    // paint'i ve metin shaping'i vardır. Karşılaştırma ortalamalar
+    // üzerindendir; p50 ile karıştırılmamalıdır.
+    if !çizim.is_empty() {
+        let render_ort =
+            gpui_bilesenleri_galeri::render_toplam_ns() as f64 / çizim.len() as f64 / MS;
+        let çizim_ort = çizim.mean() / MS;
+        println!(
+            "aşama (ortalama)         render gövdeleri {render_ort:6.3} ms · \
+             render sonrası draw aşamaları {:6.3} ms · toplam draw {çizim_ort:6.3} ms",
+            (çizim_ort - render_ort).max(0.),
+        );
+    }
+    if !g_tam || !ç_tam {
+        eprintln!(
+            "uyarı: histogram farkı alınamadı; sayılar pencere başlangıcından \
+             veri taşıyor olabilir."
+        );
+    }
+    if gecikme.is_empty() {
+        eprintln!("uyarı: ölçüm penceresinde girdi örneği yok — yazılmadı mı?");
+    }
 }

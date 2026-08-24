@@ -547,34 +547,49 @@ Teşhis satırı ölçüm moduna eklendi ve iki olağan şüpheli **elendi**:
 | `draw` içinde sunum/vsync beklemesi | **Elenmedi ama zayıf** — `Window::draw` present çağırmıyor (`needs_present` işaretliyor); yine de 20,8 ms, 60 Hz aralığına (16,7 ms) şüpheli yakın |
 | Platform metin ve GPU katmanı | **Kalan ana aday** — headless koşumda CoreText de Metal atlası da hiç çalışmıyor |
 
-### 8.2.1 Ayrıştırma: `draw`ın %89'u GPUI ve platform katmanında
+### 8.2.1 Ayrıştırma — GERİ ÇEKİLDİ (ölçüm kusurlu)
 
-Ölçüm moduna ayrıştırma satırı eklendi: tezgâhın kendi `render` gövdeleri
-(kök + dört panel) sarmalanıp süreleri toplanıyor; `draw` toplamından
-çıkarılınca kalan, GPUI'nin yerleşim/prepaint/paint işi ile platform
-katmanının (shaping, rasterizasyon, sahne kodlama) payı oluyor.
+Bu bölüm bir ayrıştırma sayısı ("tezgâh %11 / GPUI+platform %89") ve ondan
+türetilen bir çıkarım ("üç tur yalnız %11'e dokundu, toplam kazanç ~%5")
+taşıyordu. **İkisi de geri çekildi.** Bağımsız inceleme dört kusur
+buldu ve hepsi geçerli:
 
-Isınmış koşum (40 sn gerçek yazma, 58 kare):
+1. **Payda düzeltildi, pay düzeltilmedi.** Ölçüm penceresi kare
+   *sayısından* açılış karelerini düşüyor ama histogramın *toplam
+   süresinden* düşmüyor. Kodun kendisi bunu biliyor ve `çizim ≤…`,
+   `pay ≥…` diye basıyor; rapor o işaretleri yok sayıp kesin `21,7 ms` ve
+   `%11/%89` yazmıştı. Bu bir okuma hatasıydı.
+2. **Kapı yanlış olayı bekliyor.** "İlk tuş vuruşu" sandığım şey ilk
+   *geçersizleştiren platform girdisi*; metin alanına yapılan bir fare
+   tıklaması da sayacı başlatır. Ayrıca başlangıçta histogramlar
+   sıfırlanmadığı için sonuçlar pencere açılışından veri taşıyor.
+3. **Kalan pay "GPUI'nin malı" değil.** O dilimin içinde **tezgâhın
+   ürettiği ağacın** yerleşim, prepaint, paint ve shaping maliyeti var.
+   Sağ kolon önbelleği tam da o aşamaları — `reuse_prepaint` /
+   `reuse_paint` — yeniden kullanıyor. Yani "üç tur yalnız kendi %11'ine
+   dokundu" cümlesi yanlış: önbellek `render` gövdesinin dışındaki işi de
+   kesiyor.
+4. **`girdi→kare` ekran pikseli değil.** Ölçüm `present_end`e, yani
+   platformun `draw` çağrısının tamamlanmasına kadar. "Ekrana yansıma"
+   ifadesi bundan daha kesin bir şey iddia ediyordu.
 
-| Pay | Süre | Oran |
-|---|---|---|
-| Tezgâhın kendi `render` işi | 2,29 ms | **%11** |
-| GPUI + platform katmanı | 19,4 ms | **%89** |
-| Toplam `draw` (p50) | 21,7 ms | %100 |
+**Ölçüm aracı bu dört maddeye göre düzeltildi** (kod tarafı hazır, sayı
+bekliyor):
 
-İki sonuç çıkıyor:
+- Pencere başında dört histogramın da anlık görüntüsü alınıyor ve sonda
+  `Histogram::subtract` ile fark hesaplanıyor; çıkarma başarısız olursa
+  rapor bunu **yazıyor** (sessiz yanlış sayı üretmiyor).
+- Kapı artık gerçek **metin düzenlemesine** bağlı
+  (`düzenleme_sayısı`, `DüzenlemeMetniDeğişti` olaylarını sayar); fare
+  tıklaması ölçümü başlatmıyor.
+- Aşama ayrımı ortalamalar üzerinden yapılıyor ve satır adı
+  **"render gövdeleri / render sonrası draw aşamaları"** — sahiplik
+  iddiası taşımıyor.
+- Gecikme satırının adı `girdi→draw sonu` oldu; "ekrana yansıma"
+  ifadesi kaldırıldı.
 
-1. **§8.2'nin tahmini doğruydu:** ağırlık platform/GPUI katmanında.
-2. **Headless ölçüm, tezgâhın kendi işini doğru ölçüyor.** Headless `draw`
-   p50 1,75 ms idi; gerçek penceredeki tezgâh render'ı 2,29 ms — aynı
-   büyüklük. Yani headless koşum yanlış bir sayı üretmiyordu, **eksik**
-   bir sayı üretiyordu: ölçtüğü katman gerçek maliyetin onda biri.
-
-> **Ara bulgu düzeltmesi.** Bu ayrıştırmanın ilk koşumu girdisizdi (n=3,
-> yalnız açılış kareleri) ve "tezgâh payı %74" demişti. O sayı bir
-> yanılsamaydı: açılış karelerinde font yükleme ve ilk ağaç kurulumu
-> tezgâh tarafında toplanır. Isınmış ölçüm oranı %74'ten %11'e indirdi.
-> Ders, §6.4'ün tekrarı: ısınmamış örneklem yön bile yanıltır.
+Deney tasarımı da düzeltildi: iki binary **A/B ve B/A sırasıyla**, birkaç
+çift koşumda çalıştırılmalı (§8.3).
 
 ### 8.2.2 Ölçüm profili: sayılar `debug_assertions` **açıkken** alındı
 
@@ -601,25 +616,24 @@ uygulamasının yayımlanmış "8,4 ms" gibi bir kare süresi büyük olasılık
 `release`tir ve bizim 21,7 ms'lik `akici-dev` sayımızla **doğrudan
 kıyaslanamaz**.
 
-### 8.3 Üç turluk optimizasyon bu tabloda nerede duruyor?
+### 8.3 Üç turluk optimizasyonun gerçek penceredeki etkisi — ÖLÇÜLMEDİ
 
-Ayrıştırma (§8.2.1) sınırı çiziyor: üç tur, `draw`ın **%11'lik diliminde**
-çalıştı. O dilimde headless ölçüm %53 kazanç gösterdi; toplam gecikmeye
-yansıması bu yüzden kabaca %5 mertebesindedir.
+Bu bölüm bir tahmin ("toplam gecikmeye yansıması ~%5") taşıyordu; §8.2.1
+geri çekilince o tahminin dayanağı da kalmadı ve **geri çekildi**.
 
-Bu bir başarısızlık değil, **kapsam gerçeği**: tezgâh kendi kurduğu ağacı
-daraltabilir, GPUI'nin yerleşim/paint işini ve platformun metin/GPU
-katmanını daraltamaz. O katman kardeş depoların (`gpui`, `gpui_apple`)
-malıdır.
+Etkiyi ölçmenin tek doğru yolu duruyor: aynı koşumun önbellekli ve
+önbelleksiz iki kez yapılması. İlk deneme başarısız oldu (taban koşumunda
+pencereye yazılmadı, `girdi→kare: örnek yok`). Doğru deney şöyle
+kurulmalı:
 
-**Doğrudan ölçüm henüz alınamadı.** Önbellekli/önbelleksiz çift koşum
-denendi; ikinci koşumda pencereye yazılmadığı için taban boş çıktı
-(`girdi→kare: örnek yok`). Ölçüm modu buna göre düzeltildi: sayaç artık
-pencere açılışıyla değil **ilk tuş vuruşuyla** başlıyor, yani kaçırılan
-saniyeler ölçümü yemiyor. Koşum tekrarlanabilir:
+- Ölçüm penceresi düzeltildikten sonra koşulmalı (§8.2.1'deki dört madde).
+- İki binary **A/B ve B/A sırasıyla**, birkaç çift koşumda çalıştırılmalı
+  — tek sıra ısınma ve termal etkileri ikinci koşuma yükler.
+- Her koşumda benzer tempoda yazılmalı; `n` değerleri yakın değilse
+  karşılaştırma o farkla birlikte okunmalı.
 
 ```bash
-# önbellekli (bugünkü hâl)
+# önbellekli
 cargo run --profile akici-dev --features olcum \
     -p gpui-bilesenleri-galeri-masaustu -- --geniş --olcum 40
 # taban
@@ -628,18 +642,17 @@ cargo run --profile akici-dev \
     -p gpui-bilesenleri-galeri-masaustu -- --geniş --olcum 40
 ```
 
-İki koşumda benzer tempoda yazmak gerekir; `girdi→kare` satırındaki `n`
-değerleri yakın değilse karşılaştırma o farkla birlikte okunmalıdır.
-
 ### 8.4 Kayıtlı sonuç
 
 Bu ölçümden sonra depo için geçerli tek cümle şudur:
 
-> 1600×1000 pencerede, 60 Hz ekranlı bir macOS makinesinde, odak sonrası
-> bir tuş vuruşunun ekrana yansıması p50 ~29–32 ms sürüyor. Bu sürenin
-> yaklaşık üçte ikisi `Window::draw` içinde geçiyor (p50 ~21,7 ms) ve o
-> işin **%89'u GPUI ile platform katmanına**, %11'i tezgâhın kendi
-> element ağacı kurulumuna ait.
+> 1600×1000 pencerede, 60 Hz ekranlı bir macOS makinesinde,
+> `debug_assertions` açık bir derlemede, bir metin girdisinden platformun
+> `draw` çağrısının tamamlanmasına kadar geçen süre p50 ~29–32 ms
+> ölçüldü. Bu bir **uyarı işareti**dir ve düzeltilmiş ölçüm penceresiyle
+> doğrulanmadan mühürlenmemelidir. Sürenin `draw` içi dağılımı (hangi
+> aşama ne kadar) şu an **bilinmiyor** — ilk ayrıştırma denemesi kusurlu
+> çıktı ve geri çekildi (§8.2.1).
 
 120 FPS iddiası kapanmadı; ölçüm onu **çürüttü**.
 

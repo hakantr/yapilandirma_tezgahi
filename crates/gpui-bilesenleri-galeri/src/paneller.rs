@@ -172,6 +172,10 @@ impl OlayAkışıPaneli {
     /// yazarken alan her tuşta `DüzenlemeMetniDeğişti` yayımlıyor ve akış
     /// tek bir tuş dizisiyle doluyordu.
     fn kaydet(&mut self, olay: TezgahOlayı, bağlam: &mut Context<Self>) {
+        // Ölçüm kapısı: yalnız gerçek metin düzenlemesi sayılır.
+        if olay.ad == "DüzenlemeMetniDeğişti" {
+            DÜZENLEME_SAYISI.with(|sayaç| sayaç.set(sayaç.get().saturating_add(1)));
+        }
         match self.olaylar.first_mut() {
             Some(baş) if baş.ad == olay.ad && baş.özet == olay.özet => {
                 baş.sayı = baş.sayı.saturating_add(1);
@@ -316,6 +320,22 @@ thread_local! {
 /// Tezgâhın `render` gövdelerinde geçen toplam süre (nanosaniye).
 pub fn render_toplam_ns() -> u64 {
     RENDER_NS.with(std::cell::Cell::get)
+}
+
+thread_local! {
+    /// Alanın yayımladığı `DüzenlemeMetniDeğişti` olaylarının sayısı.
+    ///
+    /// Ölçüm penceresinin kapısı budur. Platform girdi histogramı
+    /// **her** geçersizleştiren olayı sayar — metin alanına yapılan bir
+    /// fare tıklaması da oraya girer — yani "ilk girdi" ile "ilk gerçek
+    /// düzenleme" aynı şey değildir. Ölçüm yazma evresini hedeflediği
+    /// için kapı bu sayaca bağlanır.
+    static DÜZENLEME_SAYISI: std::cell::Cell<u64> = const { std::cell::Cell::new(0) };
+}
+
+/// Alanda yapılan metin düzenlemelerinin sayısı (bu iş parçacığında).
+pub fn düzenleme_sayısı() -> u64 {
+    DÜZENLEME_SAYISI.with(std::cell::Cell::get)
 }
 
 /// Sayacı sıfırlar; ölçüm penceresini açılış karelerinden ayırmak için.
