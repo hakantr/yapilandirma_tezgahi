@@ -478,7 +478,7 @@ thread_local! {
 }
 
 /// Üst şeridin kabuğa inen ekseni.
-#[derive(Clone, Debug)]
+#[derive(Clone, Debug, PartialEq)]
 struct KabukGörünümü {
     aile: Arc<str>,
     punto: f32,
@@ -517,6 +517,32 @@ pub fn kabuk_görünümünü_kur(
     });
 }
 
+thread_local! {
+    // `galeri_teması` memoizu: (palet, kabuk görünümü) → anlık görüntü.
+    static GALERİ_TEMASI_MEMOSU: std::cell::RefCell<
+        Option<(crate::GaleriPaleti, KabukGörünümü, Arc<TemaAnlıkGörüntüsü>)>,
+    > = const { std::cell::RefCell::new(None) };
+    // `tezgah_teması` memoizu: (tema tercihi, taban görüntü) → anlık
+    // görüntü. Anahtar tercihin kendisidir; üretici saf kalır ve sürüm
+    // artmadan kurulan tercih varyantları da doğru görüntüyü alır.
+    static TEZGAH_TEMASI_MEMOSU: std::cell::RefCell<
+        Option<(
+            crate::TezgahTeması,
+            Arc<TemaAnlıkGörüntüsü>,
+            Arc<TemaAnlıkGörüntüsü>,
+        )>,
+    > = const { std::cell::RefCell::new(None) };
+}
+
+/// Tezgâh önizleme kutusunun sabit etkileşim hedefi.
+///
+/// Tasarımın önizleme kutusu 58 piksel yüksekliğindedir; `Hap` yarıçapı bu
+/// ölçünün yarısından türer. Tek kaynak: hem tezgâh teması hem köşe
+/// kaydırıcısının üst sınırı buradan okur — sınır için tam tema kurulmaz.
+pub(crate) fn tezgah_etkileşim_hedefi() -> gpui::Pixels {
+    px(58.)
+}
+
 /// Galerinin `ORT-004` token değerlerini üreten ürün teması.
 ///
 /// `ORT-004` token *şeklinin* sahibidir; değerleri ürün verir. Galeri kendi
@@ -526,23 +552,9 @@ pub fn galeri_teması() -> Arc<TemaAnlıkGörüntüsü> {
     // Canlı sergiler de seçilen paletten beslenir; aksi hâlde koyu kipte
     // kabuk döner ama kartların içi açık kalır.
     let p = crate::palet();
-    let renk = |onaltılık: u32| -> Hsla { rgb(onaltılık).into() };
-    let gölge = |y: f32, bulanıklık: f32| GölgeTokenı {
-        renk: hsla(0., 0., 0., 0.12),
-        ofset_x: px(0.),
-        ofset_y: px(y),
-        bulanıklık: px(bulanıklık),
-        yayılma: px(0.),
-    };
     // Kabuk tipografisi kurulmadıysa kütüphane varsayılanı kullanılır;
     // galerinin başka ekranları bu dikişi kurmaz.
-    let KabukGörünümü {
-        aile,
-        punto,
-        ölçek,
-        yoğunluk,
-        hareket,
-    } = KABUK_GÖRÜNÜMÜ
+    let kabuk = KABUK_GÖRÜNÜMÜ
         .with(|hücre| hücre.borrow().clone())
         .unwrap_or_else(|| KabukGörünümü {
             aile: Arc::from("IBM Plex Sans"),
@@ -551,6 +563,31 @@ pub fn galeri_teması() -> Arc<TemaAnlıkGörüntüsü> {
             yoğunluk: ArayüzYoğunluğu::Normal,
             hareket: HareketTercihi::Tam,
         });
+    // Üretici saftır (palet + kabuk görünümü → anlık görüntü): girdiler
+    // değişmedikçe aynı görüntü paylaşılır, sıcak yolda ~30 tahsislik
+    // yeniden kurulum yapılmaz.
+    if let Some((önceki_palet, önceki_kabuk, tema)) =
+        GALERİ_TEMASI_MEMOSU.with(|hücre| hücre.borrow().clone())
+        && önceki_palet == p
+        && önceki_kabuk == kabuk
+    {
+        return tema;
+    }
+    let renk = |onaltılık: u32| -> Hsla { rgb(onaltılık).into() };
+    let gölge = |y: f32, bulanıklık: f32| GölgeTokenı {
+        renk: hsla(0., 0., 0., 0.12),
+        ofset_x: px(0.),
+        ofset_y: px(y),
+        bulanıklık: px(bulanıklık),
+        yayılma: px(0.),
+    };
+    let KabukGörünümü {
+        aile,
+        punto,
+        ölçek,
+        yoğunluk,
+        hareket,
+    } = kabuk.clone();
     let gövde = TextStyle {
         color: renk(p.kabuk_ana_metin),
         font_family: aile.to_string().into(),
@@ -564,7 +601,7 @@ pub fn galeri_teması() -> Arc<TemaAnlıkGörüntüsü> {
         kenarlık: renk(kenar),
     };
 
-    Arc::new(TemaAnlıkGörüntüsü {
+    let tema = Arc::new(TemaAnlıkGörüntüsü {
         // Aday bildirilmiyor: ORT-017 profilinin kütüphane
         // varsayılanı kullanılır (`None` sıfır padding demek değildir).
         metin_düzenleme_iç_boşluğu: None,
@@ -683,7 +720,9 @@ pub fn galeri_teması() -> Arc<TemaAnlıkGörüntüsü> {
         }),
         imleç: None,
         gelişmiş_tema: None,
-    })
+    });
+    GALERİ_TEMASI_MEMOSU.with(|hücre| *hücre.borrow_mut() = Some((p, kabuk, tema.clone())));
+    tema
 }
 
 /// `BİL-010` tezgâh ekranının renk paleti.
@@ -736,13 +775,22 @@ pub fn tezgah_kod_metin() -> u32 {
 /// uygulanır; galerinin geri kalanı `galeri_teması()` ile çizilmeye devam
 /// eder. Böylece tek bir ailenin tasarımı bütün kataloğu değiştirmez.
 pub fn tezgah_teması(tercih: &crate::TezgahTeması) -> Arc<TemaAnlıkGörüntüsü> {
+    let taban = galeri_teması();
+    // Üretici saftır: tercih ve taban değişmedikçe aynı görüntü paylaşılır,
+    // tema-türetim yollarında yeniden tahsis yapılmaz.
+    if let Some((önceki_tercih, önceki_taban, tema)) =
+        TEZGAH_TEMASI_MEMOSU.with(|hücre| hücre.borrow().clone())
+        && önceki_tercih == *tercih
+        && Arc::ptr_eq(&önceki_taban, &taban)
+    {
+        return tema;
+    }
     let renk = |onaltılık: u32| -> Hsla { rgb(onaltılık).into() };
     let kutu = |arka: u32, ön: u32, kenar: u32| KutuRenkleri {
         arka_plan: renk(arka),
         ön_plan: renk(ön),
         kenarlık: renk(kenar),
     };
-    let taban = galeri_teması();
     // `ORT-004 §4` bileşen ham font ailesi okuyamaz; aileyi tema verir.
     // Tezgâhtaki yazı denetimleri bu yüzden alana değil temaya yazar.
     let gövde = TextStyle {
@@ -768,7 +816,7 @@ pub fn tezgah_teması(tercih: &crate::TezgahTeması) -> Arc<TemaAnlıkGörüntü
         ..taban.tipografi.gövde.clone()
     };
 
-    Arc::new(TemaAnlıkGörüntüsü {
+    let tema = Arc::new(TemaAnlıkGörüntüsü {
         // `ORT-004` iç boşluk farkı tercihe bağlı. `None` sıfır dolgu
         // demek değil: fark bildirilmez ve `ORT-017` kütüphane varsayılanı
         // (8/8/4/4) geçerli kalır.
@@ -816,9 +864,10 @@ pub fn tezgah_teması(tercih: &crate::TezgahTeması) -> Arc<TemaAnlıkGörüntü
             ..taban.tipografi.clone()
         },
         // Tasarımın önizleme kutusu 58 piksel yüksekliğindedir; `Hap`
-        // yarıçapı bu ölçünün yarısından türer.
+        // yarıçapı bu ölçünün yarısından türer. Tek kaynak:
+        // `tezgah_etkileşim_hedefi`.
         ölçüler: ÖlçüTokenları {
-            etkileşim_hedefi: px(58.),
+            etkileşim_hedefi: tezgah_etkileşim_hedefi(),
             ..taban.ölçüler
         },
         köşeler: KöşeTokenları {
@@ -852,7 +901,10 @@ pub fn tezgah_teması(tercih: &crate::TezgahTeması) -> Arc<TemaAnlıkGörüntü
             devre_dışı: kutu(tezgah_kağıt(), tezgah_soluk(), tezgah_ince()),
         }),
         ..(*taban).clone()
-    })
+    });
+    TEZGAH_TEMASI_MEMOSU
+        .with(|hücre| *hücre.borrow_mut() = Some((tercih.clone(), taban, tema.clone())));
+    tema
 }
 
 // Tezgâh anahtarlarının görünen karşılığı artık kodda bir sözlük değildir:

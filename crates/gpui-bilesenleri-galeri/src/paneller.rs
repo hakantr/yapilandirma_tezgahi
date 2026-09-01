@@ -225,8 +225,10 @@ impl Render for AlanDurumPaneli {
 
 impl AlanDurumPaneli {
     fn gövde(&mut self, bağlam: &mut Context<Self>) -> gpui::Div {
-        let Ok((tercih, çözücü)) = self.kök.read_with(bağlam, |kök, _| {
-            (kök.tezgah_tercihleri().clone(), kök.tezgah_çözücüsü())
+        // Panel her tuş vuruşunda çizilir; tercihten yalnız gereken dar
+        // değer çıkarılır, tam `TezgahTercihleri` klonlanmaz.
+        let Ok((önem_zemini, çözücü)) = self.kök.read_with(bağlam, |kök, _| {
+            (kök.tezgah_tercihleri().önem_zemini, kök.tezgah_çözücüsü())
         }) else {
             return div();
         };
@@ -251,7 +253,9 @@ impl AlanDurumPaneli {
                         &çözücü.çöz(&crate::anahtar("galeri.tezgah.bölüm.turetilmis_durum")),
                     ))
                     .child(crate::sergiler::turetilmis_durum_satırı(
-                        &tercih, &alan, bağlam,
+                        önem_zemini,
+                        &alan,
+                        bağlam,
                     )),
             )
             .child(crate::kart(&g, &t).child(crate::sergiler::değer_durumu(&alan, bağlam)))
@@ -394,16 +398,31 @@ impl YuvaNotuPaneli {
 impl Render for YuvaNotuPaneli {
     fn render(&mut self, _pencere: &mut Window, bağlam: &mut Context<Self>) -> impl IntoElement {
         render_ölç(|| {
-            let Ok(tercih) = self
-                .kök
-                .read_with(bağlam, |kök, _| kök.tezgah_tercihleri().clone())
+            // Panel her tuş vuruşunda çizilir; tercihten yalnız gereken üç
+            // dar değer çıkarılır, tam `TezgahTercihleri` klonlanmaz.
+            let Ok((yuva_görünürlüğü, açık_yuva_sayısı, parola_yuvası_var)) =
+                self.kök.read_with(bağlam, |kök, _| {
+                    let tercih = kök.tezgah_tercihleri();
+                    (
+                        tercih.yuva_görünürlüğü,
+                        tercih.açık_yuva_sayısı(),
+                        tercih.görünürlük.parola_yuvası_var(),
+                    )
+                })
             else {
                 return div();
             };
             let alan = self.alan.clone();
             // Not yokken boş `div` kalır: kart kendi aralarını kenar
             // boşluklarıyla kurduğu için boş çocuk görünür iz bırakmaz.
-            crate::sergiler::yuva_görünürlük_notu(&tercih, &alan, bağlam).unwrap_or_else(div)
+            crate::sergiler::yuva_görünürlük_notu(
+                yuva_görünürlüğü,
+                açık_yuva_sayısı,
+                parola_yuvası_var,
+                &alan,
+                bağlam,
+            )
+            .unwrap_or_else(div)
         })
     }
 }

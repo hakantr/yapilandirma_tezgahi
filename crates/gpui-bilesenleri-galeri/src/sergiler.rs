@@ -814,7 +814,7 @@ pub(crate) struct TezgahKabukDurumu {
 /// bileşen `BİL-010`. Seçici olarak durmasının nedeni, listenin
 /// büyüyeceği gün yerleşimin değişmemesi.
 pub(crate) fn tezgah_ekranı(
-    tercih: crate::TezgahTercihleri,
+    tercih: &crate::TezgahTercihleri,
     içerik: crate::Tezgahİçeriği,
     sistem_aileleri: std::rc::Rc<Vec<String>>,
     kabuk: TezgahKabukDurumu,
@@ -878,7 +878,7 @@ pub(crate) fn tezgah_ekranı(
                         .flex_col()
                         .min_h(px(0.))
                         .child(tezgah_üst_şeridi(
-                            &tercih,
+                            tercih,
                             kabuk,
                             &sistem_aileleri,
                             &g,
@@ -1780,25 +1780,26 @@ pub(crate) fn yardımcı_eylem_şeridi(
 /// hiçbir şey görmüyor ve düğmeyi bozuk sanıyordu. Kip ekranda yazılı ama
 /// iki bilgi arasındaki bağı kurmak okuyucuya kalıyordu.
 pub(crate) fn yuva_görünürlük_notu(
-    tercih: &crate::TezgahTercihleri,
+    // Panel her tuş vuruşunda çizilir; tercihten yalnız bu üç değer okunur
+    // ve tam `TezgahTercihleri` klonlanmadan dar değerler geçirilir.
+    yuva_görünürlüğü: gpui_bilesenleri::YardımcıEylemGörünürlüğü,
+    açık_yuva_sayısı: usize,
+    parola_yuvası_var: bool,
     alan: &Entity<GirişKutusu>,
     bağlam: &mut Context<crate::YuvaNotuPaneli>,
 ) -> Option<Div> {
     use gpui_bilesenleri::YardımcıEylemGörünürlüğü as G;
 
     let değer_var = !alan.read(bağlam).metin().is_empty();
-    let değere_bağlı = matches!(
-        tercih.yuva_görünürlüğü,
-        G::DeğerVarken | G::DeğerVarkenKademeli
-    );
+    let değere_bağlı = matches!(yuva_görünürlüğü, G::DeğerVarken | G::DeğerVarkenKademeli);
     let mut satırlar: Vec<&'static str> = Vec::new();
-    if !değer_var && değere_bağlı && tercih.açık_yuva_sayısı() > 0 {
+    if !değer_var && değere_bağlı && açık_yuva_sayısı > 0 {
         satırlar.push("Kutu boşken yuvalar gizli: seçili kip değere bağlı.");
     }
     // `§22` göz simgesi gizlenmiş içeriği açar; içerik zaten açıkken
     // açacağı bir şey yok ve yuva pasif durur. Gerekçe `aria_label`'da
     // vardı ama göz kararıyla okunmuyordu: düğme bozuk sanılıyordu.
-    if !tercih.görünürlük.parola_yuvası_var() {
+    if !parola_yuvası_var {
         satırlar.push(
             "Göz simgesi pasif: içerik zaten açık. Görünürlüğü Gizli ya da \
              Geçici göster yapın.",
@@ -3222,7 +3223,9 @@ pub(crate) fn dogrulama_satırı(rapor: &gpui_bilesenleri::GirişYapılandırmaR
 /// etkileşimden gelir ve `EtkileşimDurumu` alanı `GirişKutusu`'nda
 /// tutulmuyor. Pasif ve gerekçeli dururlar.
 pub(crate) fn turetilmis_durum_satırı(
-    tercih: &crate::TezgahTercihleri,
+    // Panel her tuş vuruşunda çizilir; tercihten yalnız bu alan okunur ve
+    // tam `TezgahTercihleri` klonlanmadan dar değer geçirilir.
+    önem_zemini: bool,
     alan: &Entity<GirişKutusu>,
     bağlam: &mut Context<crate::AlanDurumPaneli>,
 ) -> Div {
@@ -3352,7 +3355,7 @@ pub(crate) fn turetilmis_durum_satırı(
                         .child(ızgara_dörtlü().child(hücre(panel_tercih_düğmesi(
                             "önem-zemin",
                             "Zemine de uygula",
-                            tercih.önem_zemini,
+                            önem_zemini,
                             bağlam,
                             |t| t.önem_zemini = !t.önem_zemini,
                         )))),

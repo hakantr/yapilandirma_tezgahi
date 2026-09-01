@@ -1129,6 +1129,22 @@ Kanıt sınırı CPU `draw` ve üst-seviye kart kuruluşudur. Sayaç GPU maliyet
 layout/prepaint alt aşamalarını tek tek, sunum zamanını veya foton gecikmesini
 ölçmez.
 
+### 8.9 Tahsis temizliği atomunun A/B ölçümü (1 Eyl 2026)
+
+Tuş-vuruşu başına iki tam `TezgahTercihleri` klonunun, kök-kare yolundaki
+üç tercih klonunun, tek sabit için tam tema kurulumunun
+(`tezgah_etkileşim_hedefi`) kaldırılması ve tema üreticisi memoları; aynı
+makinede, aynı komutla, taze A/B koşumuyla ölçüldü (**eski milisaniye
+değerleri yeniden kullanılmadı**). Düzenek, ham çıktılar ve tablo:
+`olcumler/kare_olcumu_0006_ab/` (A = `bce72cc` worktree, B = bu atom;
+ABBA+BAAB, n=4/taraf, 1600×1000, TEKRAR=200, headless CPU).
+
+Sonuç: hedef senaryo **K · tuş vuruşu** ort medyanı −%4,3 / p50 −%3,0 ve
+tutarlı (14/16 ikili karşılaştırmada B önde); **D · temiz** −%1,2..1,7
+tutarlı; **S** ve **T** gürültü bandında (±%2–4) — bu ikisinde kazanç
+iddiası yok. Render gövdesi (CPU) sayısıdır; GPU/present ile eşitlenemez.
+Hedef senaryodaki gözlemlenebilir kazanım nedeniyle atom bütün korunur.
+
 ## 9. İnceleme düzeltmeleri (24 Ağu 2026, bağımsız salt-okunur inceleme)
 
 Üç turun ardından yapılan dış kaynak incelemesi dört noktayı düzeltti ya

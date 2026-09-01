@@ -350,11 +350,6 @@ pub struct GaleriUygulaması {
     /// Çözüm yalnız temaya (ve temayla birlikte sürümü artan palete) göre
     /// değişir; kare dikişi onu her karede yeniden çözmez.
     görünüm_önbelleği: Option<(u64, std::sync::Arc<ÇözülmüşTezgahGörünümü>)>,
-    /// `ORT-003 §2` yarıçap tavanı, tema sürümüne bağlı.
-    ///
-    /// Değer yalnız temadan türer; tek ölçü için her karede tam bir tema
-    /// anlık görüntüsü kurmak kare hızında israftı.
-    yarıçap_önbelleği: Option<(u64, f32)>,
     /// Bu kökün penceresi; hedefli geçersizleme için saklanır.
     ///
     /// `refresh_windows()` bütün pencereleri yeniler — tezgâhta tek pencere
@@ -453,7 +448,6 @@ impl GaleriUygulaması {
             kod_önbelleği: None,
             görünüm_önbelleği: None,
             pencere_tutamacı: None,
-            yarıçap_önbelleği: None,
             galeri_teması: match hedef {
                 GaleriHedefi::Masaüstü => GaleriTeması::Kağıt,
                 GaleriHedefi::Wasm => GaleriTeması::Mürekkep,
@@ -515,8 +509,9 @@ impl GaleriUygulaması {
         // `YÖN-006.ACC-008`: kabuk başlıkları ham dizeden değil, `ORT-021`
         // kök-kapsamlı hizmetinden çözülür.
         let çözücü = self.tezgah_çözücüsü();
+        // Tercih yalnız okunur: klonlanmaz, doğrudan ödünç verilir.
         gpui::div().size_full().child(sergiler::tezgah_ekranı(
-            self.tezgah.clone(),
+            &self.tezgah,
             içerik,
             sistem_aileleri,
             kabuk,
@@ -1425,15 +1420,11 @@ impl GaleriUygulaması {
     /// `ORT-003 §2` yarıçap tavanı: kısa kenarın yarısı; tema sürümüne bağlı.
     ///
     /// Tek satırlı alanda kısıtlayan kenar kutu yüksekliğidir.
-    fn en_fazla_yarıçap(&mut self) -> f32 {
-        if let Some((sürüm, değer)) = self.yarıçap_önbelleği
-            && sürüm == self.tezgah.tema.sürüm
-        {
-            return değer;
-        }
-        let değer = f32::from(tezgah_teması(&self.tezgah.tema).ölçüler.etkileşim_hedefi) / 2.;
-        self.yarıçap_önbelleği = Some((self.tezgah.tema.sürüm, değer));
-        değer
+    fn en_fazla_yarıçap(&self) -> f32 {
+        // Tezgâh temasının etkileşim hedefi sabittir ve tek kaynaktan
+        // okunur; sınır için tam tema anlık görüntüsü kurulmaz, önbelleğe
+        // de gerek kalmaz.
+        f32::from(crate::galeri::tezgah_etkileşim_hedefi()) / 2.
     }
 
     /// Kod paneli metni; tercih sürümüne bağlı.
@@ -1481,16 +1472,16 @@ impl GaleriUygulaması {
             .tezgah_panelleri
             .clone()
             .expect("paneller alanla birlikte kurulur");
-        let tercih = self.tezgah.clone();
         // Kod paneli metni tercih sürümüne bağlıdır: kart sonucu okur,
         // yeniden hesaplamaz. `§29` raporu da öyledir ama artık bu yolun
         // değil, bölüm panelinin girdisidir (`tezgah_bölümleri`).
         let kod = self.tezgah_kodu();
         let en_fazla_yarıçap = self.en_fazla_yarıçap();
 
+        // Tercih yalnız okunur: klonlanmaz, doğrudan ödünç verilir.
         metin_girisi_profili::tezgah_içeriği(
             metin_girisi_profili::MetinGirişiProfilGirdisi {
-                tercih: &tercih,
+                tercih: &self.tezgah,
                 alan,
                 paneller: &paneller,
                 kod,
@@ -1613,7 +1604,6 @@ impl GaleriUygulaması {
             // bölüm listesi boş döner — yarım alan kümesiyle çizim yapılmaz.
             return Vec::new();
         };
-        let tercih = self.tezgah.clone();
         // Kartın dilim okuması eşitlemeden geçer: masaüstü portu bildirimi
         // tazelik penceresi dolunca kendiliğinden yeniler; kök yalnız
         // tercih/port olaylarında eşitlenseydi kart yeni platform dilimini
@@ -1625,16 +1615,17 @@ impl GaleriUygulaması {
         let portlar = self.port_durumu(bağlam);
         // `§29` raporu tercih sürümüne bağlıdır: kart sonucu okur.
         let rapor = self.tezgah_raporu();
+        // Tercih yalnız okunur: klonlanmaz, doğrudan ödünç verilir.
         metin_girisi_profili::bölümler(
             metin_girisi_profili::BölümGirdisi {
-                tercih: &tercih,
+                tercih: &self.tezgah,
                 alanlar: &alanlar,
                 saat_dilimi: &saat_dilimi,
                 dilim_seçenekleri: &dilim_seçenekleri,
                 yerel_kök_hatası: self.yerel_kök_hatası(),
                 doldurma_var,
                 portlar,
-                sayısal: tercih.sayısal_mı(),
+                sayısal: self.tezgah.sayısal_mı(),
                 rapor: &rapor,
             },
             bağlam,

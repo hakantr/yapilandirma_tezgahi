@@ -1,0 +1,248 @@
+warning: fields `gösterim_revizyonu` and `mutlak_aralık` are never read
+   --> /Users/hakanbiris/github/gpui_bilesenleri/crates/gpui-bilesenleri-temel/src/gosterim_dilimi.rs:297:5
+    |
+296 | pub struct GösterimKonumEşlemesi {
+    |            --------------------- fields in this struct
+297 |     gösterim_revizyonu: GösterimRevizyonuDamgası,
+    |     ^^^^^^^^^^^^^^^^^^
+298 |     mutlak_aralık: MutlakGösterimAralığı,
+    |     ^^^^^^^^^^^^^
+    |
+    = note: `GösterimKonumEşlemesi` has a derived impl for the trait `Debug`, but this is intentionally ignored during dead code analysis
+    = note: `#[warn(dead_code)]` (part of `#[warn(unused)]`) on by default
+
+warning: fields `paragraf_metni` and `mutlak_utf8_başlangıcı` are never read
+   --> /Users/hakanbiris/github/gpui_bilesenleri/crates/gpui-bilesenleri-temel/src/gosterim_dilimi.rs:366:5
+    |
+365 | pub(crate) struct ParagrafBiDiKanıtYükü {
+    |                   --------------------- fields in this struct
+366 |     paragraf_metni: Arc<str>,
+    |     ^^^^^^^^^^^^^^
+367 |     mutlak_utf8_başlangıcı: u64,
+    |     ^^^^^^^^^^^^^^^^^^^^^^
+    |
+    = note: `ParagrafBiDiKanıtYükü` has a derived impl for the trait `Debug`, but this is intentionally ignored during dead code analysis
+
+warning: field `mühür` is never read
+   --> /Users/hakanbiris/github/gpui_bilesenleri/crates/gpui-bilesenleri-temel/src/gosterim_dilimi.rs:531:5
+    |
+522 | pub(crate) struct ParagrafBiDiDizinYazıcısıİçi {
+    |                   ---------------------------- field in this struct
+...
+531 |     mühür: Ort002YetkiMührü,
+    |     ^^^^^
+    |
+    = note: `ParagrafBiDiDizinYazıcısıİçi` has a derived impl for the trait `Debug`, but this is intentionally ignored during dead code analysis
+
+warning: associated function `muhurle` is never used
+   --> /Users/hakanbiris/github/gpui_bilesenleri/crates/gpui-bilesenleri-temel/src/gosterim_dilimi.rs:826:19
+    |
+825 | impl ŞekillendirmeYakınBağlamı {
+    | ------------------------------ associated function in this implementation
+826 |     pub(crate) fn muhurle(
+    |                   ^^^^^^^
+
+warning: associated function `muhurle` is never used
+   --> /Users/hakanbiris/github/gpui_bilesenleri/crates/gpui-bilesenleri-temel/src/gosterim_dilimi.rs:880:19
+    |
+879 | impl UnicodeBetikKimliği {
+    | ------------------------ associated function in this implementation
+880 |     pub(crate) fn muhurle(kimlik: TanımKimliği) -> Self {
+    |                   ^^^^^^^
+
+warning: associated function `muhurle` is never used
+   --> /Users/hakanbiris/github/gpui_bilesenleri/crates/gpui-bilesenleri-temel/src/gosterim_dilimi.rs:894:25
+    |
+893 | impl ŞekillendirmeKoşumuKimliği {
+    | ------------------------------- associated function in this implementation
+894 |     pub(crate) const fn muhurle(damga: CanlıBağlamDamgası) -> Self {
+    |                         ^^^^^^^
+
+warning: associated function `muhurle` is never used
+   --> /Users/hakanbiris/github/gpui_bilesenleri/crates/gpui-bilesenleri-temel/src/gosterim_dilimi.rs:908:19
+    |
+907 | impl ŞekillendirmeKapsamaÖzeti {
+    | ------------------------------ associated function in this implementation
+908 |     pub(crate) fn muhurle(indeksler: Arc<[u32]>) -> Self {
+    |                   ^^^^^^^
+
+warning: associated function `muhurle` is never used
+  --> /Users/hakanbiris/github/gpui_bilesenleri/crates/gpui-bilesenleri-temel/src/sekillendirme_politikasi.rs:22:19
+   |
+21 | impl OpenTypeÖzelliğiKimliği {
+   | ---------------------------- associated function in this implementation
+22 |     pub(crate) fn muhurle(kimlik: TanımKimliği) -> Self {
+   |                   ^^^^^^^
+
+warning: associated function `muhurle` is never used
+  --> /Users/hakanbiris/github/gpui_bilesenleri/crates/gpui-bilesenleri-temel/src/sekillendirme_politikasi.rs:72:19
+   |
+71 | impl OpenTypeÖzelliğiKaydı {
+   | -------------------------- associated function in this implementation
+72 |     pub(crate) fn muhurle(
+   |                   ^^^^^^^
+
+warning: associated function `muhurle` is never used
+   --> /Users/hakanbiris/github/gpui_bilesenleri/crates/gpui-bilesenleri-temel/src/sekillendirme_politikasi.rs:147:19
+    |
+146 | impl PolitikaYüzüKimliği {
+    | ------------------------ associated function in this implementation
+147 |     pub(crate) fn muhurle(kimlik: TanımKimliği) -> Self {
+    |                   ^^^^^^^
+
+warning: associated function `muhurle` is never used
+   --> /Users/hakanbiris/github/gpui_bilesenleri/crates/gpui-bilesenleri-temel/src/sekillendirme_politikasi.rs:168:25
+    |
+167 | impl ŞekillendirmePolitikasıDamgası {
+    | ----------------------------------- associated function in this implementation
+168 |     pub(crate) const fn muhurle(damga: CanlıBağlamDamgası) -> Self {
+    |                         ^^^^^^^
+
+warning: associated function `muhurle` is never used
+   --> /Users/hakanbiris/github/gpui_bilesenleri/crates/gpui-bilesenleri-temel/src/sekillendirme_politikasi.rs:182:25
+    |
+181 | impl ŞekillendirmeKısıtıDamgası {
+    | ------------------------------- associated function in this implementation
+182 |     pub(crate) const fn muhurle(damga: CanlıBağlamDamgası) -> Self {
+    |                         ^^^^^^^
+
+warning: associated function `muhurle` is never used
+   --> /Users/hakanbiris/github/gpui_bilesenleri/crates/gpui-bilesenleri-temel/src/sekillendirme_politikasi.rs:199:19
+    |
+198 | impl ŞekillendirmePolitikasıSnapshot {
+    | ------------------------------------ associated function in this implementation
+199 |     pub(crate) fn muhurle(
+    |                   ^^^^^^^
+
+warning: associated function `muhurle` is never used
+   --> /Users/hakanbiris/github/gpui_bilesenleri/crates/gpui-bilesenleri-temel/src/sekillendirme_politikasi.rs:404:19
+    |
+403 | impl TipografiŞekillendirmeKısıtı {
+    | --------------------------------- associated function in this implementation
+404 |     pub(crate) fn muhurle(
+    |                   ^^^^^^^
+
+warning: associated function `muhurle` is never used
+   --> /Users/hakanbiris/github/gpui_bilesenleri/crates/gpui-bilesenleri-temel/src/sekillendirme_politikasi.rs:457:19
+    |
+456 | impl TipografiŞekillendirmeKısıtları {
+    | ------------------------------------ associated function in this implementation
+457 |     pub(crate) fn muhurle(
+    |                   ^^^^^^^
+
+warning: associated function `muhurle` is never used
+   --> /Users/hakanbiris/github/gpui_bilesenleri/crates/gpui-bilesenleri-temel/src/sekillendirme_politikasi.rs:493:19
+    |
+492 | impl GüvenliTipografiSeçenekleri {
+    | -------------------------------- associated function in this implementation
+493 |     pub(crate) fn muhurle(kayıtlar: Arc<[TipografiŞekillendirmeKısıtı]>) -> Self {
+    |                   ^^^^^^^
+
+warning: `gpui-bilesenleri-temel` (lib) generated 16 warnings
+warning: this lint expectation is unfulfilled
+  --> /Users/hakanbiris/github/wgpu/wgpu-core/src/lock/ranked.rs:83:34
+   |
+83 |     #[cfg_attr(not(miri), expect(unused))] // but `Drop` has important side effects
+   |                                  ^^^^^^
+   |
+   = note: `#[warn(unfulfilled_lint_expectations)]` on by default
+
+warning: associated items `etkin_uc`, `bos_mu`, `bayt_araligi`, and `haritadan` are never used
+   --> /Users/hakanbiris/github/gpui_bilesenleri/crates/gpui-bilesenleri/src/metin_girisi/durum.rs:188:19
+    |
+177 | impl DogrulanmisMetinSecimi {
+    | --------------------------- associated items in this implementation
+...
+188 |     pub(crate) fn etkin_uc(&self) -> MetinKonumu {
+    |                   ^^^^^^^^
+...
+200 |     pub(crate) fn bos_mu(&self) -> bool {
+    |                   ^^^^^^
+...
+204 |     pub(crate) fn bayt_araligi(&self) -> Range<usize> {
+    |                   ^^^^^^^^^^^^
+...
+212 |     pub(crate) fn haritadan(
+    |                   ^^^^^^^^^
+    |
+    = note: `#[warn(dead_code)]` (part of `#[warn(unused)]`) on by default
+
+warning: variants `SilinenBaslangici`, `Basta`, and `Sonda` are never constructed
+   --> /Users/hakanbiris/github/gpui_bilesenleri/crates/gpui-bilesenleri/src/metin_girisi/durum.rs:377:5
+    |
+373 | pub(crate) enum SecimPlani {
+    |                 ---------- variants in this enum
+...
+377 |     SilinenBaslangici(usize),
+    |     ^^^^^^^^^^^^^^^^^
+...
+393 |     Basta,
+    |     ^^^^^
+394 |     /// Metnin terminal sınırı.
+395 |     Sonda,
+    |     ^^^^^
+    |
+    = note: `SecimPlani` has derived impls for the traits `Debug` and `Clone`, but these are intentionally ignored during dead code analysis
+
+warning: methods `eslik_gecerli`, `composition_başlat`, `composition_güncelle`, `kompozisyon_etkin_mi`, `metni_aralıkta_değiştir`, and `metni_ekle` are never used
+    --> /Users/hakanbiris/github/gpui_bilesenleri/crates/gpui-bilesenleri/src/metin_girisi/durum.rs:684:19
+     |
+ 475 | impl GirişDurumu {
+     | ---------------- methods in this implementation
+...
+ 684 |     pub(crate) fn eslik_gecerli(&self) -> bool {
+     |                   ^^^^^^^^^^^^^
+...
+ 741 |     pub(crate) fn composition_başlat(
+     |                   ^^^^^^^^^^^^^^^^^^
+...
+ 751 |     pub(crate) fn composition_güncelle(
+     |                   ^^^^^^^^^^^^^^^^^^^^
+...
+ 769 |     pub(crate) fn kompozisyon_etkin_mi(&self) -> bool {
+     |                   ^^^^^^^^^^^^^^^^^^^^
+...
+1055 |     pub(crate) fn metni_aralıkta_değiştir(
+     |                   ^^^^^^^^^^^^^^^^^^^^^^^
+...
+1069 |     pub(crate) fn metni_ekle(
+     |                   ^^^^^^^^^^
+
+warning: variant `Provisional` is never constructed
+    --> /Users/hakanbiris/github/gpui_bilesenleri/crates/gpui-bilesenleri/src/metin_girisi/durum.rs:2090:5
+     |
+2088 | pub(crate) enum UzunlukEvresi {
+     |                 ------------- variant in this enum
+2089 |     /// Yarım kalmış birleşim: bariyer ertelenir, hece süzülmez.
+2090 |     Provisional,
+     |     ^^^^^^^^^^^
+     |
+     = note: `UzunlukEvresi` has derived impls for the traits `Debug` and `Clone`, but these are intentionally ignored during dead code analysis
+
+warning: variant `Onceki` is never constructed
+   --> /Users/hakanbiris/github/gpui_bilesenleri/crates/gpui-bilesenleri/src/metin_girisi/çekirdek.rs:103:5
+    |
+101 | pub(crate) enum GosterimYakinlik {
+    |                 ---------------- variant in this enum
+102 |     /// Gösterim konumunun solundaki/önceki düzenleme sınırı.
+103 |     Onceki,
+    |     ^^^^^^
+    |
+    = note: `GosterimYakinlik` has derived impls for the traits `Debug` and `Clone`, but these are intentionally ignored during dead code analysis
+
+warning: `wgpu-core` (lib) generated 1 warning
+warning: `gpui-bilesenleri` (lib) generated 5 warnings
+    Finished `akici-dev` profile [optimized + debuginfo] target(s) in 0.29s
+warning: the following packages contain code that will be rejected by a future version of Rust: block v0.1.6
+note: to see what the problems were, use the option `--future-incompat-report`, or run `cargo report future-incompatibilities --id 1`
+     Running tests/kare_olcumu.rs (target/akici-dev/deps/kare_olcumu-c0966dab6faa93b9)
+
+running 1 test
+kare maliyeti · 200 tekrar · 1600×1000 · CPU (headless)
+D · temiz      ort   1.135 ms · p50   1.103 ms · p95   1.341 ms · en az   1.038 ms · kolon   0/200
+K · tuş vuruşu ort   1.315 ms · p50   1.249 ms · p95   1.646 ms · en az   1.145 ms · kolon   0/200
+S · seçici     ort   2.982 ms · p50   2.907 ms · p95   3.624 ms · en az   2.537 ms · kolon 200/200
+T · tercih     ort   2.831 ms · p50   2.789 ms · p95   3.288 ms · en az   2.561 ms · kolon 200/200
+test kare_maliyeti ... ok
+
+test result: ok. 1 passed; 0 failed; 0 ignored; 0 measured; 0 filtered out; finished in 2.04s
