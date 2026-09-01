@@ -48,11 +48,13 @@ pub struct MetinGirişiProfilGirdisi<'a> {
     pub(crate) son_çözüm_hatası: Option<crate::TezgahÇözümKaydı>,
     /// `§30` tercih→kutu eşitlemesinin son **kalıcı** reddi (varsa);
     /// önizleme tanı satırı exact varyantı çizer. Buraya düşmeyen tek ret
-    /// **canlı işaretli** (`birleşim_utf8.is_some()`) `CompositionEtkin`dir
-    /// — o geçici ertelemedir ve bekleyen kümeyle taşınır; asılı
-    /// kompozisyon-ekseninin işaretsiz `CompositionEtkin`i kalıcıdır ve
-    /// burada görünür.
+    /// `CompositionEtkin`dir — o geçici ertelemedir ve bekleyen kümeyle
+    /// taşınır (`BİL-010 ≥23.0` ile birleşimin her bitiş yolu kompozisyon
+    /// eksenini kapattığı için asılı bir `CompositionEtkin` kalmaz).
     pub(crate) tercih_eşitleme_hatası: Option<crate::TercihEşitlemeKaydı>,
+    /// Atomik yerel-bağlam inişinin son typed reddi (varsa); alan eski
+    /// (tutarlı) bağlamda kalmıştır ve tanı satırı exact varyantı çizer.
+    pub(crate) yerel_uygulama_hatası: Option<gpui_bilesenleri::GirişHatası>,
 }
 
 /// Solda ana eksen, sağda onu tamamlayan grup.
@@ -235,6 +237,7 @@ pub fn tezgah_içeriği(
         köşe_izi,
         son_çözüm_hatası,
         tercih_eşitleme_hatası,
+        yerel_uygulama_hatası,
     } = girdi;
     let sayısal = tercih.sayısal_mı();
 
@@ -265,6 +268,7 @@ pub fn tezgah_içeriği(
             sayısal,
             son_çözüm_hatası,
             tercih_eşitleme_hatası,
+            yerel_uygulama_hatası,
             bağlam,
         ),
         // Tasarımın `§5` şeması sol kolona `önizleme → C türetilmiş
@@ -289,6 +293,7 @@ pub(crate) fn kuruluş_hatası_içeriği(
     hata: Option<&gpui_bilesenleri::GirişKuruluşHatası>,
     son_çözüm_hatası: Option<crate::TezgahÇözümKaydı>,
     tercih_eşitleme_hatası: Option<crate::TercihEşitlemeKaydı>,
+    yerel_uygulama_hatası: Option<gpui_bilesenleri::GirişHatası>,
     sol_kaydırma: ScrollHandle,
 ) -> Tezgahİçeriği {
     let g = crate::görünüm();
@@ -333,6 +338,17 @@ pub(crate) fn kuruluş_hatası_içeriği(
                 .into_any_element(),
         );
     }
+    // Sergi kutuları kuruluş hatasından bağımsız yaşar; atomik yerel iniş
+    // reddi bu yolda da kendi typed satırıyla görünür.
+    if let Some(hata) = yerel_uygulama_hatası {
+        önizleme.push(
+            crate::stili_uygula(gpui::div(), &g.eksen_etiketi)
+                .debug_selector(|| "tanı-yerel-uygulama-hatası".into())
+                .text_color(t.vurgu)
+                .child(crate::yerel_uygulama_hatası_metni(&hata))
+                .into_any_element(),
+        );
+    }
     Tezgahİçeriği {
         başlık: anahtar("galeri.tezgah.başlık"),
         önizleme_başlığı: anahtar("galeri.tezgah.önizleme"),
@@ -357,6 +373,7 @@ fn önizleme_blokları(
     sayısal: bool,
     son_çözüm_hatası: Option<crate::TezgahÇözümKaydı>,
     tercih_eşitleme_hatası: Option<crate::TercihEşitlemeKaydı>,
+    yerel_uygulama_hatası: Option<gpui_bilesenleri::GirişHatası>,
     bağlam: &mut Context<GaleriUygulaması>,
 ) -> Vec<gpui::AnyElement> {
     use crate::sergiler::{
@@ -404,9 +421,8 @@ fn önizleme_blokları(
         );
     }
     // `§30` tercih→kutu eşitlemesinin kalıcı reddi (varsa) exact typed
-    // satırıyla görünür; yalnız canlı işaretli (`birleşim_utf8.is_some()`)
-    // `CompositionEtkin` geçici ertelemedir ve buraya düşmez — işaretsiz
-    // (asılı eksen) `CompositionEtkin` dâhil diğer her ret burada çizilir.
+    // satırıyla görünür; yalnız `CompositionEtkin` geçici ertelemedir ve
+    // buraya düşmez — diğer her ret burada çizilir.
     if let Some(kayıt) = tercih_eşitleme_hatası {
         let g = crate::görünüm();
         let t = crate::TezgahTokenları::paletten(crate::palet());
@@ -415,6 +431,20 @@ fn önizleme_blokları(
                 .debug_selector(|| "tanı-tercih-eşitleme-hatası".into())
                 .text_color(t.vurgu)
                 .child(crate::tercih_eşitleme_hatası_metni(&kayıt))
+                .into_any_element(),
+        );
+    }
+    // Atomik yerel-bağlam inişinin typed reddi (varsa): alan eski (tutarlı)
+    // bağlamda; akıbet exact varyantla görünür, iniş sonraki eşitleme
+    // turlarında yeniden denenir.
+    if let Some(hata) = yerel_uygulama_hatası {
+        let g = crate::görünüm();
+        let t = crate::TezgahTokenları::paletten(crate::palet());
+        bloklar.push(
+            crate::stili_uygula(gpui::div(), &g.eksen_etiketi)
+                .debug_selector(|| "tanı-yerel-uygulama-hatası".into())
+                .text_color(t.vurgu)
+                .child(crate::yerel_uygulama_hatası_metni(&hata))
                 .into_any_element(),
         );
     }

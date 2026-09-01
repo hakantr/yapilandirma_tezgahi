@@ -45,6 +45,7 @@ impl MinimalGirişÖlçümü {
             bileşen,
             hizmetler.unicode(),
             hizmetler.alan_damgası(&kimlik_fabrikası),
+            (*hizmetler.yerel_kök()).clone(),
             yapılandırma,
             örnek,
             tema,
@@ -53,10 +54,8 @@ impl MinimalGirişÖlçümü {
         )
         .unwrap_or_else(|hata| panic!("minimal ölçüm alanı kurulamadı: {hata:?}"));
         let alan = sonuç.bileşen;
-        let yerel_kök = hizmetler.yerel_kök();
         alan.update(bağlam, |alan, _| {
             alan.simge_kataloğu = Some(katalog);
-            alan.yerel = (*yerel_kök).clone();
         });
         Self {
             alan,

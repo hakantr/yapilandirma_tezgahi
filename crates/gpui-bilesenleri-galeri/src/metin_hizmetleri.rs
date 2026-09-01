@@ -679,11 +679,10 @@ mod testler {
     /// RTL yerel gerçek fabrika yolundan `SağdanSola` çözülür.
     ///
     /// Kanıt seviyesi **hizmet düzeyidir**: yaşayan `GaleriUygulaması` kökü
-    /// sunum dilini `tr` sabitler ve canlı bir RTL geçişi, yerel bağlamın
-    /// kuruluş/çalışma-anında bileşene atomik enjekte edilebilmesini bekler
-    /// (`blocked_by_missing_public_product_seam`, bkz.
-    /// `GaleriUygulaması::yerel_kökü_eşitle`). Bu test canlı-host RTL
-    /// kanıtı olarak sunulmaz.
+    /// sunum dilini `tr` sabitler. Enjekte kuruluş bağlamı ve atomik
+    /// çalışma-anı değişimi artık bileşen yüzeyinden tüketiliyor; canlı bir
+    /// RTL geçişi yalnız kökün sunum-dili politikasının (bugün sabit `tr`)
+    /// açılmasını bekliyor. Bu test canlı-host RTL kanıtı olarak sunulmaz.
     #[test]
     fn rtl_yerel_sagdan_sola_cozulur() {
         let unicode = UnicodeVeYerelMetinHizmetleri::yerlesik(fabrika());
@@ -1025,9 +1024,9 @@ mod testler {
                     .sergi_girişlerini_al(pencere, bağlam)
                     .expect("sergi alanları kurulur");
                 let kök = uygulama.metin_hizmetleri.yerel_kök();
-                assert_eq!(&tezgah_alanı.read(bağlam).yerel, kök.as_ref());
-                assert_eq!(&alanlar.yalın.read(bağlam).yerel, kök.as_ref());
-                assert_eq!(&alanlar.tutar.read(bağlam).yerel, kök.as_ref());
+                assert_eq!(tezgah_alanı.read(bağlam).yerel_bağlam(), kök.as_ref());
+                assert_eq!(alanlar.yalın.read(bağlam).yerel_bağlam(), kök.as_ref());
+                assert_eq!(alanlar.tutar.read(bağlam).yerel_bağlam(), kök.as_ref());
                 // `GirişKuruluşSonucu` eksenleri kayıpsız: uyarı raporu ve
                 // sağlayıcı akıbeti galeri durumunda durur.
                 assert!(uygulama.tezgah_kuruluş_raporu.is_some());
@@ -1068,8 +1067,8 @@ mod testler {
                 assert_eq!(yeni_kök.sunum_saat_dilimi(), &istanbul);
                 assert!(yeni_kök.damga().sürüm().0 > eski_kök.damga().sürüm().0);
                 // Yaşayan alanlar yeni kökü tüketir; eski bağlam bırakıldı.
-                assert_eq!(&alan.read(bağlam).yerel, yeni_kök.as_ref());
-                assert_eq!(&alanlar.yalın.read(bağlam).yerel, yeni_kök.as_ref());
+                assert_eq!(alan.read(bağlam).yerel_bağlam(), yeni_kök.as_ref());
+                assert_eq!(alanlar.yalın.read(bağlam).yerel_bağlam(), yeni_kök.as_ref());
                 // Hizmet yeniden mühürlendi; eski bağlam exact bayat.
                 let yeni_hizmet = uygulama.metin_hizmetleri.ileti_hizmeti();
                 assert!(!Arc::ptr_eq(&eski_hizmet, &yeni_hizmet));
@@ -1151,8 +1150,9 @@ mod testler {
                 );
             });
         });
-        // Birleşim kanonik `unmark_text` atomuyla biter (kompozisyon değeri
-        // yalnız orada düşer); ileri eşitleme şimdi uygulanır.
+        // Birleşim `unmark_text` atomuyla biter (kompozisyon değeri
+        // `insertText`-commit yolunda da düşer; bu test unmark kolunu
+        // sürer); ileri eşitleme şimdi uygulanır.
         görsel.update(|pencere, bağlam| {
             desen_kutusu.update(bağlam, |kutu, bağlam| {
                 gpui::EntityInputHandler::unmark_text(kutu, pencere, bağlam);
@@ -1178,22 +1178,23 @@ mod testler {
         });
     }
 
-    /// Asılı kompozisyon ekseni bekleyen kaydı **kalıcılaştıramaz**:
-    /// birleşim, işaret kaldırılmadan `replace_text_in_range` ile
-    /// kesinleşirse bileşenin kompozisyon-değeri ekseni asılı kalır
-    /// (`composition_iptal` yalnız `unmark_text`/iptal yollarında koşar) ve
-    /// `CompositionEtkin` artık geçici değildir. Bekleyen kayıt bu retle
-    /// **silinir** (dolu kümeden kalıcı rete gerçek geçiş), akıbet exact
-    /// typed görünür, kutunun metin olayları bastırılmadan akmaya devam
-    /// eder ve eksen gerçek `unmark_text` yoluyla iyileşir.
+    /// `insertText`-commit kompozisyon değerini düşürür: **asılı eksen
+    /// oluşmaz** (`BİL-010 ≥23.0` commit kolu `composition_iptal()`
+    /// çağırır). Birleşim işaret kaldırılmadan `replace_text_in_range` ile
+    /// kesinleşse bile kompozisyon ekseni kapanır; bekleyen hedef kutunun
+    /// metin olayında yeniden denenir ve **uygulanır** — kalıcı
+    /// `CompositionEtkin` kaydı üretilmez, tanı satırı boyanmaz.
     ///
     /// Senaryo baştan sona gerçek platform giriş noktalarıyla kurulur
-    /// (`replace_and_mark_text_in_range` + `replace_text_in_range` +
-    /// `unmark_text`); private durum kurcalanmaz. Kök neden kardeştedir ve
-    /// yalnız raporlanır: `replace_text` commit kolu `ime_aralığı`nı
-    /// düşürürken kompozisyon-değeri eksenini düşürmez.
+    /// (`replace_and_mark_text_in_range` + `replace_text_in_range`);
+    /// private durum kurcalanmaz. Bu test, eskiden burada duran
+    /// `asili_kompozisyon_ekseni_bekleyeni_kalicilastiramaz` nöbetinin
+    /// yerine geçer: o nöbetin sınadığı asılı duruma ürün düzeltmesinden
+    /// sonra platform giriş noktalarından erişilemiyor.
     #[gpui::test]
-    fn asili_kompozisyon_ekseni_bekleyeni_kalicilastiramaz(bağlam: &mut gpui::TestAppContext) {
+    fn inserttext_commiti_kompozisyonu_dusurur_asili_eksen_olusmaz(
+        bağlam: &mut gpui::TestAppContext,
+    ) {
         bağlam.update(crate::bileşen_tuş_bağlarını_kur);
         let (uygulama, görsel) = bağlam.add_window_view(|_, _| crate::GaleriUygulaması::yeni());
         görsel.run_until_parked();
@@ -1229,8 +1230,8 @@ mod testler {
                 );
             });
         });
-        // Birleşim işaret kaldırılmadan kesinleşir: işaret aralığı düşer,
-        // kompozisyon-değeri ekseni asılı kalır.
+        // Birleşim işaret kaldırılmadan `insertText` ile kesinleşir: işaret
+        // aralığı da kompozisyon değeri de aynı commit'te düşer.
         görsel.update(|pencere, bağlam| {
             desen_kutusu.update(bağlam, |kutu, bağlam| {
                 gpui::EntityInputHandler::replace_text_in_range(
@@ -1243,60 +1244,35 @@ mod testler {
             });
         });
         görsel.run_until_parked();
-        // Olayın yeniden denemesi asılı ekseni **kalıcı** sınıflar: dolu
-        // bekleyen kayıt silinir, akıbet exact typed gözlenir ve boyanır.
         görsel.update(|_, bağlam| {
-            uygulama.update(bağlam, |uygulama, _| {
+            uygulama.update(bağlam, |uygulama, bağlam| {
+                assert!(
+                    desen_kutusu.read(bağlam).durum.composition.is_none(),
+                    "`insertText`-commit kompozisyon değerini düşürmeli; asılı eksen kalmamalı"
+                );
+                // Commit'in metin olayı bekleyen ileri eşitlemeyi yeniden
+                // denedi ve eksen kapandığı için hedef **uygulandı**.
+                assert_eq!(
+                    desen_kutusu.read(bağlam).metin(),
+                    hedef.as_str(),
+                    "bekleyen hedef commit sonrasında uygulanmalı; seçilen tercih kazanır"
+                );
                 assert!(
                     uygulama.bekleyen_tercih_eşitlemeleri.is_empty(),
-                    "asılı eksen bekleyen kaydı kalıcılaştıramaz; kalıcı ret kaydı siler"
-                );
-                let kayıt = uygulama
-                    .tercih_eşitleme_hatası()
-                    .expect("asılı eksenin akıbeti exact typed gözlenmeli");
-                assert_eq!(kayıt.kutu, desen_kutusu.entity_id());
-                assert_eq!(kayıt.hata, gpui_bilesenleri::GirişHatası::CompositionEtkin);
-            });
-        });
-        görsel.run_until_parked();
-        assert!(
-            görsel.debug_bounds("tanı-tercih-eşitleme-hatası").is_some(),
-            "asılı eksenin tanı satırı gerçekten boyanmalı"
-        );
-        // Kutunun metin olayları bastırılmaz: sıradan bir düzenleme ters
-        // yönden tercihe akar ve uyum kurulunca kalıcı ret kaydı düşer.
-        görsel.update(|pencere, bağlam| {
-            desen_kutusu.update(bağlam, |kutu, bağlam| {
-                gpui::EntityInputHandler::replace_text_in_range(kutu, None, "5", pencere, bağlam);
-            });
-        });
-        görsel.run_until_parked();
-        let kutu_metni = görsel.update(|_, bağlam| desen_kutusu.read(bağlam).metin().to_owned());
-        görsel.update(|_, bağlam| {
-            uygulama.update(bağlam, |uygulama, _| {
-                assert_eq!(
-                    uygulama.tezgah.desen, kutu_metni,
-                    "asılı eksende metin olayları bastırılmadan tercihe akmalı"
+                    "uygulanan hedefin bekleyen kaydı düşmeli"
                 );
                 assert!(
                     uygulama.tercih_eşitleme_hatası().is_none(),
-                    "uyum kurulunca kalıcı ret kaydı düşmeli"
+                    "asılı eksen kalmadığı için kalıcı `CompositionEtkin` kaydı üretilmemeli"
                 );
             });
         });
         görsel.run_until_parked();
         assert!(
             görsel.debug_bounds("tanı-tercih-eşitleme-hatası").is_none(),
-            "iyileşen karede tanı satırı sönmeli"
+            "asılı eksen kalmadığı için tanı satırı boyanmamalı"
         );
-        // Eksen gerçek yoldan iyileşir: `unmark_text` kompozisyon değerini
-        // düşürür ve ileri eşitleme yeniden uygulanabilir olur.
-        görsel.update(|pencere, bağlam| {
-            desen_kutusu.update(bağlam, |kutu, bağlam| {
-                gpui::EntityInputHandler::unmark_text(kutu, pencere, bağlam);
-            });
-        });
-        görsel.run_until_parked();
+        // Eksen kapalı: sonraki ileri eşitleme doğrudan uygulanır.
         let hedef2 = crate::HAZIR_DESENLER[2].1.to_owned();
         görsel.update(|_, bağlam| {
             uygulama.update(bağlam, |uygulama, bağlam| {
@@ -1305,12 +1281,41 @@ mod testler {
                 assert_eq!(
                     desen_kutusu.read(bağlam).metin(),
                     hedef2.as_str(),
-                    "iyileşen eksende ileri eşitleme yeniden uygulanır"
+                    "kapalı eksende ileri eşitleme doğrudan uygulanır"
                 );
                 assert!(uygulama.bekleyen_tercih_eşitlemeleri.is_empty());
                 assert!(uygulama.tercih_eşitleme_hatası().is_none());
             });
         });
+    }
+
+    /// Tanı satırları typed hatayı **string sezgisine çevirmez**: sunum
+    /// metni exact varyant adını taşır; kayıt yuvaları zaten
+    /// `Option<GirişHatası>`/`TercihEşitlemeKaydı` tipindedir ve dizeye
+    /// indirgenmeden taşınır.
+    #[test]
+    fn tani_satirlari_exact_varyant_adini_tasir() {
+        // `tercih_eşitleme_hatası_metni` de aynı `{hata:?}` mekanizmasıyla
+        // yazar; kayıt tipi `EntityId` istediği için burada eş mekanizma
+        // iki varyant üzerinden doğrulanır.
+        for (hata, varyant) in [
+            (
+                gpui_bilesenleri::GirişHatası::CompositionEtkin,
+                "CompositionEtkin",
+            ),
+            (
+                gpui_bilesenleri::GirişHatası::SürümTükendi(
+                    gpui_bilesenleri::GirişSürümEkseni::MetinVeIme,
+                ),
+                "SürümTükendi",
+            ),
+        ] {
+            let metin = crate::yerel_uygulama_hatası_metni(&hata);
+            assert!(
+                metin.contains(varyant),
+                "tanı satırı exact varyantı taşımalı: {metin:?}"
+            );
+        }
     }
 
     /// `CompositionEtkin` dışındaki eşitleme retleri **bekleyen kayda
@@ -1479,7 +1484,7 @@ mod testler {
                     .sergi_girişleri
                     .clone()
                     .expect("bölüm okuması alanları kurdu");
-                assert_eq!(&alanlar.yalın.read(bağlam).yerel, yeni_kök.as_ref());
+                assert_eq!(alanlar.yalın.read(bağlam).yerel_bağlam(), yeni_kök.as_ref());
             });
         });
     }
@@ -1724,7 +1729,7 @@ mod testler {
                     &eski_kök,
                     &uygulama.metin_hizmetleri.yerel_kök()
                 ));
-                assert_eq!(&alanlar.yalın.read(bağlam).yerel, eski_kök.as_ref());
+                assert_eq!(alanlar.yalın.read(bağlam).yerel_bağlam(), eski_kök.as_ref());
                 // Tarih türünde saat dilimi kartı kurulur; akıbet değeri
                 // bölüm kurulumuna (çizim yoluna) inilir.
                 uygulama

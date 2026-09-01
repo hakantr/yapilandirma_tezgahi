@@ -188,12 +188,14 @@ impl gpui_bilesenleri::EşzamansızDoğrulamaPortu for GösterimDoğrulamaPortu 
 /// Masaüstü ve WASM'in aynı katalog ve bilgi mimarisiyle açtığı galeri.
 /// `§30` tercih→kutu eşitlemesinin **kalıcı** ret kaydı.
 ///
-/// Geçici olan yalnız **canlı işaretli** (`birleşim_utf8.is_some()`)
-/// `CompositionEtkin`dir; o buraya girmez, bekleyen kümeyle taşınır. Canlı
-/// işareti olmayan (asılı kompozisyon-ekseni) `CompositionEtkin` dâhil
-/// diğer her ret bu kalıcı typed kanala düşer. Buradaki kayıt exact typed
-/// hatayı ve hangi tercih kutusunda üretildiğini taşır; önizleme tanı
-/// satırı çizer, aynı kutunun sonraki başarılı eşitlemesi kaydı düşürür.
+/// Geçici olan yalnız `CompositionEtkin`dir; o buraya girmez, bekleyen
+/// kümeyle taşınır (`BİL-010 ≥23.0` ile bu ret her zaman **yaşayan** bir
+/// kompozisyonu anlatır: birleşimin her bitiş yolu — `unmark_text` de,
+/// `insertText`-commit de — kompozisyon değerini düşürür, asılı eksen
+/// kalmaz). Diğer her ret bu kalıcı typed kanala düşer. Buradaki kayıt
+/// exact typed hatayı ve hangi tercih kutusunda üretildiğini taşır;
+/// önizleme tanı satırı çizer, aynı kutunun sonraki başarılı eşitlemesi
+/// kaydı düşürür.
 #[derive(Clone, Debug, Eq, PartialEq)]
 pub(crate) struct TercihEşitlemeKaydı {
     pub(crate) kutu: gpui::EntityId,
@@ -206,6 +208,12 @@ pub(crate) fn tercih_eşitleme_hatası_metni(kayıt: &TercihEşitlemeKaydı) -> 
         "Tercih kutusu eşitlemesi kalıcı retle düştü: ‹{:?}›",
         kayıt.hata
     )
+}
+
+/// Atomik yerel-bağlam inişi retinin exact sunum satırı; varyant adı
+/// korunur. Alan eski (tutarlı) bağlamda kalmıştır.
+pub(crate) fn yerel_uygulama_hatası_metni(hata: &gpui_bilesenleri::GirişHatası) -> String {
+    format!("Yerel bağlam alana uygulanamadı, alan eski bağlamda: ‹{hata:?}›")
 }
 
 pub struct GaleriUygulaması {
@@ -244,11 +252,11 @@ pub struct GaleriUygulaması {
     /// `§30` dış-yazım reddiyle ertelenen tercih→kutu eşitlemeleri.
     ///
     /// Kümedeki kimlik, tercihin hedef metnini o kutuya henüz yazamadığı
-    /// bir tercih kutusudur; buraya giren tek akıbet **canlı işaretli**
-    /// (`birleşim_utf8.is_some()`) `CompositionEtkin`dir — yaşayan IME
-    /// birleşimi dış yazımla bozulamaz ve birleşimin her bitiş yolu işareti
-    /// düşürdüğü için erteleme sınırlıdır (diğer her ret kalıcı typed
-    /// kanala gider). Bekleyen kutunun metin olayı tercihe **geri
+    /// bir tercih kutusudur; buraya giren tek akıbet `CompositionEtkin`dir
+    /// — yaşayan IME birleşimi dış yazımla bozulamaz ve birleşimin her
+    /// bitiş yolu (`unmark_text` de, `insertText`-commit de) kompozisyon
+    /// eksenini kapattığı için erteleme sınırlıdır (diğer her ret kalıcı
+    /// typed kanala gider). Bekleyen kutunun metin olayı tercihe **geri
     /// yazılmaz** — kullanıcının seçtiği hedefi birleşim metni ezemez;
     /// olay önce ileri eşitlemeyi yeniden dener, hedef uygulanınca kayıt
     /// düşer. Hedefin kendisi saklanmaz: ileri eşitleme hedefi her
@@ -256,13 +264,18 @@ pub struct GaleriUygulaması {
     bekleyen_tercih_eşitlemeleri: std::collections::HashSet<gpui::EntityId>,
     /// `§30` tercih eşitlemesinin son **kalıcı** reddi (varsa), exact typed.
     ///
-    /// Canlı işaretli (`birleşim_utf8.is_some()`) `CompositionEtkin`
-    /// dışındaki retler — terminal `SürümTükendi` de, asılı kompozisyon
-    /// ekseninin işaretsiz `CompositionEtkin`i de — bekleyen kayda dönüşmez
-    /// ve metin olaylarını bastırmaz; akıbetleri burada durur,
-    /// [`Self::tercih_eşitleme_hatası`] ile okunur ve önizleme tanı
-    /// satırında çizilir.
+    /// `CompositionEtkin` dışındaki retler — örn. terminal `SürümTükendi` —
+    /// bekleyen kayda dönüşmez ve metin olaylarını bastırmaz; akıbetleri
+    /// burada durur, [`Self::tercih_eşitleme_hatası`] ile okunur ve
+    /// önizleme tanı satırında çizilir.
     tercih_eşitleme_hatası: Option<TercihEşitlemeKaydı>,
+    /// Atomik yerel-bağlam inişinin (`yerel_bağlamı_değiştir`) son typed
+    /// reddi (varsa) — ör. yeni yerelde maskenin yeniden uygulanamaması.
+    ///
+    /// Ret alanı **eski (tutarlı)** bağlamda bırakır; akıbet burada durur,
+    /// önizleme tanı satırında çizilir ve uygulama hatası yaşarken her
+    /// eşitleme turu inişi yeniden dener — başarıda kayıt düşer.
+    yerel_uygulama_hatası: Option<gpui_bilesenleri::GirişHatası>,
     orta_kaydırma: ScrollHandle,
     /// Tezgâh sol alt bloğunun sıradan flex-scroll tutamacı.
     tezgah_sol_kaydırma: ScrollHandle,
@@ -417,6 +430,7 @@ impl GaleriUygulaması {
             ileti_çözüm_hata_kaydı: Rc::new(std::cell::RefCell::new(None)),
             bekleyen_tercih_eşitlemeleri: std::collections::HashSet::new(),
             tercih_eşitleme_hatası: None,
+            yerel_uygulama_hatası: None,
             orta_kaydırma: ScrollHandle::new(),
             tezgah_sol_kaydırma: ScrollHandle::new(),
             sergi_girişleri: None,
@@ -733,23 +747,16 @@ impl GaleriUygulaması {
     /// Yaşayan yerel kökü çözülmüş dilimle eşitler.
     ///
     /// Kök değiştiyse `ORT-021` hizmeti tek atomda yeniden mühürlenmiştir;
-    /// yeni bağlam bütün yaşayan alanlara inilir ki hiçbir alan eski kökü
-    /// sessizce kullanmasın. Bağlamlar fabrika üretimidir, elle kurulmaz.
-    ///
-    /// **Bilinen sınır (`blocked_by_missing_public_product_seam`):** yeni
-    /// bağlamın alana inişi bugün `pub yerel` alan yazımıdır ve maske/
-    /// varsayılan/gösterim planlarını **birlikte** güncellemez; `kur`
-    /// hazırlığı da kendi iç `tr/latn/gregory/UTC` bağlamıyla koşar. Atomik
-    /// güncelleme, BİL-010'un kuruluşta enjekte yerel bağlam + typed
-    /// çalışma-anı değişim yüzeyini açmasını bekler
-    /// (`authorize_bil010_injected_locale_context_and_atomic_runtime_locale_update_surface`).
-    /// Karar atomunun eksen-ayrılığı hükmü: `MetinDamgası` ile
-    /// `YerelBağlamDamgası` ayrı nominal eksenlerdir (`ORT-002` sözleşmesi
-    /// aralarında eşitlik/dönüşüm tanımlamaz); enjekte yerel bağlamın
-    /// damgası metin damgasına eşitlenmez ve ondan türetilmez, çalışma-anı
-    /// yerel değişiminde metin damgası **sabit** kalır — yalnız
-    /// yerel-türevli planlar atomik yenilenir. O karar çözülene kadar bu
-    /// yazım cilalanmaz.
+    /// yeni bağlam bütün yaşayan alanlara **atomik yüzeyden**
+    /// (`GirişKutusu::yerel_bağlamı_değiştir`) inilir: yerel-türevli
+    /// planlar (maske) bileşenin kendi atomunda yeniden kurulur ve metin
+    /// damgası sabit kalır (`ACC-158`) — eksen-ayrılığı hükmü artık
+    /// bileşenin kendi sözleşmesidir. Bağlamlar fabrika üretimidir, elle
+    /// kurulmaz. Not: bu yüzey
+    /// `authorize_bil010_injected_locale_context_and_atomic_runtime_locale_update_surface`
+    /// karar atomunun ürünüdür ve şimdilik kardeşin **commitsiz çalışma
+    /// ağacından** tüketilir; kardeş yüzeyi mühürleyene kadar bu dikiş
+    /// yeniden oynayabilir.
     /// Eşitlemenin dayandığı çözülmüş dilimi döndürür: dilimi okuyan her
     /// sunum yolu bu dönüşü kullanmalı ki ekrandaki dilim ile `ORT-021`
     /// kökü hiçbir karede ayrışmasın (masaüstü portu bildirimi tazelik
@@ -761,7 +768,17 @@ impl GaleriUygulaması {
             .yerel_kökü_gerekirse_yenile(&self.kimlik_fabrikası, dilim.kimlik.as_ref())
         {
             Ok(Some(yeni_kök)) => yeni_kök,
-            Ok(None) => return dilim,
+            Ok(None) => {
+                // Kök yerinde; ama önceki iniş typed retle düştüyse alanlar
+                // eski (tutarlı) bağlamda kalmıştır — her eşitleme turu
+                // inişi yeniden dener, başarıda kayıt düşer. Güncel alan
+                // için bileşen erken döner; tur ucuz kalır.
+                if self.yerel_uygulama_hatası.is_some() {
+                    let kök = self.metin_hizmetleri.yerel_kök();
+                    self.yaşayan_alanlara_uygula(&kök, bağlam);
+                }
+                return dilim;
+            }
             Err(hata) => {
                 // Terminal akıbet: kök ve alanlar eski (hâlâ tutarlı)
                 // bağlamda kalır; exact sonuç durumda görünür durur.
@@ -775,17 +792,40 @@ impl GaleriUygulaması {
                 return dilim;
             }
         };
+        self.yaşayan_alanlara_uygula(&yeni_kök, bağlam);
+        dilim
+    }
+
+    /// Yeni yerel bağlamı bütün yaşayan alanlara atomik yüzeyden indirir.
+    ///
+    /// Ret typed'dır ve yutulmaz: son ret [`Self::yerel_uygulama_hatası`]
+    /// yuvasında durur ve önizleme tanı satırında çizilir; başarılı tam
+    /// iniş yuvayı temizler. Ret alanı **eski (tutarlı)** bağlamda bırakır
+    /// (bileşen atomu commit'i tek noktada yapar). Bildirim yalnız geçişte
+    /// üretilir — bu yol çizimden de çağrılır.
+    fn yaşayan_alanlara_uygula(
+        &mut self,
+        kök: &Arc<gpui_bilesenleri::YerelMetinBağlamı>,
+        bağlam: &mut Context<Self>,
+    ) {
+        let mut son_ret: Option<gpui_bilesenleri::GirişHatası> = None;
         if let Some(alan) = self.tezgah_alanı.clone() {
-            let kök = Arc::clone(&yeni_kök);
-            alan.update(bağlam, |alan, bağlam| {
-                alan.yerel = (*kök).clone();
-                bağlam.notify();
-            });
+            let yeni = (**kök).clone();
+            if let Err(hata) = alan.update(bağlam, |alan, bağlam| {
+                alan.yerel_bağlamı_değiştir(yeni, bağlam)
+            }) {
+                son_ret = Some(hata);
+            }
         }
         if let Some(alanlar) = self.sergi_girişleri.clone() {
-            alanlar.yerel_bağlamı_değiştir(&yeni_kök, bağlam);
+            if let Some(hata) = alanlar.yerel_bağlamı_değiştir(kök, bağlam) {
+                son_ret = Some(hata);
+            }
         }
-        dilim
+        if self.yerel_uygulama_hatası != son_ret {
+            self.yerel_uygulama_hatası = son_ret;
+            bağlam.notify();
+        }
     }
 
     /// Çizim ağacının `ORT-021` anahtar çözücüsü; kök-kapsamlı hizmeti sarar
@@ -811,6 +851,11 @@ impl GaleriUygulaması {
     /// `§30` tercih eşitlemesinin son kalıcı reddi (varsa), exact typed.
     pub(crate) fn tercih_eşitleme_hatası(&self) -> Option<TercihEşitlemeKaydı> {
         self.tercih_eşitleme_hatası.clone()
+    }
+
+    /// Atomik yerel-bağlam inişinin son typed reddi (varsa).
+    pub(crate) fn yerel_uygulama_hatası(&self) -> Option<gpui_bilesenleri::GirişHatası> {
+        self.yerel_uygulama_hatası.clone()
     }
 
     /// Uygulama kökünün `ORT-002` motoru.
@@ -972,14 +1017,6 @@ impl GaleriUygulaması {
                 // uygulamayı düşürmemeli). Anlık görüntü aynı kirada
                 // alındığı için `EskiSürüm` bu yolda üretilemez.
                 let anlık = gpui_bilesenleri::MetinDüzenlemePortu::anlık_görüntü(kutu);
-                // Canlı işaretin tek güvenilir göstergesi anlık görüntünün
-                // birleşim aralığıdır: her commit yolu onu düşürür. Bileşenin
-                // kompozisyon-değeri ekseni ise yalnız `unmark_text`/iptal
-                // yollarında düşer ve `insertText`-commit (ör. ölü tuş ya da
-                // birleşimi işaret kaldırılmadan kesinleştiren platform)
-                // sonrasında **asılı kalabilir** — o durumda `CompositionEtkin`
-                // bir erteleme değil kalıcı akıbettir.
-                let canlı_birleşim = anlık.birleşim_utf8.is_some();
                 let sonuç = gpui_bilesenleri::MetinDüzenlemePortu::dış_değişikliği_uygula(
                     kutu,
                     gpui_bilesenleri::MetinDeğişikliği {
@@ -991,7 +1028,7 @@ impl GaleriUygulaması {
                 if sonuç.is_ok() {
                     bağlam.notify();
                 }
-                sonuç.map(|_| ()).map_err(|hata| (hata, canlı_birleşim))
+                sonuç.map(|_| ())
             });
             match sonuç {
                 Ok(()) => {
@@ -1007,26 +1044,24 @@ impl GaleriUygulaması {
                         bağlam.notify();
                     }
                 }
-                // Yalnız **canlı işaretli** `CompositionEtkin` geçici
-                // erteleme akıbetidir: yaşayan IME birleşimi dış yazımla
-                // bozulamaz ve birleşimin her bitiş yolu işaret aralığını
-                // düşürdüğü için erteleme sınırlıdır. Hedef kaybolmaz —
-                // bekleyen kayıt, kutunun bir sonraki metin olayında ileri
-                // eşitlemeyi yeniden denetir ve o olayın kutu metnini
-                // tercihe geri yazmasını bastırır; birleşim biterken seçilen
-                // tercih birleşim metnine ezilmez.
-                Err((gpui_bilesenleri::GirişHatası::CompositionEtkin, true)) => {
+                // `CompositionEtkin` geçici erteleme akıbetidir: yaşayan IME
+                // birleşimi dış yazımla bozulamaz ve birleşimin her bitiş
+                // yolu — `unmark_text` de, `insertText`-commit de
+                // (`BİL-010 ≥23.0` commit kolu kompozisyon değerini düşürür)
+                // — ekseni kapattığı için erteleme sınırlıdır. Hedef
+                // kaybolmaz — bekleyen kayıt, kutunun bir sonraki metin
+                // olayında ileri eşitlemeyi yeniden denetir ve o olayın kutu
+                // metnini tercihe geri yazmasını bastırır; birleşim biterken
+                // seçilen tercih birleşim metnine ezilmez.
+                Err(gpui_bilesenleri::GirişHatası::CompositionEtkin) => {
                     self.bekleyen_tercih_eşitlemeleri.insert(kutu.entity_id());
                 }
-                // Diğer her ret **kalıcıdır**: `SürümTükendi` terminaldir
-                // (eşitleme bir daha başarılı olamaz), canlı işaretsiz
-                // `CompositionEtkin` ise asılı kompozisyon ekseninin
-                // akıbetidir ve ancak yeni bir birleşim döngüsü ya da
-                // `unmark_text` onu düşürene kadar sürer. İkisi de bekleyen
-                // kayda dönüşmez — dönüşseydi kutunun metin olayları
-                // süresiz bastırılırdı; exact typed akıbet burada gözlenir
-                // ve önizleme tanı satırında çizilir.
-                Err((hata, _)) => {
+                // Diğer her ret **kalıcıdır**: örn. `SürümTükendi`
+                // terminaldir (eşitleme bir daha başarılı olamaz). Kalıcı
+                // ret bekleyen kayda dönüşmez — dönüşseydi kutunun metin
+                // olayları süresiz bastırılırdı; exact typed akıbet burada
+                // gözlenir ve önizleme tanı satırında çizilir.
+                Err(hata) => {
                     self.bekleyen_tercih_eşitlemeleri.remove(&kutu.entity_id());
                     let kayıt = TercihEşitlemeKaydı {
                         kutu: kutu.entity_id(),
@@ -1223,6 +1258,10 @@ impl GaleriUygulaması {
             bileşen,
             self.metin_hizmetleri.unicode(),
             self.metin_hizmetleri.alan_damgası(&self.kimlik_fabrikası),
+            // Yerel bağlam kuruluşta enjekte edilir: `kur` hazırlığı
+            // (maske şablonu, varsayılan) host kökünün bağlamıyla koşar,
+            // kutu bağlam üretmez.
+            (*self.metin_hizmetleri.yerel_kök()).clone(),
             yapılandırma,
             örnek,
             tema,
@@ -1255,16 +1294,8 @@ impl GaleriUygulaması {
         // Portlar, simge kataloğu ve yaşayan yerel kök hosttan verilir;
         // yerel bağlam fabrika üretimidir, alan üzerinde elle kurulmaz.
         //
-        // **Bilinen sınır (`blocked_by_missing_public_product_seam`):**
-        // `kur` hazırlığı (maske şablonu, varsayılan) bileşenin kendi iç
-        // `tr/latn/gregory/UTC` bağlamıyla koştu; buradaki yazım yalnız
-        // yaşayan bağlamı host köküne çevirir, hazırlık planlarını yeniden
-        // kurmaz. Kuruluşta enjekte yerel bağlam BİL-010'un açması gereken
-        // yüzeydir; o karar çözülene kadar bu dikiş cilalanmaz.
-        let yerel_kök = self.metin_hizmetleri.yerel_kök();
         alan.update(bağlam, |alan, _| {
             alan.simge_kataloğu = Some(katalog);
-            alan.yerel = (*yerel_kök).clone();
             alan.imleç_portu = imleç_portu;
             alan.otomatik_doldurma_portu = doldurma_portu;
         });
@@ -1442,6 +1473,7 @@ impl GaleriUygulaması {
                 self.tezgah_kuruluş_hatası.as_ref(),
                 self.son_ileti_çözüm_hatası(),
                 self.tercih_eşitleme_hatası(),
+                self.yerel_uygulama_hatası(),
                 self.tezgah_sol_kaydırma.clone(),
             );
         };
@@ -1467,6 +1499,7 @@ impl GaleriUygulaması {
                 köşe_izi: self.köşe_izi.clone(),
                 son_çözüm_hatası: self.son_ileti_çözüm_hatası(),
                 tercih_eşitleme_hatası: self.tercih_eşitleme_hatası(),
+                yerel_uygulama_hatası: self.yerel_uygulama_hatası(),
             },
             bağlam,
         )
@@ -2445,24 +2478,29 @@ impl MetinGirişiAlanları {
     /// Host yerel kökü değişince **bütün** kutulara yeni bağlamı indirir.
     ///
     /// Bağlam host fabrikasının ürünüdür; kutu üzerinde alan alan mutasyon
-    /// yapılmaz, yaşayan bağlam bütün olarak değiştirilir. Böylece hiçbir
-    /// kutu eski kökü sessizce kullanmaz.
-    ///
-    /// Bilinen sınır: bu iniş maske/varsayılan/gösterim planlarını birlikte
-    /// güncellemez (`blocked_by_missing_public_product_seam`, bkz.
-    /// `yerel_kökü_eşitle` notu).
+    /// yapılmaz, yaşayan bağlam bileşenin atomik yüzeyiyle bütün olarak
+    /// değiştirilir (yerel-türevli planlar bileşen atomunda yenilenir,
+    /// metin damgası sabit kalır). Böylece hiçbir kutu eski kökü sessizce
+    /// kullanmaz.
     fn yerel_bağlamı_değiştir(
         &self,
         kök: &Arc<gpui_bilesenleri::YerelMetinBağlamı>,
         bağlam: &mut Context<GaleriUygulaması>,
-    ) {
+    ) -> Option<gpui_bilesenleri::GirişHatası> {
+        // Atomik yüzey: yerel-türevli planlar bileşenin kendi atomunda
+        // yenilenir, güncel kutu için erken döner. Ret typed döndürülür ve
+        // çağıran (kök) yuvasında gözlenebilir tutar; ret alan kutuyu eski
+        // (tutarlı) bağlamda bırakır.
+        let mut son_ret = None;
         for kutu in self.kutular() {
-            let kök = Arc::clone(kök);
-            kutu.update(bağlam, |kutu, bağlam| {
-                kutu.yerel = (*kök).clone();
-                bağlam.notify();
-            });
+            let yeni = (**kök).clone();
+            if let Err(hata) = kutu.update(bağlam, |kutu, bağlam| {
+                kutu.yerel_bağlamı_değiştir(yeni, bağlam)
+            }) {
+                son_ret = Some(hata);
+            }
         }
+        son_ret
     }
 
     /// Sergi kutularını `BİL-010 §29` fallible kuruluş yolundan kurar.
@@ -2507,6 +2545,9 @@ impl MetinGirişiAlanları {
                 bileşen,
                 hizmetler.unicode(),
                 hizmetler.alan_damgası(kimlik_fabrikası),
+                // Yaşayan yerel bağlam kuruluşta host kökünden enjekte
+                // edilir; kutu kendi kökünü kurmaz.
+                (*yerel_kök).clone(),
                 yapılandırma,
                 metin,
                 tema,
@@ -2521,12 +2562,6 @@ impl MetinGirişiAlanları {
             let alan = sonuç.bileşen;
             alan.update(bağlam, |alan, _| {
                 alan.simge_kataloğu = Some(katalog);
-                // Yaşayan yerel bağlam host kökünden gelir; kutu kendi
-                // kökünü kurmaz, bağlam alan alan mutasyona uğratılmaz.
-                // Bilinen sınır: `kur` hazırlığı bileşenin iç bağlamıyla
-                // koştu (`blocked_by_missing_public_product_seam`, bkz.
-                // `yerel_kökü_eşitle` notu).
-                alan.yerel = (*yerel_kök).clone();
             });
             Ok(alan)
         };

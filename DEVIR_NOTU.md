@@ -74,6 +74,32 @@ Taşınma uyarlamaları:
 
 ## 5. Kardeş eşitleme sicili
 
+### 1 Eyl 2026 — ürün `708e39e` (BİL-010 `23.0.0`)
+
+Kardeş `gpui_bilesenleri`, BİL-010 yerel bağlam kapanış paketini uzak ana
+dala aldı: kuruluşta enjekte yerel bağlam + atomik `yerel_bağlamı_değiştir`
+(`22.0.0`), S-2 etkin-IME fail-closed reddi ve `insertText`-commit'in
+kompozisyon değerini düşürmesi (`23.0.0`, `1e7fce9`), açık maskeli
+başlangıcın düzenleme tabanına bağlanması (`3a89047`), `ACC-158` kanıt bağı
+(`708e39e`). Bu depoda uygulananlar: göç yamaları (0001–0004) commit
+zincirine geçirildi; göç-uyum atomunda "asılı/işaretsiz `CompositionEtkin`"
+sınıflandırması kaldırıldı — o duruma ürün `1e7fce9` sonrasında platform
+giriş noktalarından erişilemiyor (canlı ölçüldü: eski nöbet güncel ürünle
+düşer) — ve BİL-010 `23.0.0` kabul matrisi `host_entegrasyonu` testlerine
+bağlandı.
+
+**ORT-002 üretici sayım notu (düzeltme):** kayıt toplamları
+`21/101/598`dir ve bunlar **takvim / numaralandırma / saat dilimi**
+eksenleridir (`18+3`, `100+1`, `341+257` kanonik+alias); dil sayısı
+değildir. Ara araştırmadaki `17/99/340` sayımı her kanonik diziyi bir eksik
+saymıştı. Dil etiketi için üretilmiş kapalı bir kayıt dizisi **yoktur**:
+`dil_etiketi` geçerli etiketi ayrıştırıp normalize eder, dil ekseni açık
+kümedir. Galeride görünen sabit dil örnekleri (ör. yapıştırma deneme kümesi
+`tr-TR`/`en-US`) yalnız sergi örnekleridir; desteklenen dil sınırı
+değildir. Saat dilimi eksiksizliği üreticinin sabitlenmiş girdileri
+kapsamındadır: kanonik TZDB dosyaları ve `backward` dahil, isteğe bağlı
+`backzone` dahil değildir.
+
 ### 24 Ağu 2026 — gpui `bbc4a9b1da` / wgpu `d4359d749`
 
 Kardeş `gpui`, Zed `1b86941c` + kardeş wgpu `d4359d74` senkronunu ve
