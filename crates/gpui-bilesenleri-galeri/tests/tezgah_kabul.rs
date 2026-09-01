@@ -108,7 +108,9 @@ fn madde_25_rezervli_serit_ifadesi_yok() {
 /// başladığı gün düşer ve maddeler yeniden ele alınır (`F2.6` K1).
 #[test]
 fn madde_8_17_gosterge_cizimi_kanonikte_yok() {
-    let render = include_str!("../../../../gpui_bilesenleri/crates/gpui-bilesenleri/src/metin_girisi/bileşen.rs");
+    let render = include_str!(
+        "../../../../gpui_bilesenleri/crates/gpui-bilesenleri/src/metin_girisi/bileşen.rs"
+    );
     let gövde = render
         .split_once("impl Render for GirişKutusu")
         .map(|(_, sonra)| sonra)

@@ -16,9 +16,7 @@ use gpui_bilesenleri_galeri::{Akış, GaleriUygulaması, bileşen_tuş_bağları
 /// Bölüm listesi artık `Tezgahİçeriği`nde taşınmaz: sağ kolon önbellekli
 /// bölüm panelinin çizimidir ve o çizim de bu API'den okur — test ile
 /// ekran aynı kurulumu görür.
-fn bölümler(
-    bağlam: &mut TestAppContext, tür: TezgahDeğerKipi
-) -> Vec<(&'static str, Akış)> {
+fn bölümler(bağlam: &mut TestAppContext, tür: TezgahDeğerKipi) -> Vec<(&'static str, Akış)> {
     bağlam.update(|bağlam| bileşen_tuş_bağlarını_kur(bağlam));
     let (uygulama, görsel) = bağlam.add_window_view(move |_, _| GaleriUygulaması::yeni());
     görsel.update(|pencere, bağlam| {

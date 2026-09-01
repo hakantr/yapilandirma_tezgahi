@@ -39,8 +39,7 @@ use std::sync::Arc;
 use std::time::Instant;
 
 use gpui::{
-    AnyWindowHandle, Bounds, Context, TestApp, Window, WindowBounds, WindowOptions, point, px,
-    size,
+    AnyWindowHandle, Bounds, Context, TestApp, Window, WindowBounds, WindowOptions, point, px, size,
 };
 use gpui_bilesenleri_galeri::{
     GaleriUygulaması, GaleriVarlıkKaynağı, bileşen_tuş_bağlarını_kur, bölüm_çizim_sayısı,
@@ -211,7 +210,11 @@ fn kare_maliyeti() {
     let mut dönüşüm = false;
     let mut k = senaryo(&mut uygulama, tutamaç, &mut |uygulama, pencere, bağlam| {
         dönüşüm = !dönüşüm;
-        let metin = if dönüşüm { "ölçüm a 123" } else { "ölçüm b 456" };
+        let metin = if dönüşüm {
+            "ölçüm a 123"
+        } else {
+            "ölçüm b 456"
+        };
         uygulama.ölçüm_alanına_yaz(metin, pencere, bağlam);
     });
 
