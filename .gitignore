@@ -4,3 +4,4 @@ __pycache__/
 /target/
 /crates/gpui-bilesenleri-galeri-wasm/web/pkg/
 Tezgah_yeni_tasarimi/
+.codewhale/

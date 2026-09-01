@@ -87,7 +87,8 @@ yok; bu depoda uygulananlar:
   betik CLI'dan 0.2.126 bekliyordu; CLI 0.2.127'ye yükseltildi,
   `tools/wasm_galeri_hazirla.py` beklentileri güncellendi, paket yeniden
   üretildi.
-- Tarayıcı önizlemesi için `.claude/launch.json` eklendi (`ee8dbd7`).
+- Tarayıcı önizlemesi için araç başlatma yapılandırması eklendi
+  (`ee8dbd7`); dosya depo hijyeni turunda kaldırıldı.
 
 Doğrulama: `cargo test` 16 hedef / 211 test yeşil; wasm32 cross-check
 temiz; masaüstü smoke (8 sn ayakta) geçti; tarayıcıda yeni paket

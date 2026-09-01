@@ -128,12 +128,6 @@
       ],
       "iki_tonlu_ikincil_yollar": {}
     },
-    "anthropic": {
-      "temalar": [
-        "filled"
-      ],
-      "iki_tonlu_ikincil_yollar": {}
-    },
     "apartment": {
       "temalar": [
         "outlined"
@@ -610,12 +604,6 @@
           1
         ]
       }
-    },
-    "claude": {
-      "temalar": [
-        "filled"
-      ],
-      "iki_tonlu_ikincil_yollar": {}
     },
     "clear": {
       "temalar": [
