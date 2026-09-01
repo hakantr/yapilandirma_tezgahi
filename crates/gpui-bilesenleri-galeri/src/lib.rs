@@ -23,6 +23,8 @@ mod metin_girisi_tezgahi;
 // `ORT-002`/`ORT-021` uygulama-kökü hizmet sahipliği. Kök burada bir kez
 // kurulur; bileşenler yalnız verilen capability değerlerini tüketir.
 mod metin_hizmetleri;
+#[cfg(feature = "olcum-izleyici")]
+mod minimal_giris_olcumu;
 mod onboarding;
 mod palet;
 // Alanı gözleyen panel entity'leri: kök alanın durum değişimini dinlemez,
@@ -58,6 +60,8 @@ pub(crate) use metin_hizmetleri::{
     MetinHizmetleriKökü, SaatDilimiSeçenekleri, TezgahÇözümKaydı, TezgahİletiÇözücüsü,
     YerelKökHatası, son_çözüm_hatası_metni, yerel_kök_hatası_metni,
 };
+#[cfg(feature = "olcum-izleyici")]
+pub use minimal_giris_olcumu::*;
 pub use onboarding::*;
 pub use palet::*;
 pub use paneller::*;
@@ -1299,6 +1303,7 @@ impl GaleriUygulaması {
                     bağlam.new(move |bağlam| OlayAkışıPaneli::yeni(alan, bağlam))
                 };
                 let yuva_notu = {
+                    let kök = kök.clone();
                     let alan = alan.clone();
                     bağlam.new(move |bağlam| YuvaNotuPaneli::yeni(kök, alan, bağlam))
                 };
@@ -1306,11 +1311,18 @@ impl GaleriUygulaması {
                     let kök = bağlam.entity();
                     bağlam.new(move |_| BölümlerPaneli::yeni(&kök))
                 };
+                #[cfg(feature = "olcum-izleyici")]
+                let sanal_sol = {
+                    let kök = kök.clone();
+                    bağlam.new(move |_| SanalSolKolonPaneli::yeni(kök))
+                };
                 self.tezgah_panelleri = Some(TezgahPanelleri {
                     alan_durumu,
                     olay_akışı,
                     yuva_notu,
                     bölümler,
+                    #[cfg(feature = "olcum-izleyici")]
+                    sanal_sol,
                 });
             }
         }
@@ -1458,6 +1470,66 @@ impl GaleriUygulaması {
             },
             bağlam,
         )
+    }
+
+    /// Sanal `ListState` yolunun istediği tek üst düzey sol-kolon öğesini
+    /// kökün bağlamında kurar. Normal yol aynı kurucuları topluca çağırır.
+    #[cfg(feature = "olcum-izleyici")]
+    pub(crate) fn sanal_sol_kartı(
+        &mut self,
+        indis: usize,
+        bağlam: &mut Context<Self>,
+    ) -> gpui::AnyElement {
+        let paneller = self
+            .tezgah_panelleri
+            .clone()
+            .expect("sanal liste alan panelleri kurulduktan sonra çizilir");
+        if indis < metin_girisi_profili::SOL_TOPLAM_KART_SAYISI - 1 {
+            return metin_girisi_profili::sol_ek_kartı(indis, &self.tezgah, &paneller, bağlam)
+                .unwrap_or_else(|| div().into_any_element());
+        }
+        let kod = self.tezgah_kodu();
+        metin_girisi_profili::sol_kod_kartı(kod)
+    }
+
+    /// Ölçümde sıradan scroll ile sanal listenin aynı üst düzey öğesini
+    /// görünür kılar.
+    #[cfg(feature = "olcum-izleyici")]
+    pub fn ölçüm_sol_konumunu_ayarla(
+        &mut self,
+        konum: SolListeÖlçümKonumu,
+        bağlam: &mut Context<Self>,
+    ) {
+        if sol_liste_sanallaştırması_açık() {
+            if let Some(paneller) = self.tezgah_panelleri.clone() {
+                paneller.sanal_sol.update(bağlam, |panel, bağlam| {
+                    panel.konumu_ayarla(konum);
+                    bağlam.notify();
+                });
+            }
+        } else {
+            match konum {
+                SolListeÖlçümKonumu::Üst => {
+                    self.tezgah_sol_kaydırma.set_offset(point(px(0.), px(0.)));
+                }
+                SolListeÖlçümKonumu::Orta => {
+                    self.tezgah_sol_kaydırma.scroll_to_top_of_item(3);
+                }
+                SolListeÖlçümKonumu::Son => self.tezgah_sol_kaydırma.scroll_to_bottom(),
+            }
+        }
+        bağlam.notify();
+    }
+
+    /// Isınma karesinden sonra gerçekleşen mantıksal sol-scroll konumu.
+    #[cfg(feature = "olcum-izleyici")]
+    pub fn ölçüm_sol_mantıksal_konumu(&self, bağlam: &gpui::App) -> (usize, gpui::Pixels) {
+        if sol_liste_sanallaştırması_açık()
+            && let Some(paneller) = self.tezgah_panelleri.as_ref()
+        {
+            return paneller.sanal_sol.read(bağlam).mantıksal_konum();
+        }
+        self.tezgah_sol_kaydırma.logical_scroll_top()
     }
 
     /// `BİL-010` sergi/tercih kutularını bir kez kurar.

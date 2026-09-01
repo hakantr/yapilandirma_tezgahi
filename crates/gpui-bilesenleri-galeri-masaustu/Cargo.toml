@@ -17,7 +17,32 @@ workspace = true
 #
 #     cargo run --profile akici-dev --features olcum \
 #         -p gpui-bilesenleri-galeri-masaustu -- --olcum 20
+#
+# Tüketici ablation'ı kullanıcı girdisi istemez; yaşayan alanı gerçek
+# giriş yolundan programatik değiştirir:
+#
+#     cargo run --release --features olcum-izleyici \
+#         -p gpui-bilesenleri-galeri-masaustu -- --geniş --olcum-izleyici 80
+#
+# Tezgâhın tamamı ile tek `GirişKutusu` kökünü aynı otomatik yükte ölçmek:
+#
+#     cargo run --release --features olcum-izleyici \
+#         -p gpui-bilesenleri-galeri-masaustu -- --geniş --olcum-giris 20
+#     cargo run --release --features olcum-izleyici \
+#         -p gpui-bilesenleri-galeri-masaustu -- \
+#         --geniş --minimal-giris --olcum-giris 20
+#
+# Sol kolonun olağan flex-scroll ve `ListState` sanallaştırmasını aynı
+# otomatik yükte, üst/orta/son kaydırma konumlarında karşılaştırmak:
+#
+#     cargo run --release --features olcum-izleyici \
+#         -p gpui-bilesenleri-galeri-masaustu -- \
+#         --geniş --olcum-giris 20 --sol-konum orta --sanal-sol-liste
 olcum = ["gpui/profiler", "dep:hdrhistogram"]
+olcum-izleyici = [
+    "olcum",
+    "gpui-bilesenleri-galeri/olcum-izleyici",
+]
 
 [dependencies]
 hdrhistogram = { version = "7", optional = true }

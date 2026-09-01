@@ -9,6 +9,11 @@ publish.workspace = true
 workspace = true
 
 [features]
+# Gerçek-pencere izleyici ablation'ı. Normal ürün derlemesinde callback
+# yollarına deney bayrağı ya da sayaç maliyeti eklenmez; masaüstü ölçüm
+# özelliği bunu yalnız ölçüm binary'sine taşır.
+olcum-izleyici = []
+
 # Ölçüm tabanı: sağ kolonun önbelleğini kapatır.
 #
 # Önbellekli/önbelleksiz karşılaştırması elle düzenlemeyle değil bu

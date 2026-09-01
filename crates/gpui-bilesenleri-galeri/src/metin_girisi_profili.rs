@@ -105,9 +105,34 @@ fn sol_kartlar(
         .collect()
 }
 
+/// Kod paneli dâhil sanal listenin üst düzey öğe sayısı.
+#[cfg(feature = "olcum-izleyici")]
+pub(crate) const SOL_TOPLAM_KART_SAYISI: usize = SOL_EK_KART_SAYISI + 1;
 const SOL_EK_KART_SAYISI: usize = 6;
 
+#[cfg(feature = "olcum-izleyici")]
+thread_local! {
+    static SOL_KART_KURULUMU: std::cell::Cell<u64> = const { std::cell::Cell::new(0) };
+}
+
+#[cfg(feature = "olcum-izleyici")]
+fn sol_kart_kurulumunu_say() {
+    SOL_KART_KURULUMU.with(|sayaç| sayaç.set(sayaç.get().saturating_add(1)));
+}
+
+#[cfg(not(feature = "olcum-izleyici"))]
 fn sol_kart_kurulumunu_say() {}
+
+/// Ölçüm aralığında kurulan üst düzey sol-kolon öğesi sayısı.
+#[cfg(feature = "olcum-izleyici")]
+pub fn sol_kart_kurulum_sayısı() -> u64 {
+    SOL_KART_KURULUMU.with(std::cell::Cell::get)
+}
+
+#[cfg(feature = "olcum-izleyici")]
+pub fn sol_kart_kurulumunu_sıfırla() {
+    SOL_KART_KURULUMU.with(|sayaç| sayaç.set(0));
+}
 
 /// Sol kolonun tek bir üst düzey kartını kurar.
 ///
@@ -213,6 +238,10 @@ pub fn tezgah_içeriği(
     } = girdi;
     let sayısal = tercih.sayısal_mı();
 
+    #[cfg(feature = "olcum-izleyici")]
+    let sanal_öğe = crate::sol_liste_sanallaştırması_açık()
+        .then(|| paneller.sanal_sol.clone().into_any_element());
+    #[cfg(not(feature = "olcum-izleyici"))]
     let sanal_öğe: Option<gpui::AnyElement> = None;
 
     let sol_sanal = sanal_öğe.is_some();

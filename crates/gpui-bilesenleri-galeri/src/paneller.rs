@@ -20,6 +20,8 @@
 use gpui::{
     AnyElement, Context, Entity, IntoElement, Render, WeakEntity, Window, div, prelude::*, px,
 };
+#[cfg(feature = "olcum-izleyici")]
+use gpui::{ListAlignment, ListOffset, ListSizingBehavior, ListState, list};
 use gpui_bilesenleri::GirişKutusu;
 
 use crate::{GaleriUygulaması, OLAY_AKIŞI_SINIRI, TezgahOlayı};
@@ -34,9 +36,119 @@ pub struct TezgahPanelleri {
     pub olay_akışı: Entity<OlayAkışıPaneli>,
     pub yuva_notu: Entity<YuvaNotuPaneli>,
     pub bölümler: Entity<BölümlerPaneli>,
+    /// Değişken yükseklikli sol kartların yalnız görünür bölümünü kuran
+    /// ölçüm paneli. Normal ürün yolunda çizim ağacına girmez.
+    #[cfg(feature = "olcum-izleyici")]
+    pub sanal_sol: Entity<SanalSolKolonPaneli>,
 }
 
 // Sol kolon sanallaştırma deneyinin çalışma zamanı bayrağı.
+#[cfg(feature = "olcum-izleyici")]
+thread_local! {
+    static SOL_LİSTE_SANAL: std::cell::Cell<bool> = const { std::cell::Cell::new(false) };
+}
+
+#[cfg(feature = "olcum-izleyici")]
+pub fn sol_liste_sanallaştırmasını_ayarla(açık: bool) {
+    SOL_LİSTE_SANAL.with(|değer| değer.set(açık));
+}
+
+#[cfg(feature = "olcum-izleyici")]
+pub fn sol_liste_sanallaştırması_açık() -> bool {
+    SOL_LİSTE_SANAL.with(std::cell::Cell::get)
+}
+
+/// A ve B yollarında aynı üst düzey kartı görünür kılan ölçüm konumu.
+#[cfg(feature = "olcum-izleyici")]
+#[derive(Clone, Copy, Debug, Eq, PartialEq)]
+pub enum SolListeÖlçümKonumu {
+    Üst,
+    Orta,
+    Son,
+}
+
+#[cfg(feature = "olcum-izleyici")]
+impl SolListeÖlçümKonumu {
+    pub fn adı(self) -> &'static str {
+        match self {
+            Self::Üst => "üst",
+            Self::Orta => "orta",
+            Self::Son => "son",
+        }
+    }
+}
+
+/// Sol kaydırma içeriğini GPUI'nin değişken yükseklikli `ListState`
+/// öğesiyle sanallaştıran deney paneli.
+#[cfg(feature = "olcum-izleyici")]
+pub struct SanalSolKolonPaneli {
+    kök: WeakEntity<GaleriUygulaması>,
+    liste: ListState,
+}
+
+#[cfg(feature = "olcum-izleyici")]
+impl SanalSolKolonPaneli {
+    pub(crate) fn yeni(kök: WeakEntity<GaleriUygulaması>) -> Self {
+        Self {
+            kök,
+            // İlk ölçüm açılış/font ısınmasının dışında bütün yükseklikleri
+            // öğrenir; sonraki kareler yalnız görünür aralığı kurar.
+            liste: ListState::new(
+                crate::metin_girisi_profili::SOL_TOPLAM_KART_SAYISI,
+                ListAlignment::Top,
+                px(0.),
+            )
+            .measure_all(),
+        }
+    }
+
+    pub(crate) fn konumu_ayarla(&mut self, konum: SolListeÖlçümKonumu) {
+        // Isınma düzenlemesi geçmiş ve durum kartlarının yüksekliğini
+        // değiştirmiş olabilir; ölçüm başlamadan son yüksekliği öğren.
+        self.liste.remeasure();
+        match konum {
+            SolListeÖlçümKonumu::Üst => self.liste.scroll_to(ListOffset::default()),
+            SolListeÖlçümKonumu::Orta => self.liste.scroll_to(ListOffset {
+                item_ix: 3,
+                offset_in_item: px(0.),
+            }),
+            SolListeÖlçümKonumu::Son => self.liste.scroll_to_end(),
+        }
+    }
+
+    pub(crate) fn mantıksal_konum(&self) -> (usize, gpui::Pixels) {
+        let konum = self.liste.logical_scroll_top();
+        (konum.item_ix, konum.offset_in_item)
+    }
+}
+
+#[cfg(feature = "olcum-izleyici")]
+impl Render for SanalSolKolonPaneli {
+    fn render(&mut self, _: &mut Window, _: &mut Context<Self>) -> impl IntoElement {
+        let kök = self.kök.clone();
+        let aralık = crate::görünüm().kolonlar.kart_aralığı;
+        let son = self.liste.item_count().saturating_sub(1);
+        div()
+            .size_full()
+            // Dikey olay dış yatay kaydırmaya taşınmasın; list kendi
+            // listener'ını önce çalıştırır, bu üst öğe sonra yayılımı keser.
+            .on_scroll_wheel(|_, _, bağlam| bağlam.stop_propagation())
+            .child(
+                list(self.liste.clone(), move |indis, _, bağlam| {
+                    let öğe = kök
+                        .update(bağlam, |kök, bağlam| kök.sanal_sol_kartı(indis, bağlam))
+                        .unwrap_or_else(|_| div().into_any_element());
+                    div()
+                        .w_full()
+                        .when(indis != son, |öğe| öğe.pb(aralık))
+                        .child(öğe)
+                        .into_any_element()
+                })
+                .with_sizing_behavior(ListSizingBehavior::Auto)
+                .size_full(),
+            )
+    }
+}
 
 /// `C` türetilmiş durumlar ve `§13`/`§19` değer üçlüsü: alan durumunun
 /// salt-okunur gözlemi.
@@ -81,7 +193,13 @@ impl AlanDurumPaneli {
         // `observe` **bildirim** kanalıdır; `subscribe` olay kanalıdır ve
         // bunun yerine geçmez — alan her durum değişiminde olay yayımlamaz.
         bağlam.observe(alan, |_, _, bağlam| {
+            #[cfg(not(feature = "olcum-izleyici"))]
             bağlam.notify();
+            #[cfg(feature = "olcum-izleyici")]
+            if izleyici_deneyi_durumu().gözlem_panelleri_etkin() {
+                izleyici_alan_durumu_bildirimini_say();
+                bağlam.notify();
+            }
         })
     }
 
@@ -179,7 +297,13 @@ impl OlayAkışıPaneli {
             ) {
                 DÜZENLEME_SAYISI.with(|sayaç| sayaç.set(sayaç.get().saturating_add(1)));
             }
+            #[cfg(not(feature = "olcum-izleyici"))]
             panel.kaydet(crate::olay_özeti(olay), bağlam);
+            #[cfg(feature = "olcum-izleyici")]
+            if izleyici_deneyi_durumu().olay_akışı_etkin() {
+                izleyici_olay_akışı_kaydını_say();
+                panel.kaydet(crate::olay_özeti(olay), bağlam);
+            }
         })
     }
 
@@ -256,7 +380,13 @@ impl YuvaNotuPaneli {
 
     fn gözle(alan: &Entity<GirişKutusu>, bağlam: &mut Context<Self>) -> gpui::Subscription {
         bağlam.observe(alan, |_, _, bağlam| {
+            #[cfg(not(feature = "olcum-izleyici"))]
             bağlam.notify();
+            #[cfg(feature = "olcum-izleyici")]
+            if izleyici_deneyi_durumu().gözlem_panelleri_etkin() {
+                izleyici_yuva_notu_bildirimini_say();
+                bağlam.notify();
+            }
         })
     }
 }
@@ -355,12 +485,169 @@ pub fn düzenleme_sayısı() -> u64 {
     DÜZENLEME_SAYISI.with(std::cell::Cell::get)
 }
 
+/// Gerçek pencere tüketici-ablation deneyinin dört durumu.
+///
+/// Bu yalnız galeri ölçüm yüzeyidir; varsayılan Tümü ürün davranışını
+/// korur. Abonelik nesneleri fazlar arasında sökülüp yeniden kurulmaz:
+/// ölçülen fark callback dispatch'i değil, olay özeti/liste mutasyonu ve
+/// panel bildirimlerinin doğurduğu geçersizleme yarıçapıdır.
+#[cfg(feature = "olcum-izleyici")]
+#[derive(Clone, Copy, Debug, Eq, PartialEq)]
+pub enum İzleyiciDeneyiDurumu {
+    /// Olay akışı ve iki bildirim gözlemcisi etkin.
+    Tümü,
+    /// Yalnız olay akışının özeti, kaydı ve bildirimi kapalı.
+    OlayAkışıYok,
+    /// AlanDurumPaneli ve YuvaNotuPaneli bildirimleri kapalı.
+    GözlemPanelleriYok,
+    /// Üç tüketicinin yan etkisi de kapalı; alanın kendi yolu değişmez.
+    Hiçbiri,
+}
+
+#[cfg(feature = "olcum-izleyici")]
+impl İzleyiciDeneyiDurumu {
+    pub fn ad(self) -> &'static str {
+        match self {
+            Self::Tümü => "A tümü",
+            Self::OlayAkışıYok => "B olay akışı yok",
+            Self::GözlemPanelleriYok => "C gözlem panelleri yok",
+            Self::Hiçbiri => "D hiçbiri",
+        }
+    }
+
+    fn olay_akışı_etkin(self) -> bool {
+        matches!(self, Self::Tümü | Self::GözlemPanelleriYok)
+    }
+
+    fn gözlem_panelleri_etkin(self) -> bool {
+        matches!(self, Self::Tümü | Self::OlayAkışıYok)
+    }
+}
+
+#[cfg(feature = "olcum-izleyici")]
+thread_local! {
+    static İZLEYİCİ_DENEYİ_DURUMU: std::cell::Cell<İzleyiciDeneyiDurumu> =
+        const { std::cell::Cell::new(İzleyiciDeneyiDurumu::Tümü) };
+}
+
+/// Ana iş parçacığındaki tüketici-ablation durumunu değiştirir.
+///
+/// Çağrıdan sonra pencere yenilenmeli ve geçiş karesi ölçüm dışında
+/// bırakılmalıdır. Normal uygulama bu fonksiyonu çağırmaz.
+#[cfg(feature = "olcum-izleyici")]
+pub fn izleyici_deneyi_durumunu_ayarla(durum: İzleyiciDeneyiDurumu) {
+    İZLEYİCİ_DENEYİ_DURUMU.with(|hücre| hücre.set(durum));
+}
+
+#[cfg(feature = "olcum-izleyici")]
+fn izleyici_deneyi_durumu() -> İzleyiciDeneyiDurumu {
+    İZLEYİCİ_DENEYİ_DURUMU.with(std::cell::Cell::get)
+}
+
+/// Bir ölçüm fazında gerçekten çalıştırılan üç tüketici yan etkisi.
+#[cfg(feature = "olcum-izleyici")]
+#[derive(Clone, Copy, Debug, Default, Eq, PartialEq)]
+pub struct İzleyiciEtkiSayacı {
+    pub alan_durumu_bildirimi: u64,
+    pub olay_akışı_kaydı: u64,
+    pub yuva_notu_bildirimi: u64,
+}
+
+#[cfg(feature = "olcum-izleyici")]
+thread_local! {
+    static İZLEYİCİ_ETKİ_SAYACI: std::cell::Cell<İzleyiciEtkiSayacı> =
+        const { std::cell::Cell::new(İzleyiciEtkiSayacı {
+            alan_durumu_bildirimi: 0,
+            olay_akışı_kaydı: 0,
+            yuva_notu_bildirimi: 0,
+        }) };
+}
+
+#[cfg(feature = "olcum-izleyici")]
+fn izleyici_etkisini_say(değiştir: impl FnOnce(&mut İzleyiciEtkiSayacı)) {
+    İZLEYİCİ_ETKİ_SAYACI.with(|hücre| {
+        let mut sayaç = hücre.get();
+        değiştir(&mut sayaç);
+        hücre.set(sayaç);
+    });
+}
+
+#[cfg(feature = "olcum-izleyici")]
+fn izleyici_alan_durumu_bildirimini_say() {
+    izleyici_etkisini_say(|sayaç| {
+        sayaç.alan_durumu_bildirimi = sayaç.alan_durumu_bildirimi.saturating_add(1);
+    });
+}
+
+#[cfg(feature = "olcum-izleyici")]
+fn izleyici_olay_akışı_kaydını_say() {
+    izleyici_etkisini_say(|sayaç| {
+        sayaç.olay_akışı_kaydı = sayaç.olay_akışı_kaydı.saturating_add(1);
+    });
+}
+
+#[cfg(feature = "olcum-izleyici")]
+fn izleyici_yuva_notu_bildirimini_say() {
+    izleyici_etkisini_say(|sayaç| {
+        sayaç.yuva_notu_bildirimi = sayaç.yuva_notu_bildirimi.saturating_add(1);
+    });
+}
+
+#[cfg(feature = "olcum-izleyici")]
+pub fn izleyici_etki_sayacı() -> İzleyiciEtkiSayacı {
+    İZLEYİCİ_ETKİ_SAYACI.with(std::cell::Cell::get)
+}
+
+#[cfg(feature = "olcum-izleyici")]
+pub fn izleyici_etki_sayacını_sıfırla() {
+    İZLEYİCİ_ETKİ_SAYACI.with(|sayaç| sayaç.set(İzleyiciEtkiSayacı::default()));
+}
+
+#[cfg(all(test, feature = "olcum-izleyici"))]
+mod izleyici_deneyi_testleri {
+    use super::*;
+
+    #[test]
+    fn dört_durum_iki_tüketici_eksenini_doğru_kapar() {
+        let durumlar = [
+            (İzleyiciDeneyiDurumu::Tümü, true, true),
+            (İzleyiciDeneyiDurumu::OlayAkışıYok, false, true),
+            (İzleyiciDeneyiDurumu::GözlemPanelleriYok, true, false),
+            (İzleyiciDeneyiDurumu::Hiçbiri, false, false),
+        ];
+        for (durum, olay, gözlem) in durumlar {
+            assert_eq!(durum.olay_akışı_etkin(), olay);
+            assert_eq!(durum.gözlem_panelleri_etkin(), gözlem);
+        }
+    }
+
+    #[test]
+    fn etki_sayacı_sıfırlanır() {
+        izleyici_etki_sayacını_sıfırla();
+        izleyici_alan_durumu_bildirimini_say();
+        izleyici_olay_akışı_kaydını_say();
+        izleyici_yuva_notu_bildirimini_say();
+        assert_eq!(
+            izleyici_etki_sayacı(),
+            İzleyiciEtkiSayacı {
+                alan_durumu_bildirimi: 1,
+                olay_akışı_kaydı: 1,
+                yuva_notu_bildirimi: 1,
+            }
+        );
+        izleyici_etki_sayacını_sıfırla();
+        assert_eq!(izleyici_etki_sayacı(), İzleyiciEtkiSayacı::default());
+    }
+}
+
 /// Sayacı sıfırlar; ölçüm penceresini açılış karelerinden ayırmak için.
 ///
 /// Açılış kareleri (font yükleme, ilk ağaç kurulumu) ortalamayı domine
 /// eder ve sürekli kullanımı temsil etmez.
 pub fn render_sıfırla() {
     RENDER_NS.with(|toplam| toplam.set(0));
+    #[cfg(feature = "olcum-izleyici")]
+    crate::sol_kart_kurulumunu_sıfırla();
 }
 
 thread_local! {

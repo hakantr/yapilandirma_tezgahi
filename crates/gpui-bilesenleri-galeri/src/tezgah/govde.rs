@@ -44,6 +44,8 @@ pub fn tezgah_gövdesi(
     let sol = önizleme_kolonu(
         sabit_bloklar,
         kayan_bloklar,
+        içerik.sol_sanal,
+        içerik.sol_kaydırma,
         &g.kolonlar,
         önizleme_adı.clone(),
     );
@@ -84,9 +86,36 @@ pub fn tezgah_gövdesi(
 fn önizleme_kolonu(
     sabit: Vec<AnyElement>,
     kayan: Vec<AnyElement>,
+    sanal: bool,
+    kaydırma: gpui::ScrollHandle,
     metrik: &KolonMetriği,
     ad: SharedString,
 ) -> gpui::Stateful<gpui::Div> {
+    let kayan_gövde = if sanal {
+        // `ListState` kendi kaydırma ve görünür-aralık hesabını yapar.
+        // Dışarıda ikinci bir scroll kabı kurmak iki ayrı ofset üretirdi.
+        div()
+            .flex_1()
+            .min_h(px(0.))
+            .children(kayan)
+            .into_any_element()
+    } else {
+        div()
+            .id("tezgah-onizleme-kaydırma")
+            .flex_1()
+            .min_h(px(0.))
+            .overflow_y_scroll()
+            .track_scroll(&kaydırma)
+            // Dikey tekerlek burada tüketilir: dıştaki yatay kaydırma
+            // katmanı, yalnız yatay ekseni olan bir kapta dikey deltayı
+            // yataya çevirmesin.
+            .on_scroll_wheel(|_, _, bağlam| bağlam.stop_propagation())
+            .flex()
+            .flex_col()
+            .gap(metrik.kart_aralığı)
+            .children(kayan)
+            .into_any_element()
+    };
     div()
         // `overflow_y_scroll` için `id` zorunludur.
         .id("tezgah-onizleme")
@@ -113,23 +142,7 @@ fn önizleme_kolonu(
                 .gap(metrik.kart_aralığı)
                 .children(sabit),
         )
-        .child(
-            div()
-                .id("tezgah-onizleme-kaydırma")
-                .flex_1()
-                .min_h(px(0.))
-                .overflow_y_scroll()
-                // Dikey tekerlek burada tüketilir: dıştaki yatay kaydırma
-                // katmanı, yalnız yatay ekseni olan bir kapta dikey deltayı
-                // yataya çevirir. Kolonun üzerindeyken aynı olayın iki
-                // eksende birden iş görmesi kullanıcıyı hem aşağı hem yana
-                // taşıyordu. Boş alanda çevirim yerinde duruyor.
-                .on_scroll_wheel(|_, _, bağlam| bağlam.stop_propagation())
-                .flex()
-                .flex_col()
-                .gap(metrik.kart_aralığı)
-                .children(kayan),
-        )
+        .child(kayan_gövde)
 }
 
 /// Sağ kolonun tam gövdesi: bölümleri kartlara sarar, akışlara dizer.

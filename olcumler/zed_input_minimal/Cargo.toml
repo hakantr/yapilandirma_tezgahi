@@ -1,0 +1,41 @@
+[workspace]
+
+[package]
+name = "zed-input-minimal-olcumu"
+version = "0.1.0"
+edition = "2024"
+publish = false
+
+[dependencies]
+assets = { path = "../../../zed/crates/assets" }
+editor = { path = "../../../zed/crates/editor" }
+gpui = { path = "../../../zed/crates/gpui", features = ["profiler"] }
+gpui_platform = { path = "../../../zed/crates/gpui_platform", features = ["font-kit", "wayland", "x11"] }
+release_channel = { path = "../../../zed/crates/release_channel" }
+semver = "1"
+settings = { path = "../../../zed/crates/settings" }
+theme = { path = "../../../zed/crates/theme" }
+theme_settings = { path = "../../../zed/crates/theme_settings" }
+ui_input = { path = "../../../zed/crates/ui_input" }
+
+[patch.crates-io]
+# Zed kök workspace'inin kaynak yamaları. Bu ölçüm ayrı workspace olduğu
+# için Cargo bunları kendiliğinden miras almaz; aynı editör grafiğini
+# kurabilmek için kaynakla birebir tutulur.
+tree-sitter-language = { git = "https://github.com/tree-sitter/tree-sitter", rev = "dff1fd868c750dbbae179fcd5c43ce987e4e0528" }
+async-process = { git = "https://github.com/zed-industries/async-process.git", rev = "0b6d6713570af61806e1e5cb40e0f757cb93fd9d" }
+async-task = { git = "https://github.com/smol-rs/async-task.git", rev = "b4486cd71e4e94fbda54ce6302444de14f4d190e" }
+windows-capture = { git = "https://github.com/zed-industries/windows-capture.git", rev = "f0d6c1b6691db75461b732f6d5ff56eed002eeb9" }
+calloop = { git = "https://github.com/zed-industries/calloop" }
+livekit = { git = "https://github.com/zed-industries/livekit-rust-sdks", rev = "d0e27be0cdad89eadab3e36207cda0a2b6e359ee" }
+libwebrtc = { git = "https://github.com/zed-industries/livekit-rust-sdks", rev = "d0e27be0cdad89eadab3e36207cda0a2b6e359ee" }
+notify = { git = "https://github.com/zed-industries/notify", rev = "0890bbb8ca40a4b5d1f67031698dd7918b37d991" }
+notify-types = { git = "https://github.com/zed-industries/notify", rev = "0890bbb8ca40a4b5d1f67031698dd7918b37d991" }
+webrtc-sys = { git = "https://github.com/zed-industries/livekit-rust-sdks", rev = "d0e27be0cdad89eadab3e36207cda0a2b6e359ee" }
+
+[profile.release]
+opt-level = 3
+lto = false
+codegen-units = 16
+debug = 0
+strip = "debuginfo"

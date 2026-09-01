@@ -270,6 +270,10 @@ fn yasak_kalintilar_kaynakta_sifir() {
             "src/metin_girisi_tezgahi.rs",
             include_str!("../src/metin_girisi_tezgahi.rs"),
         ),
+        (
+            "src/minimal_giris_olcumu.rs",
+            include_str!("../src/minimal_giris_olcumu.rs"),
+        ),
         ("src/paneller.rs", include_str!("../src/paneller.rs")),
         ("src/sergiler.rs", include_str!("../src/sergiler.rs")),
         ("src/tezgah.rs", include_str!("../src/tezgah.rs")),
@@ -378,6 +382,10 @@ fn hizmet_kokleri_yalniz_bilesim_kokunde_kurulur() {
         (
             "src/metin_girisi_tezgahi.rs",
             include_str!("../src/metin_girisi_tezgahi.rs"),
+        ),
+        (
+            "src/minimal_giris_olcumu.rs",
+            include_str!("../src/minimal_giris_olcumu.rs"),
         ),
         ("src/paneller.rs", include_str!("../src/paneller.rs")),
         ("src/sergiler.rs", include_str!("../src/sergiler.rs")),

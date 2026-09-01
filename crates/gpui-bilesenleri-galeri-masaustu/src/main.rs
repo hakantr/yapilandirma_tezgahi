@@ -31,6 +31,8 @@ fn main() {
             if let Err(hata) = galeri_yazı_tiplerini_kur(bağlam) {
                 eprintln!("galeri yazı tipleri kaydedilemedi: {hata}");
             }
+            #[cfg(feature = "olcum-izleyici")]
+            olcum::deney_bayraklarını_kur();
 
             let içerik_boyutu = if dar_kabul_koşumu {
                 size(px(760.), px(640.))
@@ -43,6 +45,10 @@ fn main() {
                 size(px(960.), px(640.))
             };
             let sınırlar = Bounds::centered(None, içerik_boyutu, bağlam);
+            #[cfg(feature = "olcum-izleyici")]
+            if olcum::minimal_giriş_penceresini_aç(sınırlar, bağlam) {
+                return;
+            }
             let açıldı = bağlam.open_window(
                 WindowOptions {
                     window_bounds: Some(WindowBounds::Windowed(sınırlar)),

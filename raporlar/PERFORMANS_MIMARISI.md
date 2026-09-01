@@ -843,6 +843,292 @@ etmiyordu; farkın yaklaşık yarısı doğrulama maliyetiymiş (§8.2.2).
 120 FPS iddiası kapanmadı; ölçüm onu **çürüttü**. 60 Hz bütçesine
 (16,7 ms) göre p50 sınırda, 120 Hz bütçesine (8,33 ms) göre ~2 kat.
 
+### 8.5 Metin alanı tüketici ablation'ı (25 Ağu 2026)
+
+gpui-component örneğinde etkin input2 alanının tek dış tüketicisi
+varken bu tezgâhın yaşayan alanı üç paneli besliyor:
+AlanDurumPaneli, OlayAkışıPaneli ve YuvaNotuPaneli. Varsayım,
+macOS'taki yüksek draw maliyetinin bu yayılımdan gelmesiydi.
+
+Bu varsayım dört durumlu 2×2 deneyle ayrıştırıldı:
+
+| Durum | Olay özeti/liste mutasyonu | İki bildirim panelinin notify yolu |
+|---|---:|---:|
+| A · tümü | açık | açık |
+| B · olay akışı yok | kapalı | açık |
+| C · gözlem panelleri yok | açık | kapalı |
+| D · hiçbiri | kapalı | kapalı |
+
+Alan bütün durumlarda aynı replace_text_in_range yolundan geçer; maske,
+ayrıştırma, Değişimde doğrulaması, geçici değer çözümü, iki kanonik olay
+ve alanın kendi notify çağrısı değiştirilmez. Abonelik nesneleri de bağlı
+kalır. Dolayısıyla ölçülen fark callback dispatch'i değil, olayın özete
+çevrilmesi, Vec kaydı, üç panel bildirimi ve bunların doğurduğu çizim
+yarıçapıdır. Deney kodu yalnız olcum-izleyici özelliğinde derlenir;
+normal ürün callback yoluna bayrak veya sayaç eklenmez.
+
+Dört durum 16 × 5 saniyelik dengeli sıraya dağıtılır; her durum dört
+fazlık blokların 1., 2., 3. ve 4. zaman konumunda birer kez bulunur.
+Geçiş karesi sayılarak dışarıda bırakılır. İlk iki elle-yazma pilotu
+**dışlandı**:
+
+- 80 saniyelik pilotta durum başına yalnız 67–70 kare vardı; 100-kare
+  kapısı geçilmedi.
+- 160 saniyelik pilotta A ve D birer faz kaybetti, C'nin bir fazında
+  yalnız 3 kare / 2 gerçek düzenleme vardı. Toplamlar yüksek görünse de
+  faz kapısı geçilmedi.
+
+Kullanıcı temposunu değişken olmaktan çıkarmak için geçerli koşumlarda
+yaşayan alan gerçek pencerede 50 ms arayla iki eş uzunluklu metin arasında
+değiştirildi. Bu, fiziksel klavye ya da girdi→draw ölçümü değildir; yalnız
+aynı metin mutasyonunun tüketici yayılımına göre draw maliyetini
+karşılaştırır. Ortam: macOS 26.6.2, Apple M4 Pro, release, 1600×1000
+mantıksal piksel, ölçek 1,0×, erişilebilirlik kapalı; taban revizyon
+e6836746.
+
+| Koşum | A tümü p50 / ort | B olay yok p50 / ort | C gözlem yok p50 / ort | D hiçbiri p50 / ort |
+|---|---:|---:|---:|---:|
+| 1 | 12,493 / 12,878 ms | 12,247 / 12,729 ms | 12,313 / 12,745 ms | 12,435 / 12,835 ms |
+| 2 | 12,435 / 12,785 ms | 12,452 / 12,835 ms | 12,714 / 13,004 ms | 12,804 / 13,028 ms |
+
+İki koşumun da her durumunda **400 kare / 400 gerçek düzenleme** vardır.
+Sayaçlar bayrakların gerçekten uygulandığını ayrıca mühürledi:
+
+- A: alan 400, olay kaydı 800, yuva 400;
+- B: alan 400, olay kaydı 0, yuva 400;
+- C: alan 0, olay kaydı 800, yuva 0;
+- D: üçü de 0.
+
+Farklar iki koşum arasında yön değiştirdi:
+
+| Kapatılan tüketici | Koşum 1, durum−A | Koşum 2, durum−A |
+|---|---:|---:|
+| Olay akışı | −0,150 ms (−%1,2) | +0,050 ms (+%0,4) |
+| İki gözlem paneli | −0,133 ms (−%1,0) | +0,218 ms (+%1,7) |
+| Üçü birden | −0,043 ms (−%0,3) | +0,243 ms (+%1,9) |
+
+Eşit örneklemli iki koşumun ortalama-ortalamaları A/B/C/D için sırasıyla
+12,832 / 12,782 / 12,875 / 12,932 ms'dir. Bütün tüketicileri kapatma
+toplamı düşürmek yerine +0,100 ms göstermiştir; tekil etkiler de
+işaretlerini korumamıştır. Sarılmış render gövdeleri bütün durumlarda
+0,177–0,198 ms aralığındadır.
+
+Sınır: D durumunda üç abonelik fiziksel olarak sökülmez; callback'ler
+çağrılıp sayaç dalından geri döner. Bu yüzden deney GPUI'nin üç aboneliği
+bulup callback'e teslim etme maliyetini ortak paydadan çıkarır. Ölçülen ve
+elenecek hipotez, kullanıcı varsayımındaki pahalı kısımdır: farklı
+nesnelerin değiştirilmesi, olay özeti/liste işi, panel bildirimleri ve
+çizim yarıçapı. Çıplak abonelik-dispatch maliyetini ölçmek için panelleri
+fazlar arasında gerçekten söküp yeniden bağlayan ayrı bir deney gerekir.
+
+**Sonuç:** üç tüketicinin downstream yayılımı gerçektir ama bu macOS
+düzeninde ölçülebilir bir darboğaz değildir. Gözlenen farkların tamamı
+yaklaşık ±0,25 ms / ±%2 bandında ve tekrarlar arasında yön değiştiriyor.
+Bu yan etkiler gpui-component ile tezgâh arasındaki çok-milisaniyelik
+farkı açıklayamaz. Sonraki yüksek değerli teşhis tüketici yan etkisini
+değil, alanın kendi metin yolu ile GPUI/platform
+layout–prepaint–paint–shaping aşamalarını hedeflemelidir.
+
+### 8.6 Tek alan / tam tezgâh ayrımı ve gpui-component karşılaştırması
+
+§8.5 tüketici yan etkilerini eledi ama iki olasılığı ayırmıyordu:
+`GirişKutusu`nun kendi çizimi pahalı olabilir ya da alanın tezgâh ağacının
+içinde bulunması geniş bir layout/paint yarıçapı doğuruyor olabilir. Bu
+ayrım için ölçüm özelliğine ikinci bir kök eklendi. `MinimalGirişÖlçümü`
+yalnız tek bir yaşayan `GirişKutusu` entity'si taşır; `GaleriUygulaması`,
+tezgâh kabuğu, üst şerit, sol kolon ve dört panel hiç kurulmaz. Alanın
+`TezgahTercihleri::default()` yapılandırması, örnek değeri, teması ve
+simge kataloğu tam tezgâhla aynıdır. Sarmalayıcının varsayılan metin
+türünde ve odaksız programatik koşumda kullanılmayan platform portları
+minimal kökte kurulmaz; ölçümde etkin kalan değişken çevre ağacıdır.
+
+Tam ve minimal kök aynı release binary'sinde derlenir. İkisinde de pencere
+1600×1000 mantıksal piksel / ölçek 1,0×; aynı iki eş uzunluklu metin
+50 ms arayla 400 kez `EntityInputHandler::replace_text_in_range` üzerinden
+değiştirilir. Açılış ve font ısınması ölçümden önce yapılır. Koşumlar
+zaman kaymasını görünür kılmak için A–B–B–A sırasındadır:
+
+```text
+A: --geniş --olcum-giris 20
+B: --geniş --minimal-giris --olcum-giris 20
+```
+
+Ortam: macOS 26.6.2, Apple M4 Pro, release; ana depo tabanı
+`e6836746`, kanonik bileşen deposu `d120c052`, yerel GPUI `7f203b7a`.
+Çalışma ağacındaki bu deney kodu taban commit'in üzerinde henüz
+commitlenmemiştir.
+
+| Koşum | Kök | draw n | p50 | p95 | p99 | ortalama |
+|---|---|---:|---:|---:|---:|---:|
+| A1 | Tam tezgâh | 400 | 12,427 ms | 16,409 ms | 19,022 ms | 12,741 ms |
+| B1 | Tek `GirişKutusu` | 400 | 0,472 ms | 0,728 ms | 0,782 ms | 0,482 ms |
+| B2 | Tek `GirişKutusu` | 400 | 0,295 ms | 0,487 ms | 0,531 ms | 0,335 ms |
+| A2 | Tam tezgâh | 400 | 12,354 ms | 16,278 ms | 18,153 ms | 12,918 ms |
+
+İki tekrarın ortalama-ortalamaları tam tezgâhta **12,830 ms**, tek
+alanda **0,409 ms**. Minimal kök toplam draw maliyetini **12,421 ms /
+%96,8** düşürüyor; tam tezgâh yaklaşık **31,4 kat** pahalı. Her koşumda
+400 düzenlemeye 400 draw düşmesi, iki yükün de eşit teslim edildiğini
+doğruluyor. §8.5'teki 12,832 ms A ortalamasının bu deneyde yeniden
+üretilmesi de yeni tek-kova yolunun eski dengeli ölçümle tutarlı olduğunu
+gösteriyor.
+
+Pencere etkinliği de kabul kapısına bağlandı ve nihai koşumda dört
+pencerenin tamamı `etkin evet` bildirdi. Bundan önceki bir blokta 400
+düzenlemeye yalnız 127 / 107 / 159 draw düşen üç faz **dışlandı**; yaklaşık
+5 FPS deseni etkin olmayan pencere aralığıyla uyumluydu. Açılış yolu
+`Window::activate_window()` ile açık hâle getirildi ve %90 draw kapısı bu
+koşumların rapora sızmasını engelledi.
+
+gpui-component için önce kullanılan `crates/story/examples/olcum.rs`
+yalnız `input2`yi açmıyordu: bütün `Gallery` kökünü açıp kullanıcının elle
+yazdığı kareleri ölçüyordu. Bu nedenle önceki 5,607 / 5,288 ms draw
+ortalamaları “input2 bileşen süresi” diye okunamaz. Eşdeğer sınır için
+bağımlılığa dokunmadan `crates/story/examples/olcum_input2_minimal.rs`
+eklendi. Bu örnek `Gallery`, `StoryContainer`, araç çubuğu ve abone
+kurmadan yalnız `InputState + Input` oluşturur; aynı iki metni aynı
+50 ms / 400 düzenleme düzeninde gerçek `EntityInputHandler` yolundan
+geçirir.
+
+gpui-component tabanı `7885c416`, kilitli Zed/GPUI kaynağı
+`8b1497db`; yani iki depo **aynı GPUI revizyonunu kullanmıyor**.
+Sonuçlar bu nedenle çapraz-depo mutlak üstünlük kanıtı değil, yönlü bir
+teşhistir:
+
+| gpui-component minimal input2 | draw n | p50 | p95 | p99 | ortalama |
+|---|---:|---:|---:|---:|---:|
+| Koşum 1 | 400 | 0,836 ms | 1,142 ms | 1,195 ms | 0,839 ms |
+| Koşum 2 | 400 | 0,807 ms | 1,112 ms | 1,225 ms | 0,823 ms |
+
+İki koşum ortalaması **0,831 ms**'dir. Bizim tek `GirişKutusu` ölçümümüz
+aynı dış yükte 0,409 ms ile bunun altında kaldı. Farklı GPUI kaynakları,
+tema ve bileşen yetenekleri yüzünden nominal %51 farkı “bizim bileşen
+ürün düzeyinde %51 daha hızlıdır” iddiasına çevrilemez; fakat “bizim
+metin alanının kendi yolu
+gpui-component input2'den çok geridir” hipotezi bu veride açıkça
+**reddedilir**.
+
+**Karar:** darboğaz `GirişKutusu` çekirdeği ya da üç tüketicinin yan
+etkisi değildir. Alan bildirimi tezgâhın atalarını kirlettiğinde hâlâ
+kurulan/yerleşen/boyanan geniş sol ağaç ve kabuk yaklaşık 12,42 ms'lik
+farkın sahibidir. Sonraki tur alan bileşenini sadeleştirmemeli; yaşayan
+önizlemeyi geniş statik ağacın kardeşi olan bağımsız bir entity/cache
+sınırına taşımalı ve bu A–B–B–A kapısıyla yeniden ölçmelidir.
+
+Kanıt sınırı değişmedi: sayılar CPU `draw` süresidir. GPU çalışma süresi,
+sunum kuyruğu, input-to-present ve foton gecikmesi ölçülmedi; buradan
+120 FPS ya da sıfıra yakın gecikme iddiası çıkarılamaz.
+
+### 8.7 Zed `ui_input::InputField` karşılaştırması
+
+Üçüncü referans olarak Zed'in kendi form alanı ölçüldü. Seçilen bileşen
+`ui_input::InputField`'dır; bu yalnız düşük seviyeli bir metin öğesi
+değildir. `InputField::new`, Zed'in fabrikasından gerçek bir
+`Editor::single_line` kurar ve alanın metnini `EditorElement` ile çizer.
+Dolayısıyla sonuç buffer, seçim, display-map ve editör çizim yolunu taşıyan
+daha yetenekli bir tek satırlık alanın maliyetidir.
+
+Zed kaynağı salt okunur bırakıldı. Tezgâh içinde ayrı workspace olan
+`olcumler/zed_input_minimal` hedefi kuruldu; hedef yalnız bir
+`InputField` açar, `Gallery` veya Zed çalışma alanı kurmaz. İç editör iki
+eş uzunluklu metin arasında 50 ms arayla 400 kez gerçek
+`EntityInputHandler::replace_text_in_range` yolundan değiştirilir. Pencere
+1600×1000 mantıksal piksel / ölçek 1,0×; 1 saniye açılış ve ek bir ısınma
+düzenlemesi histogramın dışındadır. Kabul kapısı 400/400 düzenleme ve en
+az 360 `draw` ister.
+
+Ortam önceki iki minimal ölçümle aynı macOS / Apple M4 Pro makinesidir.
+Zed revizyonu `1b86941c`; bileşen ve GPUI aynı monorepodan gelir. Ayrı
+hedef `opt-level=3`, LTO kapalı, 16 codegen unit ile release derlendi.
+Kilit çözümü 1087 paket girdisi taşır; bu Zed editörünün geniş derleme
+grafiğini gösterir, çalışma zamanı veya kare maliyeti değildir.
+
+| Minimal Zed `InputField` | draw n | p50 | p95 | p99 | ortalama |
+|---|---:|---:|---:|---:|---:|
+| Koşum 1 | 420 | 1,436 ms | 1,741 ms | 1,865 ms | 1,411 ms |
+| Koşum 2 | 412 | 1,468 ms | 1,738 ms | 1,837 ms | 1,422 ms |
+
+İki koşumda da 400/400 düzenleme uygulandı ve pencere etkin kaldı. Zed
+koşumları düzenleme sayısına ek olarak 12–20 çizim içerdi; tablo
+ölçüm aralığındaki bütün `draw`ları içerir, yalnız mutasyonla bire bir
+eşleşen kareleri seçmez. İki koşumun ortalama-ortalaması **1,417 ms**,
+p50 ortalaması **1,452 ms**'dir. P99 iki koşumda da 1,9 ms'nin altında;
+yalıtılmış bileşenin CPU `draw` işi 8,33 ms'lik 120 Hz kare bütçesinin
+rahatça içindedir.
+
+Aynı dış yükle eldeki sonuçların yönlü özeti şöyledir:
+
+| Kök / bileşen | İki koşum ortalaması | Bizim minimal alana oran |
+|---|---:|---:|
+| Bizim tek `GirişKutusu` | 0,409 ms | 1,00× |
+| gpui-component minimal `input2` | 0,831 ms | 2,03× |
+| Zed minimal `InputField` | 1,417 ms | 3,46× |
+| Bizim tam tezgâh | 12,830 ms | 31,4× |
+
+Zed alanı bizim minimal alandan **1,008 ms / 3,46 kat**, gpui-component
+alanından **0,586 ms / 1,70 kat** daha pahalıdır. Bu beklenmedik görünen
+sıra mimari kapsamla uyumludur: Zed'in form alanı tam `Editor` çekirdeğini
+taşırken diğer iki alan daha dar tek satır bileşenleridir. Farklı GPUI
+revizyonları ve temalar nedeniyle bu tablo ürün düzeyinde kütüphane
+üstünlüğü kanıtlamaz.
+
+Asıl teşhis değişmiyor ve güçleniyor: Zed'in görece ağır editör tabanlı
+tek alanı bile tam tezgâhtan yaklaşık **9,1 kat** ucuzdur. Bu nedenle
+tezgâhtaki 12,83 ms maliyeti `GirişKutusu` çekirdeğine veya “Zed'in özel
+metin motoru bizde yok” açıklamasına yüklemek doğru değildir. Kanıtın
+işaret ettiği yer, alan değiştiğinde yeniden işlenen geniş tezgâh
+ağacının layout/prepaint/paint yarıçapıdır.
+
+Kanıt sınırı yine CPU `draw`dır. 8,33 ms altında kalmak input-to-present,
+GPU süresi, panel taraması veya sürekli 120 FPS teslimi kanıtlamaz.
+
+### 8.8 Görünmeyen sol kartlar ve `ListState` sanallaştırması
+
+“Pencere dışında kalan kartların CPU çizim işini GPUI kendiliğinden atlıyor
+mu?” sorusu için geçici, ölçülebilir bir A/B yolu kuruldu. A tabanı mevcut
+`div().overflow_y_scroll()` ağacıdır; bu yol yedi üst-seviye sol kartın
+tamamını her kök render'ında kurar. B yolu aynı kartları, aynı entity'leri ve
+aynı abonelikleri koruyarak GPUI `ListState` içine taşır. `measure_all()` ve
+konumlandırma ısınma aralığında tamamlanır; 400 düzenlemelik histogram yalnız
+kararlı çalışma aralığını içerir. Sayaç, her draw'da gerçekten kurulan
+üst-seviye sol kart sayısını da kaydeder.
+
+Koşumlar 25 Ağustos 2026'da macOS 26.6.2 / Apple M4 Pro üzerinde, 1600×1000
+mantıksal piksel ve ölçek 1,0× ile release derlemede yapıldı. Ana depo tabanı
+`e6836746`, GPUI `7f203b7a`, bileşen deposu `a905ae65` idi. Her konumda sıra
+A–B–B–A; her faz 400 programatik gerçek metin düzenlemesi × 50 ms'dir.
+“Orta/B” ilk koşumunda 400 düzenlemeye 392 draw, diğer on bir koşumda 400
+draw düştü; hepsi %90 kabul kapısının üzerindedir.
+
+| Konum | A: flex-scroll ort. | B: `ListState` ort. | B−A | A kart/kare | B kart/kare |
+|---|---:|---:|---:|---:|---:|
+| Üst | 13,019 ms | 13,062 ms | +0,043 ms (+%0,33) | 7,00 | 5,00 |
+| Orta | 12,916 ms | 12,857 ms | −0,059 ms (−%0,46) | 7,00 | 2,01 |
+| Son | 12,928 ms | 12,837 ms | −0,091 ms (−%0,70) | 7,00 | 3,00 |
+
+Sanallaştırmanın çalıştığı sayaçla kanıtlandı: orta konumda görünmeyen beş
+kartın kurulumları draw başına gerçekten ortadan kalktı. Ölçülen kök `render`
+gövdesi konuma göre yaklaşık 0,05–0,07 ms ucuzladı. Fakat toplam `draw`
+kazancı üstte yön değiştirdi, orta ve sonda yalnız 0,06–0,09 ms kaldı; bu
+ölçekte p95/p99 kuyruğunun ve koşumlar arası gürültünün altında. Yani mevcut
+yedi kart için `ListState` **doğru çalışan ama ürün düzeyinde anlamlı hızlanma
+vermeyen** bir kaldıraçtır.
+
+Bu sonuç GPUI'nin görünürlük sınırını ikiye ayırır. Sıradan flex-scroll sahne
+çıktısında boş klipli GPU ilkel öğelerini eleyebilir; fakat deklaratif
+çocukların kuruluşunu, layout ve prepaint dolaşımını otomatik olarak sanal
+listeye çevirmiyor. `ListState`/`uniform_list` bu CPU işini görünür aralığa
+indirebilir, ancak uygulama veri kaynağını açıkça bu yapılara taşımalıdır.
+Tezgâhta yalnız yedi üst-seviye kart bulunduğundan kurtarılan iş küçüktür;
+görünür kartların iç ağaçları ve yaklaşık 12,7 ms'lik render-sonrası draw
+dilimi kalır. Bu nedenle üretim mimarisi bu deneyle değiştirilmemeli; daha
+yüksek kardinaliteli geçmiş/sonuç listeleri oluşursa aynı kapı yeniden
+değerlendirilmelidir.
+
+Kanıt sınırı CPU `draw` ve üst-seviye kart kuruluşudur. Sayaç GPU maliyetini,
+layout/prepaint alt aşamalarını tek tek, sunum zamanını veya foton gecikmesini
+ölçmez.
+
 ## 9. İnceleme düzeltmeleri (24 Ağu 2026, bağımsız salt-okunur inceleme)
 
 Üç turun ardından yapılan dış kaynak incelemesi dört noktayı düzeltti ya
@@ -879,26 +1165,32 @@ koşar; hiçbir entity kirli değilse çizim de yoktur.
 
 ## 10. Sıradaki işler (öncelik sırasıyla)
 
-Gerçek pencere ölçümü (§8) sırayı değiştirdi: artık en değerli iş, yaklaşık
-16,8 ms ortalamalı `draw`ın içini ayrıştırmak ve faz-bazlı A/B kapısını bir
-kez daha doğrulamaktır. Platformlar arası tekrar ondan sonra gelir.
+Tek-alan ayrımı (§8.6) sırayı yeniden değiştirdi: yaklaşık 12,42 ms fark
+kanonik girişin içinde değil, onu saran tezgâh ağacında. En değerli iş
+önce geçersizleme/paint yarıçapını daraltmak; platform içini daha ayrıntılı
+profillemek ondan sonra gelir.
 
-1. **`draw`ın render sonrası diliminin içi.** Ağırlığın orada olduğu
-   ölçüldü (§8.1: ort 14,63 ms / 16,84 ms) ama o dilimin içi
+1. **Yaşayan önizlemeyi bağımsız sınır yapmak.** Alanı geniş statik sol
+   ağacın içinde tutmak yerine kardeş bir entity/cache sınırına taşı; kart
+   sırası ve erişilebilirlik ağacı değişmemeli. Ardından aynı
+   `--olcum-giris` A–B–B–A kapısını koştur. Kabul ölçütü yalnız ortalama
+   düşüş değil, 400/400 draw ve iki tekrarda aynı yön. Sol kartları
+   `ListState` ile sanallaştırma §8.8'de ölçüldü ve mevcut yedi kartta en çok
+   %0,70 toplam kazanç verdi; bu nedenle bu işin yerine geçmez.
+2. **`draw`ın render sonrası diliminin içi.** Ağırlığın orada olduğu
+   ölçüldü (§8.6: tam kökte ortalama 12,65 ms civarı kalan draw) ama o dilimin içi
    (yerleşim / prepaint / paint / shaping / rasterizasyon / sahne kodlama)
    ayrılmadı. Dilim **sahiplik değil aşamadır**: içinde hem GPUI'nin hem
    tezgâhın ürettiği ağacın işi var. Tezgâhın oradaki payına dokunan tek
    kaldıraç önbellektir (`reuse_prepaint`/`reuse_paint`) ve net `draw`
    etkisi §8.3.4'te ölçülüyor. Geri kalanı kardeş depoların işi (`gpui`,
    `gpui_apple`); araç hazır: GPUI'nin `profiler` izleri ve Instruments.
-2. **Faz-bazlı macOS doğrulaması.** §8.3.4'teki iki koşum toplam-kova
+3. **Faz-bazlı macOS önbellek doğrulaması.** §8.3.4'teki iki koşum toplam-kova
    kapısından geçti; yeni araç her fazın ayrı örnek sayısını da basıyor ve
-   zayıf/geçişsiz fazı reddediyor. Linux'a geçmeden önce aynı 12 × 5 sn
-   ABBA koşumuyla sonuç mühürlenmeli.
-3. **Linux'ta aynı ölçüm** — hem headless hem gerçek pencere. İki kural
-   yürürlükte: mutlak süreler platformlar arası yarıştırılmaz;
-   karşılaştırma aynı makinede çift koşumla yapılır
-   (`olcum-onbelleksiz`).
+   zayıf/geçişsiz fazı reddediyor. Bir sonraki yapısal değişiklikten sonra
+   aynı 12 × 5 sn ABBA koşumuyla önbellek kazancı yeniden mühürlenmeli.
+   Linux koşumu mevcut revizyonda tamamlandı; kod değişmeden sırf tekrar
+   için yeniden koşturulmaz.
 4. **`ORT-018 bil-010.input.commit`:** kabul motorunu ölçer; bu turlardan
    etkilenmedi, sayı gerilememeli.
 5. **Headless koşumdaki p95 kuyruğu** (§6.2): p50'nin ~2 katı, kaynağı
