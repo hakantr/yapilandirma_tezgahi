@@ -701,13 +701,23 @@ pub fn önbelleği_ayarla(açık: bool) {
 ///
 /// `Instant` çifti kare başına birkaç kez koşar (~25 ns), yani ölçtüğü
 /// büyüklüğün yanında görünmez; bu yüzden ölçüm bayrağına bağlanmadı ve
-/// her derlemede açık kalır.
+/// masaüstü derlemelerinde açık kalır. `wasm32-unknown-unknown`'da
+/// `std::time::Instant::now` panikler ("time not implemented"); ölçüm
+/// koşumları masaüstü hakeminde yaşadığı için tarayıcıda gövde ölçülmeden
+/// çalıştırılır — sayaç orada hep sıfır kalır.
 pub(crate) fn render_ölç<R>(gövde: impl FnOnce() -> R) -> R {
-    let başlangıç = std::time::Instant::now();
-    let sonuç = gövde();
-    let geçen = başlangıç.elapsed().as_nanos() as u64;
-    RENDER_NS.with(|toplam| toplam.set(toplam.get().saturating_add(geçen)));
-    sonuç
+    #[cfg(not(target_family = "wasm"))]
+    {
+        let başlangıç = std::time::Instant::now();
+        let sonuç = gövde();
+        let geçen = başlangıç.elapsed().as_nanos() as u64;
+        RENDER_NS.with(|toplam| toplam.set(toplam.get().saturating_add(geçen)));
+        sonuç
+    }
+    #[cfg(target_family = "wasm")]
+    {
+        gövde()
+    }
 }
 
 impl BölümlerPaneli {
