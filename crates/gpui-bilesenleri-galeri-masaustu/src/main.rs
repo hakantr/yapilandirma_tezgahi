@@ -1,25 +1,22 @@
 //! Masaüstü galeri başlatıcısı.
-//!
 //! Bu sarmalayıcı yalnız platform kurulumu yapar: varlık kaynağı, tuş bağı
 //! kaydı ve pencere açma. Davranış, yapılandırma veya çizim tanımı taşımaz;
 //! bu yüzden masaüstü ile WASM aynı galeri çekirdeğini aynı şekilde açar.
 
 #![allow(non_ascii_idents)]
 
-#[path = "platform.rs"]
-mod platform;
-// Gerçek pencere ölçümü; yalnız `olcum` özelliğiyle derlenir.
 #[cfg(feature = "olcum")]
 #[path = "olcum.rs"]
 mod olcum;
-
-use std::sync::Arc;
+#[path = "platform.rs"]
+mod platform;
 
 use gpui::{App, AppContext, Bounds, WindowBounds, WindowOptions, px, size};
 use gpui_bilesenleri_galeri::{
     GaleriUygulaması, GaleriVarlıkKaynağı, PlatformPortları, bileşen_tuş_bağlarını_kur,
     galeri_yazı_tiplerini_kur,
 };
+use std::sync::Arc;
 
 fn main() {
     let dar_kabul_koşumu = std::env::args().any(|argüman| argüman == "--dar");
@@ -30,9 +27,7 @@ fn main() {
             // Tuş yolları GPUI eylem sistemine bağlıdır; bu kayıt olmadan
             // platform Backspace/ok tuşlarını teslim edecek hedef bulamaz.
             bileşen_tuş_bağlarını_kur(bağlam);
-            // Kitaplık yüzleri iki hedefte de kayıtlı olmalı: masaüstü yalnız
-            // işletim sisteminde kurulu aileleri görür ve bunlar makineden
-            // makineye değişir.
+            // Kitaplık yüzleri iki hedefte de kayıtlı olmalıdır.
             if let Err(hata) = galeri_yazı_tiplerini_kur(bağlam) {
                 eprintln!("galeri yazı tipleri kaydedilemedi: {hata}");
             }
@@ -54,15 +49,20 @@ fn main() {
                     ..Default::default()
                 },
                 |_, bağlam| {
-                    bağlam.new(|_| {
+                    bağlam.new(|bağlam| {
                         let mut uygulama = GaleriUygulaması::yeni();
-                        // Sarmalayıcı yalnız bildirimi kurar; öncelik sırası
-                        // ve düşme kuralı çekirdektedir.
-                        uygulama.platform_portlarını_kur(PlatformPortları {
-                            saat_dilimi: Some(Arc::new(platform::SistemSaatDilimi)),
-                            imleç: Some(Arc::new(platform::SistemİmleciTercihi)),
-                            otomatik_doldurma: Some(Arc::new(platform::SistemOtomatikDoldurma)),
-                        });
+                        // Sarmalayıcı yalnız bildirimi kurar; öncelik ve düşme
+                        // kuralı çekirdekte, kimlik kapısı kök motorunda:
+                        let motor = uygulama.metin_motoru();
+                        let dilim = platform::SistemSaatDilimi::yeni(motor);
+                        uygulama.platform_portlarını_kur(
+                            PlatformPortları {
+                                saat_dilimi: Some(Arc::new(dilim)),
+                                imleç: Some(Arc::new(platform::SistemİmleciTercihi::yeni())),
+                                otomatik_doldurma: Some(Arc::new(platform::SistemOtomatikDoldurma)),
+                            },
+                            bağlam,
+                        );
                         uygulama
                     })
                 },

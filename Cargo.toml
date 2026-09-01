@@ -24,8 +24,12 @@ gpui_web = { path = "../gpui/crates/gpui_web", default-features = false }
 wasm-bindgen = "=0.2.127"
 
 # Bileşen ailesi kardeş depodan gelir; tezgâh onun sözleşme uyumunu ölçer.
+# `ORT-002` edinme kökü (`UnicodeVeYerelMetinHizmetleri`) ve `ORT-021`
+# çözüm hizmeti yalnız temel sandıktan dışa açılır; uygulama-kökü sahipliği
+# için doğrudan bağımlılık gerekir.
 gpui-bilesenleri = { path = "../gpui_bilesenleri/crates/gpui-bilesenleri" }
 gpui-bilesenleri-kabuk = { path = "../gpui_bilesenleri/crates/gpui-bilesenleri-kabuk" }
+gpui-bilesenleri-temel = { path = "../gpui_bilesenleri/crates/gpui-bilesenleri-temel" }
 gpui-bilesenleri-galeri = { path = "crates/gpui-bilesenleri-galeri" }
 
 # Akıcı geliştirme profili: tezgâhın elle denendiği koşumlar için.

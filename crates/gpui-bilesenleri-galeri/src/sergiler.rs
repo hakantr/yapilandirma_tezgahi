@@ -102,6 +102,9 @@ pub(crate) struct SergiDurumu {
     /// Kökün profil yolunda üretilir; sergi onu yalnız gövdeye yerleştirir.
     /// Genel bakış onu kullanmadığı için `None` taşıyabilir.
     pub tezgah_içeriği: Option<crate::Tezgahİçeriği>,
+    /// `ORT-021` kök-kapsamlı ileti çözücüsü; tezgâh içeriğiyle birlikte
+    /// verilir. Genel bakış tezgâh gövdesi çizmediği için `None` kalabilir.
+    pub tezgah_çözücüsü: Option<crate::TezgahİletiÇözücüsü>,
     pub düğme_sayacı: u32,
     pub seçili: u8,
     pub onaylı: bool,
@@ -221,6 +224,10 @@ pub(crate) fn aile_sergisi(
                 .take()
                 .expect("BİL-010 sergisi tezgâh içeriğiyle çağrılır"),
             durum.tezgah.tema.metin_ölçeği,
+            durum
+                .tezgah_çözücüsü
+                .take()
+                .expect("BİL-010 sergisi tezgâh çözücüsüyle çağrılır"),
         )
         .into_any_element(),
         "BİL-020" => seçim_sergisi(durum.seçili, bağlam).into_any_element(),
@@ -811,6 +818,7 @@ pub(crate) fn tezgah_ekranı(
     içerik: crate::Tezgahİçeriği,
     sistem_aileleri: std::rc::Rc<Vec<String>>,
     kabuk: TezgahKabukDurumu,
+    çözücü: crate::TezgahİletiÇözücüsü,
     bağlam: &mut Context<GaleriUygulaması>,
 ) -> Stateful<Div> {
     let g = crate::görünüm();
@@ -878,7 +886,7 @@ pub(crate) fn tezgah_ekranı(
                             bağlam,
                         ))
                         .child(div().flex_1().min_h(px(0.)).mt(px(ölçü::BLOK_ARASI)).child(
-                            tezgah_gövde_bloğu(içerik, tercih.tema.metin_ölçeği),
+                            tezgah_gövde_bloğu(içerik, tercih.tema.metin_ölçeği, çözücü),
                         )),
                 ),
         )
@@ -1295,16 +1303,26 @@ fn görünüm_ekseni(
                                 iç_boşluk == değer,
                             )
                             .child(değer.adı())
-                            .on_click(bağlam.listener(move |bu, _, _, bağlam| {
-                                bu.tezgahı_değiştir(move |k| k.tema.iç_boşluk = değer, bağlam);
-                            }))
+                            .on_click(bağlam.listener(
+                                move |bu, _, _, bağlam| {
+                                    bu.tezgahı_değiştir(
+                                        move |k| k.tema.iç_boşluk = değer,
+                                        bağlam,
+                                    );
+                                },
+                            ))
                         }))
                         .into_any_element()
                 }
             },
             bağlam,
         ))
-        .child(şerit_seçicisi("hareket", hareket_adı, hareket_listesi, bağlam))
+        .child(şerit_seçicisi(
+            "hareket",
+            hareket_adı,
+            hareket_listesi,
+            bağlam,
+        ))
 }
 
 /// `BİL-010` yapılandırma tezgâhı gövdesi: ailenin tek ekranı.
@@ -1316,7 +1334,11 @@ fn görünüm_ekseni(
 /// `tezgah_profil_içeriği` yolu), tezgâh kabuğu onu iki kolonlu düzende
 /// çizer. Kabuk hiçbir `BİL-*` tipini tanımadığı için yeni bir aile yeniden
 /// yazıldığında yalnız kendi profilini verir (harita §7 · adım 5).
-fn tezgah_gövde_bloğu(içerik: crate::Tezgahİçeriği, metin_ölçeği: f32) -> Div {
+fn tezgah_gövde_bloğu(
+    içerik: crate::Tezgahİçeriği,
+    metin_ölçeği: f32,
+    çözücü: crate::TezgahİletiÇözücüsü,
+) -> Div {
     div().size_full().flex().flex_col().min_h(px(0.)).child(
         // Gövde kalan **bütün** yüksekliği alır. Sabit bir yükseklik
         // (720px) pencerenin altında boşluk bırakıyordu ve iki kolonun
@@ -1326,7 +1348,9 @@ fn tezgah_gövde_bloğu(içerik: crate::Tezgahİçeriği, metin_ölçeği: f32) 
             crate::görünüm(),
             crate::TezgahTokenları::paletten(crate::palet()),
             metin_ölçeği,
-            crate::tezgah_bölüm_adı,
+            // `YÖN-006.ACC-008`: kabuk anahtarı gerçek `ORT-021`
+            // hizmetinden çözer, ham dize sözlüğü tanımaz.
+            move |anahtar| çözücü.çöz(anahtar),
         )),
     )
 }
@@ -1864,10 +1888,19 @@ pub(crate) fn değer_durumu(
         )
         // `§11` seçim aralığı. Grafem sırası okunur birimdir: `ORT-002`
         // bir grafemi çok baytlı ve çok kod noktalı sayabiliyor, bayt
-        // konumu panelde yanıltıcı olurdu.
+        // konumu panelde yanıltıcı olurdu. Seçim public erişicilerden
+        // okunur; iç seçim alanı artık dışa açık değil.
         .child(satır("Seçim", {
-            let baş = durum.seçim.başlangıç.grafem_sırası;
-            let son = durum.seçim.bitiş.grafem_sırası;
+            let aralık = durum.seçim_baytları();
+            let sınırlar = durum.grafem_sınırları();
+            let grafem = |bayt: usize| {
+                sınırlar
+                    .iter()
+                    .find(|konum| konum.utf8_bayt() == bayt)
+                    .map_or(0, |konum| konum.grafem_sırası())
+            };
+            let baş = grafem(aralık.start);
+            let son = grafem(aralık.end);
             if durum.seçim_boş_mu() {
                 format!("imleç · grafem {baş}")
             } else {
@@ -1875,7 +1908,12 @@ pub(crate) fn değer_durumu(
                     "{}–{} grafem · {}",
                     baş.min(son),
                     baş.max(son),
-                    if durum.seçim.ileri { "ileri" } else { "geri" }
+                    // Caret artan aralığın sonundaysa seçim ileri kuruldu.
+                    if durum.caret_baytı() == aralık.end {
+                        "ileri"
+                    } else {
+                        "geri"
+                    }
                 )
             }
         }))
@@ -2021,9 +2059,7 @@ pub(crate) fn kabuk_yuvaları(
                     .child(
                         div().mt_2().child(
                             crate::stili_uygula(div(), &crate::görünüm().gövde)
-                                .text_color(
-                                    crate::TezgahTokenları::paletten(crate::palet()).soluk,
-                                )
+                                .text_color(crate::TezgahTokenları::paletten(crate::palet()).soluk)
                                 .child(
                                     "Kip tüm yuvalara birlikte uygulanır. Kanonikte her yuva \
                                      kendi kipini taşır; ürün onları ayrı ayrı kurabilir.",
@@ -2213,21 +2249,17 @@ pub(crate) fn biçim_satırı(
             div()
                 .mt(px(ölçü::ARALIK))
                 .child(eksen_etiketi_yüzü("İşaret konumu"))
-                .child(
-                    div()
-                        .mt_1()
-                        .flex()
-                        .gap(px(ölçü::ARALIK))
-                        .children([K::Önde, K::Sonda].map(|konum| {
-                            gösterge_düğmesi(
-                                format!("işaret-konumu-{konum:?}"),
-                                örnek(konum),
-                                tercih.işaret_konumu == konum,
-                                bağlam,
-                                move |t| t.işaret_konumu = konum,
-                            )
-                        })),
-                ),
+                .child(div().mt_1().flex().gap(px(ölçü::ARALIK)).children(
+                    [K::Önde, K::Sonda].map(|konum| {
+                        gösterge_düğmesi(
+                            format!("işaret-konumu-{konum:?}"),
+                            örnek(konum),
+                            tercih.işaret_konumu == konum,
+                            bağlam,
+                            move |t| t.işaret_konumu = konum,
+                        )
+                    }),
+                )),
         );
     }
 
@@ -2747,7 +2779,9 @@ pub(crate) fn metin_içerik_türü_satırı(
     şerit_satırı()
         .child(eksen_etiketi_yüzü("Metin İçerik Türü"))
         .child(kuşak)
-        .child(türetilmiş_rozet("MetinTanımı::içerik_türü · koda yazılır"))
+        .child(türetilmiş_rozet(
+            "MetinTanımı::içerik_türü · koda yazılır",
+        ))
 }
 
 /// `§7` değer türü · **dört kamusal aile**.
@@ -2905,65 +2939,65 @@ pub(crate) fn adım_satırı(
 
     let içerik = move |bağlam: &mut Context<GaleriUygulaması>| {
         div()
-        .child(kutu_başlığı("Sayısal adım", açıkmı))
-        .child(tercih_düğmesi(
-            "adim-etkin",
-            "Yön ve sayfa tuşları",
-            açıkmı,
-            bağlam,
-            |t| t.sayısal_adım = !t.sayısal_adım,
-        ))
-        .when(açıkmı, |k| {
-            k.child(
-                div()
-                    .mt_2()
-                    .child(kutu_başlığı("Küçük · büyük", true))
-                    .child(ızgara_dörtlü().children(ölçekler.into_iter().map(|ölçek| {
-                        hücre(tercih_düğmesi(
-                            format!("adim-olcek-{}", ölçek.adı()),
-                            ölçek.adı(),
-                            tercih.adım_ölçeği == ölçek,
-                            bağlam,
-                            move |t| t.adım_ölçeği = ölçek,
-                        ))
-                    }))),
-            )
-            .child(div().mt_2().child(tercih_düğmesi(
-                "adim-hizala",
-                "Katına hizala",
-                tercih.adım_hizala,
+            .child(kutu_başlığı("Sayısal adım", açıkmı))
+            .child(tercih_düğmesi(
+                "adim-etkin",
+                "Yön ve sayfa tuşları",
+                açıkmı,
                 bağlam,
-                |t| t.adım_hizala = !t.adım_hizala,
-            )))
-            .child(div().mt_1().child(tercih_düğmesi(
-                "adim-sinir",
-                "0…100 sınırı",
-                tercih.adım_sınırı,
-                bağlam,
-                |t| t.adım_sınırı = !t.adım_sınırı,
-            )))
-            // Sarma sonlu alt ve üst sınır çiftini ister; sınır kapalıyken
-            // bu düğme çalışmayan bir tercih olurdu.
-            .when(tercih.adım_sınırı, |k| {
-                k.child(div().mt_1().child(tercih_düğmesi(
-                    "adim-sarma",
-                    "Uçtan uca sar",
-                    tercih.adım_sarma,
+                |t| t.sayısal_adım = !t.sayısal_adım,
+            ))
+            .when(açıkmı, |k| {
+                k.child(
+                    div()
+                        .mt_2()
+                        .child(kutu_başlığı("Küçük · büyük", true))
+                        .child(ızgara_dörtlü().children(ölçekler.into_iter().map(|ölçek| {
+                            hücre(tercih_düğmesi(
+                                format!("adim-olcek-{}", ölçek.adı()),
+                                ölçek.adı(),
+                                tercih.adım_ölçeği == ölçek,
+                                bağlam,
+                                move |t| t.adım_ölçeği = ölçek,
+                            ))
+                        }))),
+                )
+                .child(div().mt_2().child(tercih_düğmesi(
+                    "adim-hizala",
+                    "Katına hizala",
+                    tercih.adım_hizala,
                     bağlam,
-                    |t| t.adım_sarma = !t.adım_sarma,
+                    |t| t.adım_hizala = !t.adım_hizala,
+                )))
+                .child(div().mt_1().child(tercih_düğmesi(
+                    "adim-sinir",
+                    "0…100 sınırı",
+                    tercih.adım_sınırı,
+                    bağlam,
+                    |t| t.adım_sınırı = !t.adım_sınırı,
+                )))
+                // Sarma sonlu alt ve üst sınır çiftini ister; sınır kapalıyken
+                // bu düğme çalışmayan bir tercih olurdu.
+                .when(tercih.adım_sınırı, |k| {
+                    k.child(div().mt_1().child(tercih_düğmesi(
+                        "adim-sarma",
+                        "Uçtan uca sar",
+                        tercih.adım_sarma,
+                        bağlam,
+                        |t| t.adım_sarma = !t.adım_sarma,
+                    )))
+                })
+                // `AÇK-015`: GPUI `ScrollWheelEvent` yalnız `position`, `delta`,
+                // `modifiers` ve `touch_phase` taşır; cihaz/kaynak alanı yoktur.
+                // `SayısalTekerlekDavranışı` kanonik API'de var ama tetiklenmesi
+                // için gereken kaynak kanıtı çalışma zamanında yok. Düğme
+                // silinmiyor: silmek ekseni hiç yokmuş gibi gösterirdi.
+                .child(div().mt_1().child(devre_dışı_düğme(
+                    "Tekerlekle adım",
+                    "GPUI tekerlek olayı cihaz/kaynak alanı taşımıyor (AÇK-015)",
                 )))
             })
-            // `AÇK-015`: GPUI `ScrollWheelEvent` yalnız `position`, `delta`,
-            // `modifiers` ve `touch_phase` taşır; cihaz/kaynak alanı yoktur.
-            // `SayısalTekerlekDavranışı` kanonik API'de var ama tetiklenmesi
-            // için gereken kaynak kanıtı çalışma zamanında yok. Düğme
-            // silinmiyor: silmek ekseni hiç yokmuş gibi gösterirdi.
-            .child(div().mt_1().child(devre_dışı_düğme(
-                "Tekerlekle adım",
-                "GPUI tekerlek olayı cihaz/kaynak alanı taşımıyor (AÇK-015)",
-            )))
-        })
-        .into_any_element()
+            .into_any_element()
     };
 
     div()
@@ -4071,9 +4105,11 @@ fn doldurma_amacı_adı(amaç: gpui_bilesenleri::OtomatikDoldurmaAmacı) -> &'st
 pub(crate) fn saat_dilimi_satırı(
     tercih: &crate::TezgahTercihleri,
     dilim: &crate::ÇözülmüşSaatDilimi,
+    dilim_seçenekleri: &crate::SaatDilimiSeçenekleri,
+    yerel_kök_hatası: Option<crate::YerelKökHatası>,
     bağlam: &mut Context<GaleriUygulaması>,
 ) -> Div {
-    use crate::{SaatDilimiKaynağı, SaatDilimiKimliği, SaatDilimiTercihi};
+    use crate::{SaatDilimiKaynağı, SaatDilimiTercihi};
 
     let kaynak_adı = match dilim.kaynak {
         SaatDilimiKaynağı::Platform => "platform",
@@ -4082,12 +4118,20 @@ pub(crate) fn saat_dilimi_satırı(
         SaatDilimiKaynağı::Yedek => "yedek",
     };
     let etiket = format!(
-        "{} · {} · {kaynak_adı}",
+        "{} · {} · {kaynak_adı}{}",
         dilim
             .kimlik
             .as_ref()
-            .map_or("—".to_owned(), |k| k.0.to_string()),
-        dilim.gmt_farkı.gösterim()
+            .map_or("—".to_owned(), |k| k.iana_kimligi().to_owned()),
+        dilim.gmt_farkı.gösterim(),
+        // Kimliksiz (yalnız GMT farkı) bildirimde yaşayan yerel kök `UTC`
+        // sunum yedeğindedir; kart bunu söyler ki fark yürürlükteymiş gibi
+        // görünmesin (alan `UTC` ile biçimlerken etiket +03:00 diyordu).
+        if dilim.kimlik.is_none() {
+            " · kök: UTC sunum yedeği"
+        } else {
+            ""
+        }
     );
 
     let satır = |ad: &'static str,
@@ -4113,12 +4157,15 @@ pub(crate) fn saat_dilimi_satırı(
                 bağlam,
             ))
             .children(
-                ["Europe/Istanbul", "Europe/London", "America/New_York"].map(|ad| {
-                    let kimlik = SaatDilimiKimliği(ad.into());
+                // Kimlikler elle mühürlenmez: `ORT-002` kayıt yolundan
+                // çözülmüş seçenekler hosttan gelir.
+                dilim_seçenekleri.kullanıcı.iter().map(|kimlik| {
+                    let kimlik = kimlik.clone();
+                    let ad = kimlik.iana_kimligi().to_owned();
                     let seçili = şimdiki == SaatDilimiTercihi::Kullanıcı(kimlik.clone());
                     div().mt_1().child(tercih_düğmesi(
                         format!("dilim-kullanıcı-{ad}"),
-                        ad,
+                        &ad,
                         seçili,
                         bağlam,
                         move |t| {
@@ -4140,7 +4187,7 @@ pub(crate) fn saat_dilimi_satırı(
             .child(satır(
                 "UTC · ürün sabiti",
                 matches!(şimdiki, SaatDilimiTercihi::Ürün(_)),
-                SaatDilimiTercihi::Ürün(SaatDilimiKimliği("UTC".into())),
+                SaatDilimiTercihi::Ürün(dilim_seçenekleri.ürün.clone()),
                 bağlam,
             ))
             .into_any_element()
@@ -4149,6 +4196,20 @@ pub(crate) fn saat_dilimi_satırı(
     div()
         .mt(px(ölçü::ARALIK))
         .child(şerit_seçicisi("saat-dilimi", &etiket, içerik, bağlam))
+        // Yerel kök yenilemesinin terminal akıbeti sessizleşmez: typed ret
+        // exact varyant adıyla kartta görünür; tercih "uygulandı" gibi
+        // durmaz, eski bağlamın yürürlükte kaldığı yazılır.
+        .when_some(yerel_kök_hatası, |kutu, hata| {
+            kutu.child(
+                crate::stili_uygula(div(), &crate::görünüm().eksen_etiketi)
+                    // Testler bu satırın gerçekten boyandığını buradan
+                    // ölçer; üretim derlemesinde no-op'tur.
+                    .debug_selector(|| "tanı-yerel-kök-hatası".into())
+                    .mt_1()
+                    .text_color(crate::TezgahTokenları::paletten(crate::palet()).vurgu)
+                    .child(crate::yerel_kök_hatası_metni(hata)),
+            )
+        })
 }
 
 /// `§12`/`§17`/`§18`/`§20` odak, kabul ve erişim tercihleri.
@@ -5822,11 +5883,18 @@ fn sürekli_değer_sergisi(değer: u8, bağlam: &mut Context<GaleriUygulaması>)
 }
 
 fn ilerleme_sergisi(ilerleme: u8, bağlam: &mut Context<GaleriUygulaması>) -> Stateful<Div> {
-    let değer = İlerlemeDeğeri::Belirli {
-        tamamlanan: f64::from(ilerleme),
-        toplam: 100.0,
+    // Kanonik kesir tipli kurulur; yüzde tabanı sabittir ve sergi değeri
+    // 0..=100 aralığında üretilir.
+    let kesir = gpui_bilesenleri::İlerlemeKesri::yeni(
+        u128::from(ilerleme.min(100)),
+        std::num::NonZeroU128::new(100).expect("yüzde paydası sıfır değildir"),
+    )
+    .expect("sergi ilerlemesi 0..=100 aralığında kalır");
+    let değer = İlerlemeDeğeri::Belirli(kesir);
+    let oran = match değer {
+        İlerlemeDeğeri::Belirli(kesir) => kesir.pay() as f64 / kesir.payda().get() as f64,
+        İlerlemeDeğeri::Belirsiz => 0.,
     };
-    let oran = değer.oran().unwrap_or_default();
     sergi_kartı(
         "bil-140-canlı-sergi",
         "Durum ve İlerleme",

@@ -22,7 +22,7 @@ use gpui::{
 };
 use gpui_bilesenleri::GirişKutusu;
 
-use crate::{GaleriUygulaması, TezgahOlayı, OLAY_AKIŞI_SINIRI};
+use crate::{GaleriUygulaması, OLAY_AKIŞI_SINIRI, TezgahOlayı};
 
 /// Tezgâhın panel entity'leri; profil girdisinde birlikte taşınır.
 ///
@@ -35,6 +35,8 @@ pub struct TezgahPanelleri {
     pub yuva_notu: Entity<YuvaNotuPaneli>,
     pub bölümler: Entity<BölümlerPaneli>,
 }
+
+// Sol kolon sanallaştırma deneyinin çalışma zamanı bayrağı.
 
 /// `C` türetilmiş durumlar ve `§13`/`§19` değer üçlüsü: alan durumunun
 /// salt-okunur gözlemi.
@@ -67,7 +69,9 @@ impl AlanDurumPaneli {
     ///
     /// Panel entity'si yaşamaya devam eder; yalnız tutamaç ve abonelik
     /// değişir. Böylece çizim ağacındaki kimliği kararlı kalır.
-    pub(crate) fn alanı_bağla(&mut self, alan: Entity<GirişKutusu>, bağlam: &mut Context<Self>) {
+    pub(crate) fn alanı_bağla(
+        &mut self, alan: Entity<GirişKutusu>, bağlam: &mut Context<Self>
+    ) {
         self._abonelik = Self::gözle(&alan, bağlam);
         self.alan = alan;
         bağlam.notify();
@@ -76,7 +80,9 @@ impl AlanDurumPaneli {
     fn gözle(alan: &Entity<GirişKutusu>, bağlam: &mut Context<Self>) -> gpui::Subscription {
         // `observe` **bildirim** kanalıdır; `subscribe` olay kanalıdır ve
         // bunun yerine geçmez — alan her durum değişiminde olay yayımlamaz.
-        bağlam.observe(alan, |_, _, bağlam| bağlam.notify())
+        bağlam.observe(alan, |_, _, bağlam| {
+            bağlam.notify();
+        })
     }
 
     /// Kökün tercihine yazar; `önem_zemini` düğmesinin yolu.
@@ -86,7 +92,9 @@ impl AlanDurumPaneli {
         bağlam: &mut Context<Self>,
     ) {
         self.kök
-            .update(bağlam, |kök, bağlam| kök.tezgahı_değiştir(değiştir, bağlam))
+            .update(bağlam, |kök, bağlam| {
+                kök.tezgahı_değiştir(değiştir, bağlam)
+            })
             .ok();
     }
 }
@@ -99,10 +107,9 @@ impl Render for AlanDurumPaneli {
 
 impl AlanDurumPaneli {
     fn gövde(&mut self, bağlam: &mut Context<Self>) -> gpui::Div {
-        let Ok(tercih) = self
-            .kök
-            .read_with(bağlam, |kök, _| kök.tezgah_tercihleri().clone())
-        else {
+        let Ok((tercih, çözücü)) = self.kök.read_with(bağlam, |kök, _| {
+            (kök.tezgah_tercihleri().clone(), kök.tezgah_çözücüsü())
+        }) else {
             return div();
         };
         let g = crate::görünüm();
@@ -122,9 +129,8 @@ impl AlanDurumPaneli {
                     .child(crate::bölüm_başlığı(
                         &g,
                         &t,
-                        &crate::tezgah_bölüm_adı(&crate::anahtar(
-                            "galeri.tezgah.bölüm.turetilmis_durum",
-                        )),
+                        // `ORT-021` anahtarı kök-kapsamlı hizmetten çözülür.
+                        &çözücü.çöz(&crate::anahtar("galeri.tezgah.bölüm.turetilmis_durum")),
                     ))
                     .child(crate::sergiler::turetilmis_durum_satırı(
                         &tercih, &alan, bağlam,
@@ -155,13 +161,24 @@ impl OlayAkışıPaneli {
 
     /// Tür değişince yeniden kurulan alana bağlanır; akış sıfırlanmaz —
     /// önceki alanın yayımladıkları da "alan ürüne ne söyledi"nin parçası.
-    pub(crate) fn alanı_bağla(&mut self, alan: Entity<GirişKutusu>, bağlam: &mut Context<Self>) {
+    pub(crate) fn alanı_bağla(
+        &mut self, alan: Entity<GirişKutusu>, bağlam: &mut Context<Self>
+    ) {
         self._abonelik = Self::abone_ol(&alan, bağlam);
         bağlam.notify();
     }
 
     fn abone_ol(alan: &Entity<GirişKutusu>, bağlam: &mut Context<Self>) -> gpui::Subscription {
         bağlam.subscribe(alan, |panel, _alan, olay, bağlam| {
+            // Ölçüm kapısı tüketici ablation'ından bağımsız kalmalı. Olay
+            // akışı kapalı fazda bile gerçek düzenleme sayılır; yalnız
+            // özet/liste mutasyonu ve panel bildirimi kesilir.
+            if matches!(
+                olay,
+                gpui_bilesenleri::GirişOlayı::DüzenlemeMetniDeğişti { .. }
+            ) {
+                DÜZENLEME_SAYISI.with(|sayaç| sayaç.set(sayaç.get().saturating_add(1)));
+            }
             panel.kaydet(crate::olay_özeti(olay), bağlam);
         })
     }
@@ -172,10 +189,6 @@ impl OlayAkışıPaneli {
     /// yazarken alan her tuşta `DüzenlemeMetniDeğişti` yayımlıyor ve akış
     /// tek bir tuş dizisiyle doluyordu.
     fn kaydet(&mut self, olay: TezgahOlayı, bağlam: &mut Context<Self>) {
-        // Ölçüm kapısı: yalnız gerçek metin düzenlemesi sayılır.
-        if olay.ad == "DüzenlemeMetniDeğişti" {
-            DÜZENLEME_SAYISI.with(|sayaç| sayaç.set(sayaç.get().saturating_add(1)));
-        }
         match self.olaylar.first_mut() {
             Some(baş) if baş.ad == olay.ad && baş.özet == olay.özet => {
                 baş.sayı = baş.sayı.saturating_add(1);
@@ -233,14 +246,18 @@ impl YuvaNotuPaneli {
     }
 
     /// Tür değişince yeniden kurulan alana bağlanır.
-    pub(crate) fn alanı_bağla(&mut self, alan: Entity<GirişKutusu>, bağlam: &mut Context<Self>) {
+    pub(crate) fn alanı_bağla(
+        &mut self, alan: Entity<GirişKutusu>, bağlam: &mut Context<Self>
+    ) {
         self._abonelik = Self::gözle(&alan, bağlam);
         self.alan = alan;
         bağlam.notify();
     }
 
     fn gözle(alan: &Entity<GirişKutusu>, bağlam: &mut Context<Self>) -> gpui::Subscription {
-        bağlam.observe(alan, |_, _, bağlam| bağlam.notify())
+        bağlam.observe(alan, |_, _, bağlam| {
+            bağlam.notify();
+        })
     }
 }
 
@@ -413,7 +430,12 @@ impl BölümlerPaneli {
         }
         panel
             .clone()
-            .cached(gpui::StyleRefinement::default().flex_1().min_w(px(0.)).min_h(px(0.)))
+            .cached(
+                gpui::StyleRefinement::default()
+                    .flex_1()
+                    .min_w(px(0.))
+                    .min_h(px(0.)),
+            )
             .into_any_element()
     }
 }
@@ -429,17 +451,20 @@ impl BölümlerPaneli {
     fn gövde(&mut self, pencere: &mut Window, bağlam: &mut Context<Self>) -> gpui::AnyElement {
         // Bölümler kökün bağlamında üretilir: kart içeriklerindeki bütün
         // dinleyiciler `tezgahı_değiştir` ve akrabalarına, yani köke bağlı.
-        let Ok(bölümler) = self
-            .kök
-            .update(bağlam, |kök, bağlam| kök.tezgah_bölümleri(pencere, bağlam))
-        else {
+        let Ok((bölümler, çözücü)) = self.kök.update(bağlam, |kök, bağlam| {
+            (kök.tezgah_bölümleri(pencere, bağlam), kök.tezgah_çözücüsü())
+        }) else {
             return div().into_any_element();
         };
         let g = crate::görünüm();
         let t = crate::TezgahTokenları::paletten(crate::palet());
-        let ad = crate::tezgah_bölüm_adı(&crate::anahtar("galeri.tezgah.yapılandırma"));
-        crate::yapılandırma_kolonu_gövdesi(bölümler, &g, &t, ad, crate::tezgah_bölüm_adı)
-            .into_any_element()
+        // `ORT-021` anahtarları kök-kapsamlı hizmetten çözülür; panel ham
+        // dize sözlüğü tanımaz.
+        let ad = çözücü.çöz(&crate::anahtar("galeri.tezgah.yapılandırma"));
+        crate::yapılandırma_kolonu_gövdesi(bölümler, &g, &t, ad, move |anahtar| {
+            çözücü.çöz(anahtar)
+        })
+        .into_any_element()
     }
 }
 
@@ -475,7 +500,7 @@ mod testler {
     fn rapor_tek_yerden_kurulur() {
         let lib = include_str!("lib.rs");
         assert_eq!(
-            lib.matches(").doğrula()").count(),
+            lib.matches(".doğrula()").count(),
             1,
             "rapor önbellek ıskası dışında da kuruluyor"
         );

@@ -12,7 +12,24 @@ use gpui_bilesenleri::{
     GeçerlilikÖnemi, GeçersizOdakDavranışı, HarfDönüşümü, KırpmaPolitikası,
     MetinYapıştırmaDönüşümü, SeçiciGörünürlüğü, ÖrnekKimliğiFabrikası,
 };
-use gpui_bilesenleri_galeri::{TezgahBölütü, TezgahDeğerKipi, TezgahTercihleri, TezgahYapıştırması};
+use gpui_bilesenleri_galeri::{
+    TezgahBölütü, TezgahDeğerKipi, TezgahTercihleri, TezgahYapıştırması,
+};
+
+/// Testlerin `ORT-002` doğrulama kapısı; kimlikler yalnız motordan doğar.
+fn motor() -> std::sync::Arc<gpui_bilesenleri_temel::UnicodeMetinMotoru> {
+    use std::sync::OnceLock;
+    static MOTOR: OnceLock<std::sync::Arc<gpui_bilesenleri_temel::UnicodeMetinMotoru>> =
+        OnceLock::new();
+    MOTOR
+        .get_or_init(|| {
+            gpui_bilesenleri_temel::UnicodeVeYerelMetinHizmetleri::yerlesik(
+                ÖrnekKimliğiFabrikası::yeni_süreç_kapsamı().expect("test kimlik kapsamı"),
+            )
+            .motor()
+        })
+        .clone()
+}
 
 fn kimlik_fabrikası() -> ÖrnekKimliğiFabrikası {
     ÖrnekKimliğiFabrikası::yeni_süreç_kapsamı().expect("test kimlik kapsamı")
@@ -25,7 +42,7 @@ fn kimlik_fabrikası() -> ÖrnekKimliğiFabrikası {
 #[test]
 fn varsayilanlar_kanonik_tabani_bozmaz() {
     let taban = gpui_bilesenleri::GirişYapılandırması::tek_satırlı_metin();
-    let y = TezgahTercihleri::default().yapılandırma(&kimlik_fabrikası());
+    let y = TezgahTercihleri::default().yapılandırma(&kimlik_fabrikası(), &motor());
 
     assert_eq!(y.harf_dönüşümü, taban.harf_dönüşümü);
     assert_eq!(y.kırpma, taban.kırpma);
@@ -42,7 +59,7 @@ fn metin_isleme_eksenleri_cevrilir() {
     t.kırpma = KırpmaPolitikası::HerZamanKırp;
     t.boş_metin = BoşMetinPolitikası::Reddet;
 
-    let y = t.yapılandırma(&kimlik_fabrikası());
+    let y = t.yapılandırma(&kimlik_fabrikası(), &motor());
     assert_eq!(y.harf_dönüşümü, HarfDönüşümü::SözcükBaşı);
     assert_eq!(y.kırpma, KırpmaPolitikası::HerZamanKırp);
     assert_eq!(y.boş_metin, BoşMetinPolitikası::Reddet);
@@ -66,10 +83,10 @@ fn yapistirma_dil_etiketleriyle_cevrilir() {
     let mut t = TezgahTercihleri::default();
     t.yapıştırma = TezgahYapıştırması::TanımlıYerelAyarlarıDene;
 
-    let y = t.yapılandırma(&kimlik_fabrikası());
+    let y = t.yapılandırma(&kimlik_fabrikası(), &motor());
     match y.yapıştırma {
         MetinYapıştırmaDönüşümü::TanımlıYerelAyarlarıDene { yerel_ayarlar } => {
-            let etiketler: Vec<&str> = yerel_ayarlar.iter().map(|e| e.0.as_ref()).collect();
+            let etiketler: Vec<&str> = yerel_ayarlar.iter().map(|e| e.bcp47()).collect();
             assert_eq!(etiketler, ["tr-TR", "en-US"], "sıra anlamlıdır");
         }
         // `MetinYapıştırmaDönüşümü` `Debug` türetmez; varyantı adlandırmak
@@ -78,7 +95,7 @@ fn yapistirma_dil_etiketleriyle_cevrilir() {
     }
 
     let kod = t.kod();
-    assert!(kod.contains("DilEtiketi::yeni(\"tr-TR\")"), "{kod}");
+    assert!(kod.contains("motor.dil_etiketi(\"tr-TR\")"), "{kod}");
 }
 
 /// Her yapıştırma seçeneği kanonik bir varyanta düşer.
@@ -87,7 +104,7 @@ fn her_yapistirma_secenegi_kanonige_duser() {
     for seçenek in TezgahYapıştırması::TÜMÜ {
         let mut t = TezgahTercihleri::default();
         t.yapıştırma = seçenek;
-        let çözülmüş = t.yapılandırma(&kimlik_fabrikası()).yapıştırma;
+        let çözülmüş = t.yapılandırma(&kimlik_fabrikası(), &motor()).yapıştırma;
         let eşleşir = match seçenek {
             TezgahYapıştırması::Katı => matches!(çözülmüş, MetinYapıştırmaDönüşümü::Katı),
             TezgahYapıştırması::GeçerliKarakterleriSüz => {
@@ -112,7 +129,7 @@ fn escape_ve_gecersiz_odak_cevrilir() {
     t.escape = EscapeDavranışı::DeğişiklikleriKoru;
     t.geçersiz_odak = GeçersizOdakDavranışı::OdağıKoru;
 
-    let y = t.yapılandırma(&kimlik_fabrikası());
+    let y = t.yapılandırma(&kimlik_fabrikası(), &motor());
     assert_eq!(y.escape, EscapeDavranışı::DeğişiklikleriKoru);
     assert_eq!(y.geçersiz_odak, GeçersizOdakDavranışı::OdağıKoru);
 
@@ -128,7 +145,7 @@ fn escape_ve_gecersiz_odak_cevrilir() {
 fn bolut_kusagi_bos_kurulmaz() {
     let t = TezgahTercihleri::default();
     assert!(
-        t.yapılandırma(&kimlik_fabrikası())
+        t.yapılandırma(&kimlik_fabrikası(), &motor())
             .bitişik_bölütler
             .is_none()
     );
@@ -136,7 +153,7 @@ fn bolut_kusagi_bos_kurulmaz() {
     let mut t = TezgahTercihleri::default();
     t.başlangıç_bölütü = Some(TezgahBölütü::SabitMetin);
     let kuşak = t
-        .yapılandırma(&kimlik_fabrikası())
+        .yapılandırma(&kimlik_fabrikası(), &motor())
         .bitişik_bölütler
         .expect("bölüt seçiliyken kuşak kurulur");
     assert_eq!(
@@ -158,7 +175,7 @@ fn bolut_kademesi_her_iki_boluete_uygulanir() {
     t.bölüt_kademeli = false;
 
     let kuşak = t
-        .yapılandırma(&kimlik_fabrikası())
+        .yapılandırma(&kimlik_fabrikası(), &motor())
         .bitişik_bölütler
         .expect("kuşak kurulur");
     assert!(!kuşak.başlangıç.expect("başlangıç").opaklık_kademeli);
@@ -176,7 +193,7 @@ fn arama_gonderimi_yuvaya_baglidir() {
     let mut t = TezgahTercihleri::default();
     t.arama = false;
     assert!(
-        t.yapılandırma(&kimlik_fabrikası())
+        t.yapılandırma(&kimlik_fabrikası(), &motor())
             .arama_gönderimi
             .is_none()
     );
@@ -184,13 +201,13 @@ fn arama_gonderimi_yuvaya_baglidir() {
     t.arama = true;
     t.arama_temizleme_gönderir = true;
     let gönderim = t
-        .yapılandırma(&kimlik_fabrikası())
+        .yapılandırma(&kimlik_fabrikası(), &motor())
         .arama_gönderimi
         .expect("yuva açıkken gönderim kurulur");
     assert!(gönderim.enter_gönderir && gönderim.temizleme_gönderir);
 
     // Kuruluş raporu temiz: eksen `UyumsuzAramaGönderimi` üretmiyor.
-    let rapor = t.yapılandırma(&kimlik_fabrikası()).doğrula();
+    let rapor = t.yapılandırma(&kimlik_fabrikası(), &motor()).doğrula();
     assert!(
         !rapor
             .hatalar
@@ -209,12 +226,16 @@ fn arama_gonderimi_yuvaya_baglidir() {
 fn secici_uyarlamasi_yuvaya_baglidir() {
     let mut t = TezgahTercihleri::default();
     t.seçici = false;
-    assert!(t.yapılandırma(&kimlik_fabrikası()).seçici.is_none());
+    assert!(
+        t.yapılandırma(&kimlik_fabrikası(), &motor())
+            .seçici
+            .is_none()
+    );
 
     t.seçici = true;
     t.seçici_görünürlüğü = SeçiciGörünürlüğü::HerZamanGöster;
     let uyarlama = t
-        .yapılandırma(&kimlik_fabrikası())
+        .yapılandırma(&kimlik_fabrikası(), &motor())
         .seçici
         .expect("yuva açıkken uyarlama kurulur");
     assert_eq!(uyarlama.görünürlük, SeçiciGörünürlüğü::HerZamanGöster);
@@ -225,14 +246,21 @@ fn secici_uyarlamasi_yuvaya_baglidir() {
 #[test]
 fn zorunluluk_kurali_listeye_eklenir() {
     let t = TezgahTercihleri::default();
-    let taban_kural_sayısı = t.yapılandırma(&kimlik_fabrikası()).doğrulama.kurallar.len();
+    let taban_kural_sayısı = t
+        .yapılandırma(&kimlik_fabrikası(), &motor())
+        .doğrulama
+        .kurallar
+        .len();
 
     let mut t = TezgahTercihleri::default();
     t.zorunlu = true;
     t.doğrulama_tetikleyicisi = GeçerlilikTetikleyicisi::Değişimde;
     t.doğrulama_önemi = GeçerlilikÖnemi::Uyarı;
 
-    let kurallar = t.yapılandırma(&kimlik_fabrikası()).doğrulama.kurallar;
+    let kurallar = t
+        .yapılandırma(&kimlik_fabrikası(), &motor())
+        .doğrulama
+        .kurallar;
     assert_eq!(kurallar.len(), taban_kural_sayısı + 1);
     let kural = kurallar.last().expect("zorunluluk kuralı");
     assert_eq!(kural.tetikleyici, GeçerlilikTetikleyicisi::Değişimde);
@@ -249,7 +277,7 @@ fn zorunluluk_kurali_listeye_eklenir() {
     t2.sayısal_adım = true;
     t2.adım_sınırı = true;
     let kimlikler: Vec<u64> = t2
-        .yapılandırma(&kimlik_fabrikası())
+        .yapılandırma(&kimlik_fabrikası(), &motor())
         .doğrulama
         .kurallar
         .iter()
@@ -322,7 +350,7 @@ fn metin_icerik_turu_koda_yazilir() {
         kod.contains("içerik_türü: MetinİçerikTürü::EPosta"),
         "içerik türü koda yazılmalı:\n{kod}"
     );
-    let yapılandırma = t.yapılandırma(&kimlik_fabrikası());
+    let yapılandırma = t.yapılandırma(&kimlik_fabrikası(), &motor());
     assert!(matches!(
         yapılandırma.giriş_türü,
         gpui_bilesenleri::GirişTürü::Metin(tanım)

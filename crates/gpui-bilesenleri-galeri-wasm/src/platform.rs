@@ -8,9 +8,11 @@
 use gpui_bilesenleri_galeri::{
     GizlilikKapılıYetenek, GmtFarkı, OtomatikDoldurmaAmacı, OtomatikDoldurmaHatası,
     PlatformMetinİmleciTercihi, PlatformOtomatikDoldurmaPortu, PlatformSaatDilimiPortu,
-    PlatformİmleçPortu, PlatformİzinDurumu, SaatDilimiKaynağı, SaatDilimiKimliği,
+    PlatformİmleçPortu, PlatformİzinDurumu, SaatDilimiKaynağı, UnicodeMetinMotoru,
     ÇözülmüşSaatDilimi,
 };
+#[cfg(target_family = "wasm")]
+use std::sync::Arc;
 #[cfg(target_family = "wasm")]
 use wasm_bindgen::prelude::*;
 
@@ -36,7 +38,18 @@ extern "C" {
 }
 
 #[cfg(target_family = "wasm")]
-pub struct TarayıcıSaatDilimi;
+pub struct TarayıcıSaatDilimi {
+    /// `ORT-002` doğrulama kapısı: `Intl` dizesi kimliğe ancak kayıt
+    /// yolundan çevrilir, port kimlik mühürlemez.
+    motor: Arc<UnicodeMetinMotoru>,
+}
+
+#[cfg(target_family = "wasm")]
+impl TarayıcıSaatDilimi {
+    pub fn yeni(motor: Arc<UnicodeMetinMotoru>) -> Self {
+        Self { motor }
+    }
+}
 
 #[cfg(target_family = "wasm")]
 impl PlatformSaatDilimiPortu for TarayıcıSaatDilimi {
@@ -53,7 +66,9 @@ impl PlatformSaatDilimiPortu for TarayıcıSaatDilimi {
         }
         let ad = dilim_kimliği();
         Some(ÇözülmüşSaatDilimi {
-            kimlik: (!ad.trim().is_empty()).then(|| SaatDilimiKimliği(ad.trim().into())),
+            // Tanınmayan dize kimlik olarak bildirilmez; çözüm GMT
+            // farkıyla sürer.
+            kimlik: self.motor.saat_dilimi(ad.trim()).ok(),
             gmt_farkı,
             kaynak: SaatDilimiKaynağı::Platform,
         })

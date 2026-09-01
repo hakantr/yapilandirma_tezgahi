@@ -52,13 +52,18 @@ pub fn başlat() {
                 galeri_durumu("yazi-tipi-hatasi", &hata.to_string());
             }
             let pencere = bağlam.open_window(WindowOptions::default(), |_, bağlam| {
-                bağlam.new(|_| {
+                bağlam.new(|bağlam| {
                     let mut uygulama = GaleriUygulaması::wasm();
-                    uygulama.platform_portlarını_kur(PlatformPortları {
-                        saat_dilimi: Some(Arc::new(platform::TarayıcıSaatDilimi)),
-                        imleç: Some(Arc::new(platform::TarayıcıİmleciTercihi)),
-                        otomatik_doldurma: Some(Arc::new(platform::TarayıcıOtomatikDoldurma)),
-                    });
+                    // Saat dilimi kimlik kapısı uygulama kökünün motorudur.
+                    let dilim = platform::TarayıcıSaatDilimi::yeni(uygulama.metin_motoru());
+                    uygulama.platform_portlarını_kur(
+                        PlatformPortları {
+                            saat_dilimi: Some(Arc::new(dilim)),
+                            imleç: Some(Arc::new(platform::TarayıcıİmleciTercihi)),
+                            otomatik_doldurma: Some(Arc::new(platform::TarayıcıOtomatikDoldurma)),
+                        },
+                        bağlam,
+                    );
                     uygulama
                 })
             });

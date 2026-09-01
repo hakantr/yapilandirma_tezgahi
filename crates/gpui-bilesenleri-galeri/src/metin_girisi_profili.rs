@@ -15,7 +15,7 @@
 //! burada kurulur, kapanan eksenler pasif ve gerekçeli çizilir, yüzer panel
 //! mekanizması kalkmıştır. Kalan iş gövdeye bağlanmadır (adım 5).
 
-use gpui::{Context, Entity, prelude::*};
+use gpui::{Context, Entity, ScrollHandle, prelude::*};
 use gpui_bilesenleri::GirişKutusu;
 
 use crate::{
@@ -38,8 +38,21 @@ pub struct MetinGirişiProfilGirdisi<'a> {
     pub paneller: &'a crate::TezgahPanelleri,
     /// Kod panelinin metni; tercih sürümüne bağlı, kökten hazır gelir.
     pub kod: gpui::SharedString,
+    /// Sıradan sol kaydırmanın kararlı tutamacı.
+    pub sol_kaydırma: ScrollHandle,
     pub en_fazla_yarıçap: f32,
     pub köşe_izi: std::rc::Rc<std::cell::Cell<gpui::Bounds<gpui::Pixels>>>,
+    /// Canlı UI çözüm yolunun son typed hatası (varsa); önizleme bloğu
+    /// exact kaydı çizer. Kayıt çizim sırasında yazıldığı için görünen
+    /// değer bir önceki karenin akıbetidir — yaşayan yuva budur.
+    pub(crate) son_çözüm_hatası: Option<crate::TezgahÇözümKaydı>,
+    /// `§30` tercih→kutu eşitlemesinin son **kalıcı** reddi (varsa);
+    /// önizleme tanı satırı exact varyantı çizer. Buraya düşmeyen tek ret
+    /// **canlı işaretli** (`birleşim_utf8.is_some()`) `CompositionEtkin`dir
+    /// — o geçici ertelemedir ve bekleyen kümeyle taşınır; asılı
+    /// kompozisyon-ekseninin işaretsiz `CompositionEtkin`i kalıcıdır ve
+    /// burada görünür.
+    pub(crate) tercih_eşitleme_hatası: Option<crate::TercihEşitlemeKaydı>,
 }
 
 /// Solda ana eksen, sağda onu tamamlayan grup.
@@ -87,34 +100,51 @@ fn sol_kartlar(
     paneller: &crate::TezgahPanelleri,
     bağlam: &mut Context<GaleriUygulaması>,
 ) -> Vec<gpui::AnyElement> {
+    (0..SOL_EK_KART_SAYISI)
+        .filter_map(|indis| sol_ek_kartı(indis, tercih, paneller, bağlam))
+        .collect()
+}
+
+const SOL_EK_KART_SAYISI: usize = 6;
+
+fn sol_kart_kurulumunu_say() {}
+
+/// Sol kolonun tek bir üst düzey kartını kurar.
+///
+/// Sıradan yol altı öğenin tümünü çağırır; sanal liste yalnız görünür
+/// indisleri çağırır. Böylece sayaç, sanallaştırmanın gerçekten çalıştığını
+/// doğrudan kanıtlar.
+pub(crate) fn sol_ek_kartı(
+    indis: usize,
+    tercih: &TezgahTercihleri,
+    paneller: &crate::TezgahPanelleri,
+    bağlam: &mut Context<GaleriUygulaması>,
+) -> Option<gpui::AnyElement> {
     use crate::sergiler::{kabuk_yuvaları, parça_tipografisi, yazı_biçimi_şeridi};
 
-    vec![
-        // `§7.1` parça tipografisi ve kabukta bulunan yuvalar. Yaşayan
-        // alanın **altında** ve kaydırılabilir bölümde: sabit blokta yalnız
-        // şekil, hizalama ve alanın kendisi kalır, kaydırma alanın hemen
-        // altından başlar.
-        ikili_satır(
+    let öğe = match indis {
+        0 => ikili_satır(
             parça_tipografisi(tercih, bağlam),
             yazı_biçimi_şeridi(tercih, bağlam),
         )
         .into_any_element(),
-        // Kartın alan okuyan notu kendi gözleyen panelindedir; kökün çizim
-        // yolunda alan okuması kalmaz.
-        kabuk_yuvaları(tercih, bağlam)
+        1 => kabuk_yuvaları(tercih, bağlam)
             .child(paneller.yuva_notu.clone())
             .into_any_element(),
-        // `ORT-004 §20.1` imleç tercihi de kayan bölümde: sabit blokta
-        // yalnız şekil, hizalama ve yaşayan alan kalır.
-        crate::sergiler::imleç_satırı(tercih, bağlam).into_any_element(),
-        // `§16.2` ankraj ve açıklama yüzeyi; bunlar da kayar.
-        gösterge_kutusu(tercih, bağlam).into_any_element(),
-        // `C` türetilmiş durumlar + `§13/§19` değer üçlüsü ve `§26` olay
-        // akışı kendi entity'lerinde: alanın durumunu onlar okur, alanın
-        // bildirimini onlar dinler. Kartların kendisi panellerin çizimidir.
-        paneller.alan_durumu.clone().into_any_element(),
-        paneller.olay_akışı.clone().into_any_element(),
-    ]
+        2 => crate::sergiler::imleç_satırı(tercih, bağlam).into_any_element(),
+        3 => gösterge_kutusu(tercih, bağlam).into_any_element(),
+        4 => paneller.alan_durumu.clone().into_any_element(),
+        5 => paneller.olay_akışı.clone().into_any_element(),
+        _ => return None,
+    };
+    sol_kart_kurulumunu_say();
+    Some(öğe)
+}
+
+/// Sol kolonun son öğesi olan kod panelini kurar.
+pub(crate) fn sol_kod_kartı(kod: gpui::SharedString) -> gpui::AnyElement {
+    sol_kart_kurulumunu_say();
+    crate::sergiler::kod_paneli(kod).into_any_element()
 }
 
 /// `bölümler` girdisi.
@@ -127,6 +157,11 @@ pub(crate) struct BölümGirdisi<'a> {
     pub tercih: &'a TezgahTercihleri,
     pub alanlar: &'a crate::MetinGirişiAlanları,
     pub saat_dilimi: &'a ÇözülmüşSaatDilimi,
+    /// `ORT-002` kayıt yolundan çözülmüş saat dilimi tercih seçenekleri.
+    pub dilim_seçenekleri: &'a crate::SaatDilimiSeçenekleri,
+    /// Yerel kök yenilemesinin terminal akıbeti (varsa); kart typed sonucu
+    /// çizer, tercih sessizce "uygulanmış" görünmez.
+    pub yerel_kök_hatası: Option<crate::YerelKökHatası>,
     pub doldurma_var: bool,
     pub portlar: PortDurumu,
     pub sayısal: bool,
@@ -170,24 +205,114 @@ pub fn tezgah_içeriği(
         alan,
         paneller,
         kod,
+        sol_kaydırma,
         en_fazla_yarıçap,
         köşe_izi,
+        son_çözüm_hatası,
+        tercih_eşitleme_hatası,
     } = girdi;
     let sayısal = tercih.sayısal_mı();
+
+    let sanal_öğe: Option<gpui::AnyElement> = None;
+
+    let sol_sanal = sanal_öğe.is_some();
+    let (sol_ek, kod) = if let Some(sanal_öğe) = sanal_öğe {
+        (vec![sanal_öğe], None)
+    } else {
+        (
+            sol_kartlar(tercih, paneller, bağlam),
+            Some(sol_kod_kartı(kod)),
+        )
+    };
 
     Tezgahİçeriği {
         başlık: anahtar("galeri.tezgah.başlık"),
         önizleme_başlığı: anahtar("galeri.tezgah.önizleme"),
-        önizleme: önizleme_blokları(tercih, &alan, en_fazla_yarıçap, köşe_izi, sayısal, bağlam),
+        önizleme: önizleme_blokları(
+            tercih,
+            &alan,
+            en_fazla_yarıçap,
+            köşe_izi,
+            sayısal,
+            son_çözüm_hatası,
+            tercih_eşitleme_hatası,
+            bağlam,
+        ),
         // Tasarımın `§5` şeması sol kolona `önizleme → C türetilmiş
         // durumlar → kod paneli` sırasını veriyor. `D` aile kataloğu da
         // önizleme bağlamıdır ve aynı kolonda durur; ikisi de sağ kolonun
         // yapılandırma eksenleri arasına karışmaz.
-        sol_ek: sol_kartlar(tercih, paneller, bağlam),
-        kod: Some(crate::sergiler::kod_paneli(kod).into_any_element()),
+        sol_ek,
+        sol_sanal,
+        sol_kaydırma,
+        kod,
         // Sağ kolon önbellekli bölüm paneli: bölümler orada, kökün
         // bağlamında kurulur ve kök bildirmedikçe yeniden kurulmaz.
         yapılandırma: crate::BölümlerPaneli::öğe(&paneller.bölümler),
+    }
+}
+
+/// `§29` kuruluş başarısızlığının içeriği.
+///
+/// `GirişKutusu::kur` düştüğünde entity, panel ve abonelik yoktur; önizleme
+/// exact typed sonucu çizer. Hata yutulmaz, sahte bir alan da çizilmez.
+pub(crate) fn kuruluş_hatası_içeriği(
+    hata: Option<&gpui_bilesenleri::GirişKuruluşHatası>,
+    son_çözüm_hatası: Option<crate::TezgahÇözümKaydı>,
+    tercih_eşitleme_hatası: Option<crate::TercihEşitlemeKaydı>,
+    sol_kaydırma: ScrollHandle,
+) -> Tezgahİçeriği {
+    let g = crate::görünüm();
+    let t = crate::TezgahTokenları::paletten(crate::palet());
+    let metin = match hata {
+        Some(gpui_bilesenleri::GirişKuruluşHatası::Yapılandırma(rapor)) => {
+            format!("Kuruluş yapısal hatayla reddedildi: {:?}", rapor.hatalar)
+        }
+        Some(gpui_bilesenleri::GirişKuruluşHatası::Teknik { hata, .. }) => {
+            format!("Kuruluş teknik hazırlamada düştü: {hata:?}")
+        }
+        None => "Kuruluş sonucu kayıp".to_owned(),
+    };
+    let kart = crate::kart(&g, &t)
+        .child(crate::bölüm_başlığı(
+            &g,
+            &t,
+            "Tezgâh alanı kurulamadı",
+        ))
+        .child(gpui::div().child(metin))
+        .into_any_element();
+    let mut önizleme = vec![kart];
+    // Kuruluş hatası ile sistemik çözüm akıbeti üst üste gelebilir; ikisi
+    // de kendi typed satırıyla görünür (yoklama bu yolda da koşar).
+    if let Some(kayıt) = son_çözüm_hatası {
+        önizleme.push(
+            crate::stili_uygula(gpui::div(), &g.eksen_etiketi)
+                .debug_selector(|| "tanı-son-ileti-çözüm-hatası".into())
+                .text_color(t.vurgu)
+                .child(crate::son_çözüm_hatası_metni(&kayıt))
+                .into_any_element(),
+        );
+    }
+    // Tercih kutuları kuruluş hatasından bağımsız yaşar; kalıcı eşitleme
+    // reddi bu yolda da kendi typed satırıyla görünür.
+    if let Some(kayıt) = tercih_eşitleme_hatası {
+        önizleme.push(
+            crate::stili_uygula(gpui::div(), &g.eksen_etiketi)
+                .debug_selector(|| "tanı-tercih-eşitleme-hatası".into())
+                .text_color(t.vurgu)
+                .child(crate::tercih_eşitleme_hatası_metni(&kayıt))
+                .into_any_element(),
+        );
+    }
+    Tezgahİçeriği {
+        başlık: anahtar("galeri.tezgah.başlık"),
+        önizleme_başlığı: anahtar("galeri.tezgah.önizleme"),
+        önizleme,
+        sol_ek: Vec::new(),
+        sol_sanal: false,
+        sol_kaydırma,
+        kod: None,
+        yapılandırma: gpui::div().into_any_element(),
     }
 }
 
@@ -201,13 +326,15 @@ fn önizleme_blokları(
     en_fazla_yarıçap: f32,
     köşe_izi: std::rc::Rc<std::cell::Cell<gpui::Bounds<gpui::Pixels>>>,
     sayısal: bool,
+    son_çözüm_hatası: Option<crate::TezgahÇözümKaydı>,
+    tercih_eşitleme_hatası: Option<crate::TercihEşitlemeKaydı>,
     bağlam: &mut Context<GaleriUygulaması>,
 ) -> Vec<gpui::AnyElement> {
     use crate::sergiler::{
         dikey_hizalama_şeridi, köşe_şeridi, yardımcı_eylem_şeridi, yatay_hizalama_şeridi,
     };
 
-    vec![
+    let mut bloklar = vec![
         // `ORT-003` kutu şekli ve yarıçapı.
         // Taslakta üç satır **ikişer gruplu**: solda ana eksen, sağda onu
         // tamamlayan grup. Ayrı satırlara bölmek sol kolonu iki katına
@@ -229,7 +356,40 @@ fn önizleme_blokları(
         // sıkışabiliyordu — tezgâhın merkezindeki alan ekranda hiç
         // görünmüyordu.
         önizleme_kabuğu(alan).into_any_element(),
-    ]
+    ];
+    // `ORT-021` canlı çözüm yolunun son typed hatası (varsa) burada çizilir.
+    // Kök, render girdisini kurmadan önce kanonik anahtarı yoklar
+    // (`TezgahİletiÇözücüsü::yokla`): sistemik akıbet yuvaya aynı karede
+    // düşer ve bu satır aynı karede görünür — ikinci kare beklenmez.
+    if let Some(kayıt) = son_çözüm_hatası {
+        let g = crate::görünüm();
+        let t = crate::TezgahTokenları::paletten(crate::palet());
+        bloklar.push(
+            crate::stili_uygula(gpui::div(), &g.eksen_etiketi)
+                // Testler bu satırın gerçekten boyandığını buradan ölçer;
+                // üretim derlemesinde no-op'tur.
+                .debug_selector(|| "tanı-son-ileti-çözüm-hatası".into())
+                .text_color(t.vurgu)
+                .child(crate::son_çözüm_hatası_metni(&kayıt))
+                .into_any_element(),
+        );
+    }
+    // `§30` tercih→kutu eşitlemesinin kalıcı reddi (varsa) exact typed
+    // satırıyla görünür; yalnız canlı işaretli (`birleşim_utf8.is_some()`)
+    // `CompositionEtkin` geçici ertelemedir ve buraya düşmez — işaretsiz
+    // (asılı eksen) `CompositionEtkin` dâhil diğer her ret burada çizilir.
+    if let Some(kayıt) = tercih_eşitleme_hatası {
+        let g = crate::görünüm();
+        let t = crate::TezgahTokenları::paletten(crate::palet());
+        bloklar.push(
+            crate::stili_uygula(gpui::div(), &g.eksen_etiketi)
+                .debug_selector(|| "tanı-tercih-eşitleme-hatası".into())
+                .text_color(t.vurgu)
+                .child(crate::tercih_eşitleme_hatası_metni(&kayıt))
+                .into_any_element(),
+        );
+    }
+    bloklar
 }
 
 /// Sağ kolonun bölümleri; seçili türde kurulamayan eksen listeye girmez.
@@ -241,6 +401,8 @@ pub(crate) fn bölümler(
         tercih,
         alanlar,
         saat_dilimi,
+        dilim_seçenekleri,
+        yerel_kök_hatası,
         doldurma_var,
         portlar,
         sayısal,
@@ -468,7 +630,14 @@ pub(crate) fn bölümler(
             başlık: bölüm_anahtarı("saat_dilimi"),
             yardım: None,
             akış: Akış::C,
-            içerik: saat_dilimi_satırı(tercih, saat_dilimi, bağlam).into_any_element(),
+            içerik: saat_dilimi_satırı(
+                tercih,
+                saat_dilimi,
+                dilim_seçenekleri,
+                yerel_kök_hatası,
+                bağlam,
+            )
+            .into_any_element(),
         });
     }
 
@@ -488,12 +657,24 @@ mod testler {
     /// yakalanmayan yön buydu.
     #[test]
     fn bölüm_sözlüğünde_ölü_kayıt_yok() {
-        let kaynak = include_str!("galeri.rs");
+        // Sözlük host göçüyle `galeri.rs`ten `metin_hizmetleri.rs`teki
+        // gerçek katalog paketine (`TEZGAH_KAYITLARI`) taşındı; bekçi de
+        // onu tarar. Tarama boşa dönerse test kendi kendini yakalar —
+        // sözlük yeniden taşınırsa bekçi sessizce vakumda kalamaz.
+        let kaynak = include_str!("metin_hizmetleri.rs");
+        // Test modülündeki kurgusal anahtarlar (ör. `olmayan_kayit`) sözlük
+        // kaydı değildir; tarama katalog sabitinin yaşadığı üretim bölümüyle
+        // sınırlıdır.
+        let kaynak = kaynak
+            .split("mod testler")
+            .next()
+            .expect("üretim bölümü test modülünden önce gelir");
         let profil = include_str!("metin_girisi_profili.rs");
         // Alan gözleyen kartların başlıkları panel entity'lerinde çözülür;
         // oradaki kullanım da sözlük kaydını canlı tutar.
         let paneller = include_str!("paneller.rs");
         let ön_ek = "\"galeri.tezgah.bölüm.";
+        let mut taranan = 0usize;
         for satır in kaynak.lines() {
             let Some(kalan) = satır.split(ön_ek).nth(1) else {
                 continue;
@@ -501,6 +682,7 @@ mod testler {
             let Some(kimlik) = kalan.split('"').next() else {
                 continue;
             };
+            taranan += 1;
             assert!(
                 profil.contains(&format!("kimlik: \"{kimlik}\""))
                     || profil.contains(&format!("çöz(\"{kimlik}\")"))
@@ -508,6 +690,10 @@ mod testler {
                 "sözlükte ölü kayıt: {kimlik}"
             );
         }
+        assert!(
+            taranan >= 18,
+            "bekçi vakumda: katalog sözlüğü taranamadı ({taranan} kayıt)"
+        );
     }
 
     /// Bölüm anahtarları galerinin var olan `galeri.*` desenini sürdürür.

@@ -3,14 +3,14 @@ use gpui_bilesenleri_kabuk::{
     ArayüzYoğunluğu, BağlamSürümü, BoşlukTokenları, GölgeTokenları, GölgeTokenı, HareketTercihi,
     HareketTokenları, KutuRenkleri, KöşeTokenları, OrtakKutuTemaRolleri, RenkTokenları,
     SemantikRenkRolleri, TemaAnlıkGörüntüsü, TemaBağlamı, TemaKimliği, TipografiTokenları,
-    YerelleştirmeAnahtarı, ÖlçüTokenları, İletiArgümanı, İletiArgümanıKimliği, İletiHatası,
-    İletiÇözümProfili, İletiÇözümleyicisi, İletiİsteği,
+    YerelleştirmeAnahtarı, ÖlçüTokenları, İletiArgümanı, İletiÇözümleyicisi, İletiİsteği,
 };
-use std::{
-    collections::{BTreeMap, BTreeSet},
-    sync::Arc,
-    time::Duration,
+// `ORT-021` mühürlü çözüm hizmeti ve snapshot yalnız temel sandıktan dışa
+// açılır; sergi başlığı çözümü o yüzeyden geçer.
+use gpui_bilesenleri_temel::{
+    YerelMetinBağlamı, İletiKataloğuSnapshot, İletiÇözümHatası, İletiÇözümHizmeti,
 };
+use std::{collections::BTreeSet, sync::Arc, time::Duration};
 
 pub const ORT_AİLELERİ: &[&str] = &[
     "ORT-001", "ORT-002", "ORT-003", "ORT-004", "ORT-005", "ORT-006", "ORT-007", "ORT-008",
@@ -394,15 +394,25 @@ pub fn sergiyi_yalıt(sonuç: Result<(), &str>) -> SergiKartıSonucu {
 pub fn sergi_başlığı_isteği(sergi: &SergiTanımı) -> İletiİsteği {
     İletiİsteği {
         anahtar: sergi.başlık_anahtarı.clone(),
-        argümanlar: BTreeMap::<İletiArgümanıKimliği, İletiArgümanı>::new(),
+        argümanlar: Arc::from(Vec::<İletiArgümanı>::new()),
     }
 }
+
+/// `YÖN-006.ACC-008` sergi başlığı `ORT-021` mühürlü hizmetiyle, yaşayan
+/// yerel bağlam ve güncel katalog snapshot'ı üzerinden çözülür.
+///
+/// Sahte çözücü yoktur: `İletiÇözümleyicisi` mühürlüdür ve tek üretim
+/// implementor'u `İletiÇözümHizmeti`dir. Bayat bağlam/katalog exact
+/// `İletiÇözümHatası` varyantlarıyla döner.
 pub fn sergi_başlığını_çöz(
-    çözücü: &impl İletiÇözümleyicisi,
+    çözücü: &İletiÇözümHizmeti,
     sergi: &SergiTanımı,
-    profil: &İletiÇözümProfili,
-) -> Result<gpui::SharedString, İletiHatası> {
-    çözücü.çöz(&sergi_başlığı_isteği(sergi), profil)
+    yerel: &YerelMetinBağlamı,
+    katalog: Arc<İletiKataloğuSnapshot>,
+) -> Result<gpui::SharedString, İletiÇözümHatası> {
+    çözücü
+        .çöz(&sergi_başlığı_isteği(sergi), yerel, katalog)
+        .map(|çözülen| gpui::SharedString::new(çözülen.metin().metin()))
 }
 
 pub fn kanıtsız_ölçütler<'a>(
@@ -845,47 +855,18 @@ pub fn tezgah_teması(tercih: &crate::TezgahTeması) -> Arc<TemaAnlıkGörüntü
     })
 }
 
+// Tezgâh anahtarlarının görünen karşılığı artık kodda bir sözlük değildir:
+// taşınan metin-girişi yüzeyinin kayıtları `metin_hizmetleri` modülündeki
+// gerçek `ORT-021` katalog paketindedir ve çözüm mühürlü hizmetten geçer.
+// Bilinmeyen anahtar yine sessizce boşa düşmez; çözücü anahtarın kendisini
+// gösterir. Aşağıdaki aile adı/açıklaması sözlükleri ise **taşınmamış**
+// bileşen ailelerinin placeholder'larıdır ve bu atomda değişmez.
+
 /// Bileşenin ne işe yaradığını bir satırda anlatır.
 ///
 /// Kullanıcı yüzeyinde sözleşme numarası geçmez: sözleşmeler bizim tasarım
 /// denetimimizdir, kütüphaneyi kullananın bilmesi gerekmez. Kimlik yalnız
 /// katalog anahtarı ve kanıt yüzeyinde kalır.
-/// Tezgâh anahtarlarının görünen karşılığı.
-///
-/// `YÖN-006.ACC-008` sergi başlığını `ORT-021` anahtarından çözdürür. Katalog
-/// henüz fiziksel değil; çözüm tek yerde durur ki katalog geldiğinde burası
-/// değişsin, çağrı yerleri değil. Bilinmeyen anahtar sessizce boş dönmez,
-/// anahtarın kendisini gösterir.
-pub fn tezgah_bölüm_adı(anahtar: &YerelleştirmeAnahtarı) -> gpui::SharedString {
-    let ad = match anahtar.as_ref() {
-        "galeri.tezgah.başlık" => "Yapılandırma Tezgâhı",
-        "galeri.tezgah.önizleme" => "Önizleme ve kabuk denetimleri",
-        "galeri.tezgah.yapılandırma" => "Yapılandırma eksenleri",
-        "galeri.tezgah.bölüm.deger_turu" => "Değer türü",
-        "galeri.tezgah.bölüm.tur_tanimi_ve_maske" => "Tür tanımı ve giriş maskesi",
-        "galeri.tezgah.bölüm.bicim_profili" => "Biçim profili",
-        "galeri.tezgah.bölüm.on_ek_son_ek" => "Ön ek ve son ek",
-        "galeri.tezgah.bölüm.hacim_ve_sayac" => "Hacim ve sayaç",
-        "galeri.tezgah.bölüm.sayisal_adim" => "Sayısal adım",
-        "galeri.tezgah.bölüm.icerik_gorunurlugu" => "İçerik görünürlüğü",
-        "galeri.tezgah.bölüm.metin_isleme" => "Metin işleme",
-        "galeri.tezgah.bölüm.yapistirma" => "Yapıştırma",
-        "galeri.tezgah.bölüm.bolut_ve_gonderim" => "Bitişik bölüt ve arama gönderimi",
-        "galeri.tezgah.bölüm.port_kapilari" => "Port kapıları",
-        "galeri.tezgah.bölüm.turetilmis_durum" => "Türetilmiş durumlar",
-        "galeri.tezgah.bölüm.yapilandirma_dogrulamasi" => "Yapılandırma doğrulaması",
-        "galeri.tezgah.bölüm.dis_dogrulama" => "Dış doğrulama",
-        "galeri.tezgah.bölüm.odak_ve_kabul" => "Odak, kabul ve erişim",
-        "galeri.tezgah.bölüm.secici_ve_erisim" => "Seçici ve erişilebilirlik",
-        "galeri.tezgah.bölüm.otomatik_doldurma" => "Otomatik doldurma",
-        "galeri.tezgah.bölüm.saat_dilimi" => "Saat dilimi",
-        // Bilinmeyen anahtar: sessizce boşa düşmek yerine anahtarın kendisi
-        // görünür, böylece eksik katalog kaydı ekranda fark edilir.
-        diğer => return gpui::SharedString::new(diğer),
-    };
-    gpui::SharedString::new_static(ad)
-}
-
 pub fn aile_açıklaması(sözleşme: &str) -> &'static str {
     match sözleşme {
         "ORT-001" => "Uygulama yaşam döngüsü, pencere kökü ve platform hedefi",

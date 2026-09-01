@@ -27,6 +27,9 @@ olcum-onbelleksiz = []
 gpui.workspace = true
 gpui-bilesenleri.workspace = true
 gpui-bilesenleri-kabuk.workspace = true
+# `ORT-002` edinme kökü ve `ORT-021` mühürlü çözüm hizmeti yalnız temel
+# sandıktan dışa açılır; uygulama-kökü hizmet sahipliği buradan kurulur.
+gpui-bilesenleri-temel.workspace = true
 
 # `ORT-018` ölçümü tarayıcıda `performance.now()` okur; yalnız WASM
 # hedefinde bağlanır, masaüstü profiline girmez.

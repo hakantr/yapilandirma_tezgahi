@@ -15,20 +15,19 @@ use gpui_bilesenleri::{
     AramaGönderimYapılandırması, ArayüzYoğunluğu, AçıkSaatBiçimi, AçıkTarihBiçimi,
     AçıkTarihSaatBiçimi, AçılırYüzeyYapılandırması, BasamakGruplama, BilimselBiçim, BitişikBölüt,
     BitişikBölütKuşağı, BitişikBölütTürü, BiçimTanımı, BiçimYapılandırması, BoşMetinPolitikası,
-    DilEtiketi, DurumGöstergesiAçıklamaTercihi, DurumGöstergesiYapılandırması,
-    DurumGöstergesiYerleşimTercihi, DüğmeŞekli, EnterDavranışı, EscapeDavranışı,
-    DışHataTemizleme, GeçerlilikKuralTürü, GeçerlilikKuralı, GeçerlilikKuralıKimliği,
-    GeçerlilikTetikleyicisi, GeçerlilikÖnemi, GeçersizOdakDavranışı, GeçiciGösterimPolitikası,
-    GirişDikeyHizalama, GirişMaskesi, GirişTürü,
+    DurumGöstergesiAçıklamaTercihi, DurumGöstergesiYapılandırması, DurumGöstergesiYerleşimTercihi,
+    DüğmeŞekli, DışHataTemizleme, EnterDavranışı, EscapeDavranışı, GeçerlilikKuralTürü,
+    GeçerlilikKuralı, GeçerlilikKuralıKimliği, GeçerlilikTetikleyicisi, GeçerlilikÖnemi,
+    GeçersizOdakDavranışı, GeçiciGösterimPolitikası, GirişDikeyHizalama, GirişMaskesi, GirişTürü,
     GirişYapılandırmaHatası, GirişYapılandırmaUyarısı, GirişYapılandırması, GirişYatayHizalama,
     HareketTercihi, HarfDönüşümü, KabulSeçimi, KesirBiçimi, KesirPaydası, KutuŞekliTercihi,
-    KırpmaPolitikası, MetinYapıştırmaDönüşümü, MetinİmleciHareketi, MetinİçerikTürü, OdakSeçimi,
-    OndalıkDeğer, OndalıkDuyarlılık, ParaBirimiGösterimi, ParaBiçimi, RakamKümesi,
-    SaatDilimiGösterimi, SaatDilimiTercihi, SaatDöngüsü, Sabitİçerik, SabitİçerikSunumRolü,
-    SayaçYapılandırması, SayıBiçimi, SayımBirimi, SeçiciGörünürlüğü, SeçiciUyarlaması, SüreBirimi,
-    SüreBiçimi, TarihParçasıGösterimi, TemaKipi, UzunlukSınırı, UzunlukSınırıDavranışı,
+    KırpmaPolitikası, MetinYapıştırmaDönüşümü, MetinİçerikTürü, OdakSeçimi, OndalıkDeğer,
+    OndalıkDuyarlılık, ParaBirimiGösterimi, ParaBiçimi, RakamKümesi, SaatDilimiGösterimi,
+    SaatDilimiTercihi, SaatDöngüsü, Sabitİçerik, SabitİçerikSunumRolü, SayaçYapılandırması,
+    SayıBiçimi, SayımBirimi, SeçiciGörünürlüğü, SeçiciUyarlaması, SüreBirimi, SüreBiçimi,
+    TarihParçasıGösterimi, TemaKipi, UzunlukSınırı, UzunlukSınırıDavranışı,
     YardımcıEylemGörünürlüğü, YardımcıEylemTürü, YardımcıEylemYuvası, YardımcıEylemÇalışması,
-    YüzdeBiçimi, ÇalışırkenEnterPolitikası, İşaretKonumu, İçerikGörünürlüğü,
+    YüzdeBiçimi, ÇalışırkenEnterPolitikası, İçerikGörünürlüğü, İşaretKonumu,
 };
 
 /// Tezgâhın değer türü kipi — ekrandaki dokuz seçim.
@@ -422,22 +421,24 @@ impl İmleçHızı {
         }
     }
 
-    /// `ORT-004` metin imleci hareketi.
+    /// `ORT-004` temanın metin imleci **adayı**.
     ///
     /// `None`, temanın hareketi ezmediği anlamına gelir: çözüm hareket
-    /// tercihine, oradan platforma düşer.
-    pub const fn hareket(self) -> Option<MetinİmleciHareketi> {
+    /// tercihine, oradan platforma düşer. Aday doğrulanmamıştır; çözüm
+    /// mühürlü `metin_imleci_çözümleyicisi` kapısındadır.
+    pub const fn hareket(self) -> Option<gpui_bilesenleri::TemaMetinİmleciAdayı> {
+        use gpui_bilesenleri::TemaMetinİmleciAdayı;
         // Görev döngüsü eşit: farklı oran isteyen ürün tokenı doğrudan
         // kurar, tezgâh yaygın olanı sunar.
-        const fn eşit(ms: u64) -> Option<MetinİmleciHareketi> {
-            Some(MetinİmleciHareketi::YanıpSönen {
+        const fn eşit(ms: u64) -> Option<TemaMetinİmleciAdayı> {
+            Some(TemaMetinİmleciAdayı::YanıpSönen {
                 dönem: Duration::from_millis(ms * 2),
                 görünür_süre: Duration::from_millis(ms),
             })
         }
         match self {
             Self::Platform => None,
-            Self::Sabit => Some(MetinİmleciHareketi::Sabit),
+            Self::Sabit => Some(TemaMetinİmleciAdayı::Sabit),
             Self::Hızlı => eşit(250),
             Self::Normal => eşit(530),
             Self::Yavaş => eşit(900),
@@ -775,6 +776,16 @@ pub fn çelişki_metni(hata: &GirişYapılandırmaHatası) -> &'static str {
         H::ÇakışanÇalışmaBağı => "Çalışma bağı başka bir eksenle çakışıyor",
         H::GeçersizUzunlukSınırı => "Uzunluk sınırı bu türde kurulamaz",
         H::GeçersizSayaç => "Sayaç yapılandırması geçersiz",
+        H::GeçersizOdaklıBiçimPlanı => "Odaklı biçim planı geçersiz",
+        H::GeçersizTarihZamanPlanı => "Tarih/zaman planı geçersiz",
+        H::GerekliGenişMotorKapalı => "Gerekli geniş motor kapalı",
+        H::KaynakKısıtıÇözülemedi => "Kaynak kısıtı çözülemedi",
+        H::YapılandırmaEskidi => "Yapılandırma eskidi",
+        H::GeçersizKaynakBütçesi => "Kaynak bütçesi geçersiz",
+        H::GirişYüzeyBağıEksik => "Giriş yüzey bağı eksik",
+        H::GeçersizDurumAçıklamaProfili => "Durum açıklama profili geçersiz",
+        H::GeçersizSeçiciYüzeyProfili => "Seçici yüzey profili geçersiz",
+        H::MaskeTokenTavanıAşıldı => "Maske token tavanı aşıldı",
     }
 }
 
@@ -848,7 +859,7 @@ impl TezgahBölütü {
 /// `Vec<DilEtiketi>` taşır. Tezgâhta serbest etiket yazdırmıyoruz: geçersiz
 /// bir etiket `ORT-002` doğrulamasından döner ve eksen "çalışmıyor" gibi
 /// görünürdü. Bunun yerine sabit bir deneme kümesi sunulur; kod paneli
-/// gerçek `DilEtiketi::yeni` çağrısını yazar.
+/// gerçek `motor.dil_etiketi(...)` çağrısını yazar.
 #[derive(Clone, Copy, Debug, Default, Eq, PartialEq)]
 pub enum TezgahYapıştırması {
     #[default]
@@ -879,7 +890,12 @@ impl TezgahYapıştırması {
         }
     }
 
-    pub fn kanonik(self) -> MetinYapıştırmaDönüşümü {
+    /// Dil etiketleri `ORT-002` motorunun doğrulama kapısından geçer;
+    /// tezgâh etiket mühürlemez.
+    pub fn kanonik(
+        self,
+        motor: &gpui_bilesenleri_temel::UnicodeMetinMotoru,
+    ) -> MetinYapıştırmaDönüşümü {
         match self {
             Self::Katı => MetinYapıştırmaDönüşümü::Katı,
             Self::GeçerliKarakterleriSüz => {
@@ -888,12 +904,14 @@ impl TezgahYapıştırması {
             Self::YerelBiçimiAyıkla => MetinYapıştırmaDönüşümü::YerelBiçimiAyıkla,
             Self::TanımlıYerelAyarlarıDene => {
                 MetinYapıştırmaDönüşümü::TanımlıYerelAyarlarıDene {
-                    // `unwrap` güvenli: etiketler derleme zamanı sabitleri ve
+                    // `expect` güvenli: etiketler derleme zamanı sabitleri ve
                     // testte de doğrulanıyor. Kullanıcı girdisi değiller.
                     yerel_ayarlar: Self::YERELLER
                         .iter()
                         .map(|etiket| {
-                            DilEtiketi::yeni(*etiket).expect("sabit dil etiketi geçerlidir")
+                            motor
+                                .dil_etiketi(etiket)
+                                .expect("sabit dil etiketi kayıtlarda tanınır")
                         })
                         .collect(),
                 }
@@ -912,7 +930,7 @@ impl TezgahYapıştırması {
                 Self::YERELLER
                     .iter()
                     .map(|etiket| format!(
-                        "            DilEtiketi::yeni({etiket:?}).expect(\"geçerli etiket\"),"
+                        "            motor.dil_etiketi({etiket:?}).expect(\"geçerli etiket\"),"
                     ))
                     .collect::<Vec<_>>()
                     .join("\n")
@@ -1067,9 +1085,7 @@ impl TezgahGeçiciGösterimi {
             ),
             Self::TekrarEtkinleştireneKadar => "TekrarEtkinleştireneKadar".to_owned(),
         };
-        format!(
-            "yapılandırma.geçici_gösterim =\n    Some(GeçiciGösterimPolitikası::{gövde});"
-        )
+        format!("yapılandırma.geçici_gösterim =\n    Some(GeçiciGösterimPolitikası::{gövde});")
     }
 }
 
@@ -2063,24 +2079,28 @@ impl TezgahTercihleri {
         tema
     }
 
+    /// `motor`, `ORT-002` kökünden verilen doğrulama kapısıdır: takvim ve
+    /// dil etiketi kimlikleri yalnız oradan doğar, tezgâh mühürlemez.
     pub fn yapılandırma(
         &self,
         fabrika: &gpui_bilesenleri::ÖrnekKimliğiFabrikası,
+        motor: &gpui_bilesenleri_temel::UnicodeMetinMotoru,
     ) -> GirişYapılandırması {
         let yardımcı_kimlikleri = crate::YardımcıKimlikleri::yeni(fabrika);
-        self.yapılandırma_kimliklerle(&yardımcı_kimlikleri)
+        self.yapılandırma_kimliklerle(&yardımcı_kimlikleri, motor)
     }
 
     pub(crate) fn yapılandırma_kimliklerle(
         &self,
         yardımcı_kimlikleri: &crate::YardımcıKimlikleri,
+        motor: &gpui_bilesenleri_temel::UnicodeMetinMotoru,
     ) -> GirişYapılandırması {
         let mut y = GirişYapılandırması::tek_satırlı_metin();
         // `§6` kip kanonik aileye iner: para/yüzde `Ondalık` türdür ve
         // karşılığını biçim profili verir; Metin ailesi içerik türünü kendi
         // tanımında taşır — "koda yazılamaz" rozeti bu satırla kapandı.
         y.giriş_türü = self.değer_türü.kanonik_tür(self.metin_içerik_türü);
-        y.maske = self.maske_çöz();
+        y.maske = self.maske_çöz(motor);
         y.biçim = self.biçim_çöz();
         y.hizalama.yatay = self.hizalama;
         y.hizalama.dikey = self.dikey;
@@ -2175,7 +2195,7 @@ impl TezgahTercihleri {
         y.harf_dönüşümü = self.harf_dönüşümü;
         y.kırpma = self.kırpma;
         y.boş_metin = self.boş_metin;
-        y.yapıştırma = self.yapıştırma.kanonik();
+        y.yapıştırma = self.yapıştırma.kanonik(motor);
         y.escape = self.escape;
         y.geçersiz_odak = self.geçersiz_odak;
         // `§16.2` ankraj yoksa gösterge yapılandırmayla kapalıdır; `None`
@@ -2297,14 +2317,21 @@ impl TezgahTercihleri {
         .collect()
     }
 
-    fn maske_çöz(&self) -> Option<GirişMaskesi> {
+    fn maske_çöz(
+        &self,
+        motor: &gpui_bilesenleri_temel::UnicodeMetinMotoru,
+    ) -> Option<GirişMaskesi> {
         match self.maske {
             TezgahMaskesi::Yok => None,
             TezgahMaskesi::Desen => crate::deseni_maskeye_çevir(&self.desen),
             TezgahMaskesi::Tarih => {
                 Some(GirişMaskesi::Tarih(gpui_bilesenleri::TarihGirişMaskesi {
                     desen: "gg.aa.yyyy".into(),
-                    takvim: gpui_bilesenleri::TakvimKimliği(std::sync::Arc::from("gregory")),
+                    // Takvim kimliği elle mühürlenmez; `ORT-002` kayıt
+                    // yolundan çözülür.
+                    takvim: motor
+                        .takvim("gregory")
+                        .expect("`gregory` yerleşik takvim kayıtlarında bulunur"),
                     eksik_giriş: None,
                     rakam_kümesi: Some(RakamKümesi::Latin),
                     bölüm_gezinimi: self.bölüm_gezinimi_çöz(),
@@ -2407,8 +2434,7 @@ impl TezgahTercihleri {
             vec!["let mut yapılandırma = GirişYapılandırması::tek_satırlı_metin();".to_owned()];
         let taban = Self::default();
 
-        if self.değer_türü != taban.değer_türü
-            || self.metin_içerik_türü != taban.metin_içerik_türü
+        if self.değer_türü != taban.değer_türü || self.metin_içerik_türü != taban.metin_içerik_türü
         {
             satırlar.push(format!(
                 "yapılandırma.giriş_türü =\n    {};",

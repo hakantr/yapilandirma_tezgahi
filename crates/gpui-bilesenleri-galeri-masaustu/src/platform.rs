@@ -3,13 +3,16 @@
 //! Sarmalayıcının tek işi bildirimi okumaktır; öncelik sırası ve düşme
 //! politikası her portun kendi çekirdek çözümündedir.
 
-use std::time::Duration;
+use std::{
+    sync::{Arc, Mutex},
+    time::{Duration, Instant},
+};
 
 use gpui_bilesenleri_galeri::{
-    GizlilikKapılıYetenek, GmtFarkı, MetinİmleciHareketi, OtomatikDoldurmaAmacı,
-    OtomatikDoldurmaHatası, PlatformMetinİmleciTercihi, PlatformOtomatikDoldurmaPortu,
-    PlatformSaatDilimiPortu, PlatformİmleçPortu, PlatformİzinDurumu, SaatDilimiKaynağı,
-    SaatDilimiKimliği, ÇözülmüşSaatDilimi,
+    GizlilikKapılıYetenek, GmtFarkı, OtomatikDoldurmaAmacı, OtomatikDoldurmaHatası,
+    PlatformMetinİmleciTercihi, PlatformOtomatikDoldurmaPortu, PlatformSaatDilimiPortu,
+    PlatformİmleçPortu, PlatformİzinDurumu, SaatDilimiKaynağı, SaatDilimiKimliği,
+    UnicodeMetinMotoru, ÇözülmüşSaatDilimi,
 };
 
 /// `§25` masaüstü otomatik doldurma yeteneği.
@@ -44,11 +47,32 @@ impl PlatformOtomatikDoldurmaPortu for SistemOtomatikDoldurma {
     }
 }
 
-pub struct SistemSaatDilimi;
+/// Bildirim tazelik penceresi: dilim çözümü senkron alt süreç (`date`) ve
+/// dosya sistemi okuduğu için her çağrıda koşamaz — bu port kanonik çözüm
+/// tarafından tuş vuruşu başına bile sorgulanabiliyor. Dilim değişimi
+/// (seyahat, elle ayar) saniyeler mertebesinde nadir bir olaydır; pencere
+/// dolana kadar son bildirim geçerli sayılır.
+const DİLİM_TAZELİK_PENCERESİ: Duration = Duration::from_secs(60);
 
-impl PlatformSaatDilimiPortu for SistemSaatDilimi {
-    fn dilim(&self) -> Option<ÇözülmüşSaatDilimi> {
-        let kimlik = iana_kimliği();
+pub struct SistemSaatDilimi {
+    /// `ORT-002` doğrulama kapısı: platform dizesi kimliğe ancak kayıt
+    /// yolundan çevrilir, port kimlik mühürlemez.
+    motor: Arc<UnicodeMetinMotoru>,
+    /// Son bildirim ve okunduğu an; tazelik penceresi içinde yeniden
+    /// süreç doğurulmaz.
+    önbellek: Mutex<Option<(Instant, Option<ÇözülmüşSaatDilimi>)>>,
+}
+
+impl SistemSaatDilimi {
+    pub fn yeni(motor: Arc<UnicodeMetinMotoru>) -> Self {
+        Self {
+            motor,
+            önbellek: Mutex::new(None),
+        }
+    }
+
+    fn oku(&self) -> Option<ÇözülmüşSaatDilimi> {
+        let kimlik = iana_kimliği(&self.motor);
         let fark = gmt_farkı()?;
         Some(ÇözülmüşSaatDilimi {
             kimlik,
@@ -58,21 +82,40 @@ impl PlatformSaatDilimiPortu for SistemSaatDilimi {
     }
 }
 
+impl PlatformSaatDilimiPortu for SistemSaatDilimi {
+    fn dilim(&self) -> Option<ÇözülmüşSaatDilimi> {
+        let mut önbellek = self
+            .önbellek
+            .lock()
+            .expect("dilim önbellek kilidi zehirlenmemeli");
+        if let Some((an, bildirim)) = önbellek.as_ref()
+            && an.elapsed() < DİLİM_TAZELİK_PENCERESİ
+        {
+            return bildirim.clone();
+        }
+        let bildirim = self.oku();
+        *önbellek = Some((Instant::now(), bildirim.clone()));
+        bildirim
+    }
+}
+
 /// İşletim sisteminin IANA kimliği.
 ///
-/// `TZ` ortam değişkeni açık niyettir ve önce okunur. Yoksa macOS ve Linux'ta
+/// `TZ` ortam değişkeni **açık niyettir** ve tek başına belirleyicidir:
+/// tanınmayan bir `TZ` sistem dilimine düşülmez, kimlik bildirilmez ve
+/// çözüm GMT farkıyla sürer. `TZ` hiç yokken macOS ve Linux'ta
 /// `/etc/localtime` bağının hedefi kimliği taşır.
-fn iana_kimliği() -> Option<SaatDilimiKimliği> {
+fn iana_kimliği(motor: &UnicodeMetinMotoru) -> Option<SaatDilimiKimliği> {
     if let Ok(tz) = std::env::var("TZ")
         && !tz.trim().is_empty()
     {
-        return Some(SaatDilimiKimliği(tz.trim().into()));
+        return motor.saat_dilimi(tz.trim()).ok();
     }
     let hedef = std::fs::read_link("/etc/localtime").ok()?;
     let metin = hedef.to_str()?;
     // `.../zoneinfo/Europe/Istanbul` → `Europe/Istanbul`
     let (_, kimlik) = metin.split_once("zoneinfo/")?;
-    (!kimlik.is_empty()).then(|| SaatDilimiKimliği(kimlik.into()))
+    motor.saat_dilimi(kimlik).ok()
 }
 
 /// UTC'ye göre dakika farkı.
@@ -125,29 +168,54 @@ mod testler {
     }
 }
 
-pub struct SistemİmleciTercihi;
+/// Masaüstü imleç tercihi bildirimi.
+///
+/// Bildirim **kuruluşta bir kez** okunur: kanonik `BİL-010` bu portu her
+/// prepaint karesinde sorgular ve `defaults` alt süreci kare başına ~10 ms
+/// ana-iş-parçacığı maliyetiyle bütün kare ölçümlerini kirletiyordu.
+/// macOS imleç yanıp sönme tercihleri oturum içinde pratikte değişmez;
+/// canlı takip bilinçli olarak süreç ömrüne feda edildi (değişiklik yeniden
+/// başlatmayla alınır). Okuma pencere açılmadan, kuruluşta yapılır.
+pub struct SistemİmleciTercihi {
+    tercih: PlatformMetinİmleciTercihi,
+}
+
+impl SistemİmleciTercihi {
+    pub fn yeni() -> Self {
+        Self {
+            tercih: tercihi_oku(),
+        }
+    }
+}
+
+fn tercihi_oku() -> PlatformMetinİmleciTercihi {
+    // macOS iki ayrı süre tutar; biri bile tanımlıysa kullanıcı
+    // varsayılanı değiştirmiş demektir. Hiçbiri yoksa platform sessizdir
+    // ve bu "sabit" demek değildir.
+    let açık = süreyi_oku("NSTextInsertionPointBlinkPeriodOn");
+    let kapalı = süreyi_oku("NSTextInsertionPointBlinkPeriodOff");
+    if açık.is_none() && kapalı.is_none() {
+        return PlatformMetinİmleciTercihi::Bildirilmedi;
+    }
+    // macOS'un belgeli varsayılan fazı; eksik anahtar bu değerle
+    // tamamlanır. Çözüm politikası yine `ORT-004` mühürlü kapısındadır,
+    // bu yalnız yarım bildirimin diğer yarısıdır.
+    const VARSAYILAN_FAZ: Duration = Duration::from_millis(530);
+    let açık = açık.unwrap_or(VARSAYILAN_FAZ);
+    let kapalı = kapalı.unwrap_or(VARSAYILAN_FAZ);
+    // Sıfır süre "yanıp sönme" demektir: kullanıcı imleci sabitlemiş.
+    if açık.is_zero() || kapalı.is_zero() {
+        return PlatformMetinİmleciTercihi::Sabit;
+    }
+    PlatformMetinİmleciTercihi::YanıpSönen {
+        dönem: açık.saturating_add(kapalı),
+        görünür_süre: açık,
+    }
+}
 
 impl PlatformİmleçPortu for SistemİmleciTercihi {
     fn metin_imleci_tercihi(&self) -> PlatformMetinİmleciTercihi {
-        // macOS iki ayrı süre tutar; biri bile tanımlıysa kullanıcı
-        // varsayılanı değiştirmiş demektir. Hiçbiri yoksa platform sessizdir
-        // ve bu "sabit" demek değildir.
-        let açık = süreyi_oku("NSTextInsertionPointBlinkPeriodOn");
-        let kapalı = süreyi_oku("NSTextInsertionPointBlinkPeriodOff");
-        if açık.is_none() && kapalı.is_none() {
-            return PlatformMetinİmleciTercihi::Bildirilmedi;
-        }
-        let varsayılan = MetinİmleciHareketi::YEDEK_GÖRÜNÜR_SÜRE;
-        let açık = açık.unwrap_or(varsayılan);
-        let kapalı = kapalı.unwrap_or(varsayılan);
-        // Sıfır süre "yanıp sönme" demektir: kullanıcı imleci sabitlemiş.
-        if açık.is_zero() || kapalı.is_zero() {
-            return PlatformMetinİmleciTercihi::Sabit;
-        }
-        PlatformMetinİmleciTercihi::YanıpSönen {
-            dönem: açık.saturating_add(kapalı),
-            görünür_süre: açık,
-        }
+        self.tercih
     }
 }
 

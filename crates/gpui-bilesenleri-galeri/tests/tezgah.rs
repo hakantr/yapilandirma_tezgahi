@@ -8,11 +8,10 @@
 #![allow(non_ascii_idents)]
 
 use gpui_bilesenleri::{
-    DüğmeŞekli, DışHataTemizleme, EnterDavranışı, GeçiciGösterimPolitikası,
-    GirişDikeyHizalama,
+    DüğmeŞekli, DışHataTemizleme, EnterDavranışı, GeçiciGösterimPolitikası, GirişDikeyHizalama,
     GirişMaskesi, GirişYatayHizalama, KabulSeçimi, KutuŞekliTercihi, MetinİçerikTürü, OdakSeçimi,
-    OndalıkDeğer, SabitİçerikSunumRolü, SayımBirimi, UzunlukSınırıDavranışı,
-    ÖrnekKimliğiFabrikası, İçerikGörünürlüğü,
+    OndalıkDeğer, SabitİçerikSunumRolü, SayımBirimi, UzunlukSınırıDavranışı, ÖrnekKimliğiFabrikası,
+    İçerikGörünürlüğü,
 };
 use gpui_bilesenleri_galeri::{
     AdımÖlçeği, KİTAPLIK_AİLELERİ, TezgahDeğerKipi, TezgahGeçiciGösterimi, TezgahGörünürlüğü,
@@ -39,6 +38,21 @@ const TÜM_İÇERİK_TÜRLERİ: [MetinİçerikTürü; 4] = [
     MetinİçerikTürü::Url,
 ];
 
+/// Testlerin `ORT-002` doğrulama kapısı; kimlikler yalnız motordan doğar.
+fn motor() -> std::sync::Arc<gpui_bilesenleri_temel::UnicodeMetinMotoru> {
+    use std::sync::OnceLock;
+    static MOTOR: OnceLock<std::sync::Arc<gpui_bilesenleri_temel::UnicodeMetinMotoru>> =
+        OnceLock::new();
+    MOTOR
+        .get_or_init(|| {
+            gpui_bilesenleri_temel::UnicodeVeYerelMetinHizmetleri::yerlesik(
+                ÖrnekKimliğiFabrikası::yeni_süreç_kapsamı().expect("test kimlik kapsamı"),
+            )
+            .motor()
+        })
+        .clone()
+}
+
 fn kimlik_fabrikası() -> ÖrnekKimliğiFabrikası {
     ÖrnekKimliğiFabrikası::yeni_süreç_kapsamı().expect("test kimlik kapsamı")
 }
@@ -46,8 +60,11 @@ fn kimlik_fabrikası() -> ÖrnekKimliğiFabrikası {
 #[test]
 fn varsayilan_tercih_taban_yapilandirmayi_bozmaz() {
     let t = TezgahTercihleri::default();
-    let y = t.yapılandırma(&kimlik_fabrikası());
-    assert!(matches!(y.giriş_türü, gpui_bilesenleri::GirişTürü::Metin(_)));
+    let y = t.yapılandırma(&kimlik_fabrikası(), &motor());
+    assert!(matches!(
+        y.giriş_türü,
+        gpui_bilesenleri::GirişTürü::Metin(_)
+    ));
     assert!(y.etkin && !y.salt_okunur);
     assert_eq!(y.odak_seçimi, OdakSeçimi::TümünüSeç);
     assert_eq!(y.kabul_seçimi, KabulSeçimi::TümünüSeç);
@@ -69,13 +86,17 @@ fn on_ek_son_ek_ve_yer_tutucu_tercihi_yapilandirmaya_gecer() {
     let mut t = TezgahTercihleri::default();
     t.ön_ek = true;
     t.son_ek = true;
-    let y = t.yapılandırma(&kimlik_fabrikası());
+    let y = t.yapılandırma(&kimlik_fabrikası(), &motor());
     assert!(y.ön_ek.is_some());
     assert!(y.son_ek.is_some());
     assert!(y.yer_tutucu.is_some());
 
     t.yer_tutucu = false;
-    assert!(t.yapılandırma(&kimlik_fabrikası()).yer_tutucu.is_none());
+    assert!(
+        t.yapılandırma(&kimlik_fabrikası(), &motor())
+            .yer_tutucu
+            .is_none()
+    );
 }
 
 #[test]
@@ -85,7 +106,7 @@ fn yardimci_eylem_tercihi_uc_yuva_sinirini_asmaz() {
     t.arama = true;
     t.parola_düğmesi = true;
     t.seçici = true;
-    let y = t.yapılandırma(&kimlik_fabrikası());
+    let y = t.yapılandırma(&kimlik_fabrikası(), &motor());
     let yuvalar = y.yardımcı_eylemler.expect("yuva kümesi");
     // `§23` en fazla üç yuva.
     assert_eq!(yuvalar.len(), 3);
@@ -96,7 +117,7 @@ fn yardimci_eylem_kapaliyken_kume_kurulmaz() {
     let mut t = TezgahTercihleri::default();
     t.temizle = false;
     assert!(
-        t.yapılandırma(&kimlik_fabrikası())
+        t.yapılandırma(&kimlik_fabrikası(), &motor())
             .yardımcı_eylemler
             .is_none()
     );
@@ -105,11 +126,19 @@ fn yardimci_eylem_kapaliyken_kume_kurulmaz() {
 #[test]
 fn sayac_ve_uzunluk_siniri_tercihi_gecer() {
     let mut t = TezgahTercihleri::default();
-    assert!(t.yapılandırma(&kimlik_fabrikası()).sayaç.is_none());
-    assert!(t.yapılandırma(&kimlik_fabrikası()).uzunluk_sınırı.is_none());
+    assert!(
+        t.yapılandırma(&kimlik_fabrikası(), &motor())
+            .sayaç
+            .is_none()
+    );
+    assert!(
+        t.yapılandırma(&kimlik_fabrikası(), &motor())
+            .uzunluk_sınırı
+            .is_none()
+    );
     t.sayaç = true;
     t.uzunluk_sınırı = true;
-    let y = t.yapılandırma(&kimlik_fabrikası());
+    let y = t.yapılandırma(&kimlik_fabrikası(), &motor());
     assert!(y.sayaç.is_some());
     assert_eq!(y.uzunluk_sınırı.unwrap().en_fazla_grafem, 12);
 }
@@ -119,7 +148,8 @@ fn gizli_icerik_tercihi_parola_maskesi_kurar() {
     let mut t = TezgahTercihleri::default();
     t.görünürlük = TezgahGörünürlüğü::Gizli;
     assert!(matches!(
-        t.yapılandırma(&kimlik_fabrikası()).içerik_görünürlüğü,
+        t.yapılandırma(&kimlik_fabrikası(), &motor())
+            .içerik_görünürlüğü,
         İçerikGörünürlüğü::Gizli { .. }
     ));
 }
@@ -132,7 +162,7 @@ fn gecici_goster_tercihi_politikayla_kurulur() {
     let mut t = TezgahTercihleri::default();
     t.görünürlük = TezgahGörünürlüğü::GeçiciGöster;
     t.geçici_gösterim = TezgahGeçiciGösterimi::ZamanSınırlı;
-    let y = t.yapılandırma(&kimlik_fabrikası());
+    let y = t.yapılandırma(&kimlik_fabrikası(), &motor());
     assert!(matches!(
         y.geçici_gösterim,
         Some(GeçiciGösterimPolitikası::ZamanSınırlı { .. })
@@ -145,7 +175,11 @@ fn gecici_goster_tercihi_politikayla_kurulur() {
     // Politika yalnız `GeçiciGöster`le yazılır; başka görünürlükte
     // okunmayan bir tercih tarif ederdi.
     t.görünürlük = TezgahGörünürlüğü::Gizli;
-    assert!(t.yapılandırma(&kimlik_fabrikası()).geçici_gösterim.is_none());
+    assert!(
+        t.yapılandırma(&kimlik_fabrikası(), &motor())
+            .geçici_gösterim
+            .is_none()
+    );
 
     // Kod paneli de politikayı yalnız `GeçiciGöster`de yazar.
     t.görünürlük = TezgahGörünürlüğü::GeçiciGöster;
@@ -160,7 +194,7 @@ fn gecici_goster_tercihi_politikayla_kurulur() {
 fn dis_hata_temizleme_tercihi_gecer() {
     let mut t = TezgahTercihleri::default();
     assert_eq!(
-        t.yapılandırma(&kimlik_fabrikası())
+        t.yapılandırma(&kimlik_fabrikası(), &motor())
             .doğrulama
             .dış_hata_temizleme,
         DışHataTemizleme::YerelDüzenlemedeTemizle
@@ -169,12 +203,15 @@ fn dis_hata_temizleme_tercihi_gecer() {
 
     t.dış_hata_temizleme = DışHataTemizleme::YenidenBildirimeKadarKoru;
     assert_eq!(
-        t.yapılandırma(&kimlik_fabrikası())
+        t.yapılandırma(&kimlik_fabrikası(), &motor())
             .doğrulama
             .dış_hata_temizleme,
         DışHataTemizleme::YenidenBildirimeKadarKoru
     );
-    assert!(t.kod().contains("DışHataTemizleme::YenidenBildirimeKadarKoru"));
+    assert!(
+        t.kod()
+            .contains("DışHataTemizleme::YenidenBildirimeKadarKoru")
+    );
 }
 
 #[test]
@@ -182,7 +219,7 @@ fn kose_sekli_ve_hizalama_tercihi_gecer() {
     let mut t = TezgahTercihleri::default();
     t.şekil = DüğmeŞekli::Hap;
     t.hizalama = GirişYatayHizalama::Sağ;
-    let y = t.yapılandırma(&kimlik_fabrikası());
+    let y = t.yapılandırma(&kimlik_fabrikası(), &motor());
     assert_eq!(y.şekil, KutuŞekliTercihi::Açık(DüğmeŞekli::Hap));
     assert_eq!(y.hizalama.yatay, GirişYatayHizalama::Sağ);
 }
@@ -193,7 +230,7 @@ fn enter_ve_erisim_tercihi_gecer() {
     t.enter = EnterDavranışı::DeğeriİşleVeSonrakineGeç;
     t.salt_okunur = true;
     t.etkin = false;
-    let y = t.yapılandırma(&kimlik_fabrikası());
+    let y = t.yapılandırma(&kimlik_fabrikası(), &motor());
     assert_eq!(y.enter, EnterDavranışı::DeğeriİşleVeSonrakineGeç);
     assert!(y.salt_okunur);
     assert!(!y.etkin);
@@ -235,7 +272,7 @@ fn desen_tercihi_metin_maskesi_kurar() {
     let mut t = TezgahTercihleri::default();
     t.maske = TezgahMaskesi::Desen;
     t.desen = ">00 L?? 00999".to_owned();
-    match t.yapılandırma(&kimlik_fabrikası()).maske {
+    match t.yapılandırma(&kimlik_fabrikası(), &motor()).maske {
         Some(GirişMaskesi::Metin(m)) => assert_eq!(&*m.desen, ">00 L?? 00999"),
         diğer => panic!("beklenmeyen maske: {diğer:?}"),
     }
@@ -249,13 +286,17 @@ fn on_ek_ve_son_ek_metni_duzenlenebilir() {
     t.ön_ek_metni = "USD".to_owned();
     t.son_ek = true;
     t.son_ek_metni = "net".to_owned();
-    let y = t.yapılandırma(&kimlik_fabrikası());
+    let y = t.yapılandırma(&kimlik_fabrikası(), &motor());
     assert_eq!(y.ön_ek.unwrap().düz_metin(), "USD");
     assert_eq!(y.son_ek.unwrap().düz_metin(), "net");
 
     // Boş metin yuvayı kurmaz: görünmez bir ek yanıltıcı olur.
     t.ön_ek_metni.clear();
-    assert!(t.yapılandırma(&kimlik_fabrikası()).ön_ek.is_none());
+    assert!(
+        t.yapılandırma(&kimlik_fabrikası(), &motor())
+            .ön_ek
+            .is_none()
+    );
 }
 
 #[test]
@@ -287,7 +328,7 @@ fn tur_degisince_uymayan_tercihler_kapanir() {
     assert_eq!(t.görünürlük, TezgahGörünürlüğü::Açık);
     assert!(!t.parola_düğmesi);
     assert!(!t.uzunluk_sınırı && !t.sayaç);
-    let y = t.yapılandırma(&kimlik_fabrikası());
+    let y = t.yapılandırma(&kimlik_fabrikası(), &motor());
     assert!(y.maske.is_none() && y.sayaç.is_none() && y.uzunluk_sınırı.is_none());
 }
 
@@ -297,8 +338,11 @@ fn tur_degisince_uymayan_tercihler_kapanir() {
 fn para_kipi_bicim_profilinden_kurulur() {
     let mut t = TezgahTercihleri::default();
     t.değer_türü = TezgahDeğerKipi::ParaBirimi;
-    let y = t.yapılandırma(&kimlik_fabrikası());
-    assert!(matches!(y.giriş_türü, gpui_bilesenleri::GirişTürü::Ondalık(_)));
+    let y = t.yapılandırma(&kimlik_fabrikası(), &motor());
+    assert!(matches!(
+        y.giriş_türü,
+        gpui_bilesenleri::GirişTürü::Ondalık(_)
+    ));
     assert!(matches!(
         y.biçim,
         gpui_bilesenleri::BiçimYapılandırması::Açık(gpui_bilesenleri::BiçimTanımı::Para(_))
@@ -336,7 +380,7 @@ fn dikey_hizalama_ve_ek_tonu_yapilandirmaya_gecer() {
     t.dikey = GirişDikeyHizalama::Alt;
     t.ön_ek = true;
     t.ek_sunum_rolü = SabitİçerikSunumRolü::DeğerleEş;
-    let y = t.yapılandırma(&kimlik_fabrikası());
+    let y = t.yapılandırma(&kimlik_fabrikası(), &motor());
     assert_eq!(y.hizalama.dikey, GirişDikeyHizalama::Alt);
     assert_eq!(y.ön_ek.unwrap().sunum_rolü, SabitİçerikSunumRolü::DeğerleEş);
 
@@ -350,7 +394,7 @@ fn ortali_hizalama_tercihi_gecer() {
     let mut t = TezgahTercihleri::default();
     t.hizalama = GirişYatayHizalama::Orta;
     assert_eq!(
-        t.yapılandırma(&kimlik_fabrikası()).hizalama.yatay,
+        t.yapılandırma(&kimlik_fabrikası(), &motor()).hizalama.yatay,
         GirişYatayHizalama::Orta
     );
     assert!(t.kod().contains("GirişYatayHizalama::Orta"));
@@ -361,14 +405,14 @@ fn kose_pikseli_hazir_kademeyi_gecersiz_kilar() {
     let mut t = TezgahTercihleri::default();
     t.şekil = DüğmeŞekli::Hap;
     assert_eq!(
-        t.yapılandırma(&kimlik_fabrikası()).şekil,
+        t.yapılandırma(&kimlik_fabrikası(), &motor()).şekil,
         KutuŞekliTercihi::Açık(DüğmeŞekli::Hap)
     );
 
     // Piksel verildiğinde kademe değil ürünün ölçüsü uygulanır.
     t.köşe_pikseli = Some(14.0);
     assert_eq!(
-        t.yapılandırma(&kimlik_fabrikası()).şekil,
+        t.yapılandırma(&kimlik_fabrikası(), &motor()).şekil,
         KutuŞekliTercihi::Yarıçap(gpui::px(14.0))
     );
     assert!(t.kod().contains("KutuŞekliTercihi::Yarıçap(px(14.))"));
@@ -380,14 +424,14 @@ fn dis_tiklamada_odagi_birakma_tercihi_gecer() {
     let mut t = TezgahTercihleri::default();
     // `ACC-054` varsayılan açık; kod varsayılanı yazmaz.
     assert!(
-        t.yapılandırma(&kimlik_fabrikası())
+        t.yapılandırma(&kimlik_fabrikası(), &motor())
             .dış_tıklamada_odağı_bırak
     );
     assert!(!t.kod().contains("dış_tıklamada_odağı_bırak"));
 
     t.dış_tıklamada_odağı_bırak = false;
     assert!(
-        !t.yapılandırma(&kimlik_fabrikası())
+        !t.yapılandırma(&kimlik_fabrikası(), &motor())
             .dış_tıklamada_odağı_bırak
     );
     assert!(t.kod().contains("dış_tıklamada_odağı_bırak = false;"));
@@ -402,7 +446,7 @@ fn uzunluk_davranisi_ve_sayac_birimi_yapilandirmaya_gecer() {
     t.sayaç_birimi = SayımBirimi::KodNoktası;
     t.sayaç_sınırı_göster = false;
 
-    let y = t.yapılandırma(&kimlik_fabrikası());
+    let y = t.yapılandırma(&kimlik_fabrikası(), &motor());
     assert_eq!(
         y.uzunluk_sınırı.unwrap().davranış,
         UzunlukSınırıDavranışı::Reddet
@@ -542,7 +586,7 @@ fn bicim_secenegi_yapilandirmaya_gecer() {
     // Maske seçenekleri gösterimi değil girişi sınırlar; biçim `Genel` kalır.
     let mut t = TezgahTercihleri::default();
     assert_eq!(
-        t.yapılandırma(&kimlik_fabrikası()).biçim,
+        t.yapılandırma(&kimlik_fabrikası(), &motor()).biçim,
         BiçimYapılandırması::Genel
     );
 
@@ -557,7 +601,7 @@ fn bicim_secenegi_yapilandirmaya_gecer() {
     t.değer_türü = TezgahDeğerKipi::Ondalık;
     t.türe_uyarla();
     t.biçim_seçeneğini_uygula(sıra(BiçimUygulaması::Sayı { gruplama: true }));
-    match t.yapılandırma(&kimlik_fabrikası()).biçim {
+    match t.yapılandırma(&kimlik_fabrikası(), &motor()).biçim {
         BiçimYapılandırması::Açık(BiçimTanımı::Ondalık(biçim)) => {
             assert_eq!(
                 biçim.basamak_gruplama,
@@ -575,7 +619,7 @@ fn bicim_secenegi_yapilandirmaya_gecer() {
     t.değer_türü = TezgahDeğerKipi::Metin;
     t.türe_uyarla();
     assert_eq!(
-        t.yapılandırma(&kimlik_fabrikası()).biçim,
+        t.yapılandırma(&kimlik_fabrikası(), &motor()).biçim,
         BiçimYapılandırması::Genel
     );
 }
@@ -591,7 +635,7 @@ fn maske_secenegi_deseni_kurar() {
     let mut t = TezgahTercihleri::default();
     t.biçim_seçeneğini_uygula(sıra);
     assert_eq!(t.maske, TezgahMaskesi::Desen);
-    match t.yapılandırma(&kimlik_fabrikası()).maske {
+    match t.yapılandırma(&kimlik_fabrikası(), &motor()).maske {
         Some(GirişMaskesi::Metin(m)) => assert_eq!(&*m.desen, "00000"),
         diğer => panic!("beklenmeyen maske: {diğer:?}"),
     }
@@ -615,7 +659,7 @@ fn telefon_deseninde_bastaki_sifir_sabittir() {
 
     let mut t = TezgahTercihleri::default();
     t.biçim_seçeneğini_uygula(sıra);
-    match t.yapılandırma(&kimlik_fabrikası()).maske {
+    match t.yapılandırma(&kimlik_fabrikası(), &motor()).maske {
         Some(GirişMaskesi::Metin(m)) => assert_eq!(&*m.desen, "\\0(000) 000 00 00"),
         diğer => panic!("beklenmeyen maske: {diğer:?}"),
     }
@@ -652,7 +696,10 @@ fn kanonik_karsiligi_olmayan_secenek_uygulanmaz() {
 
 #[test]
 fn imlec_tercihi_tema_anlik_goruntusune_gecer() {
-    use gpui_bilesenleri::{MetinİmleciHareketKaynağı, MetinİmleciHareketi};
+    use gpui_bilesenleri::{
+        MetinİmleciHareketKaynağı, MetinİmleciHareketi, MetinİmleciÇözümleyicisi,
+        PlatformMetinİmleciTercihi, metin_imleci_çözümleyicisi,
+    };
     use gpui_bilesenleri_galeri::İmleçHızı;
 
     // Varsayılan `Platform`: tema hareketi ezmez, çözüm aşağı düşer.
@@ -667,15 +714,19 @@ fn imlec_tercihi_tema_anlik_goruntusune_gecer() {
     let anlık = gpui_bilesenleri_galeri::tezgah_teması(&tema);
     let token = anlık.imleç.expect("tezgâh imleç tokenı kurar");
     assert_eq!(token.kalınlık, gpui::px(3.0));
-    let çözüm = gpui_bilesenleri::metin_imleci_hareketini_çöz(
-        anlık.metin_imleci.hareket,
-        anlık.bağlam.hareket,
-        None,
-    );
+    // Çözüm mühürlü `ORT-004` çözümleyicisinden geçer; tema adayı geçerli
+    // sürelerle kurulduğu için akıbet başarılıdır.
+    let çözüm = metin_imleci_çözümleyicisi()
+        .çöz(
+            anlık.metin_imleci.hareket,
+            anlık.bağlam.hareket,
+            PlatformMetinİmleciTercihi::Bildirilmedi,
+        )
+        .expect("tezgâh imleç adayı geçerli sürelerle kurulur");
     assert!(çözüm.yanıp_söner_mi());
-    assert_eq!(çözüm.kaynak, MetinİmleciHareketKaynağı::Tema);
+    assert_eq!(çözüm.kaynak(), MetinİmleciHareketKaynağı::Tema);
     assert_eq!(
-        çözüm.hareket,
+        çözüm.hareket(),
         MetinİmleciHareketi::YanıpSönen {
             dönem: std::time::Duration::from_millis(500),
             görünür_süre: std::time::Duration::from_millis(250),
@@ -686,11 +737,13 @@ fn imlec_tercihi_tema_anlik_goruntusune_gecer() {
     tema.imleç_hızı = İmleçHızı::Sabit;
     tema.sürümü_artır();
     let anlık = gpui_bilesenleri_galeri::tezgah_teması(&tema);
-    let çözüm = gpui_bilesenleri::metin_imleci_hareketini_çöz(
-        anlık.metin_imleci.hareket,
-        anlık.bağlam.hareket,
-        None,
-    );
+    let çözüm = metin_imleci_çözümleyicisi()
+        .çöz(
+            anlık.metin_imleci.hareket,
+            anlık.bağlam.hareket,
+            PlatformMetinİmleciTercihi::Bildirilmedi,
+        )
+        .expect("sabit tema adayı süre doğrulaması istemez");
     assert!(!çözüm.yanıp_söner_mi());
 }
 
@@ -700,11 +753,11 @@ fn uzerine_yazma_tercihi_yapilandirmaya_gecer() {
     // değiştirmeye devam eder.
     let mut t = TezgahTercihleri::default();
     assert!(
-        !t.yapılandırma(&kimlik_fabrikası()).üzerine_yazma,
+        !t.yapılandırma(&kimlik_fabrikası(), &motor()).üzerine_yazma,
         "varsayılan ekleme kipidir"
     );
     t.üzerine_yazma = true;
-    assert!(t.yapılandırma(&kimlik_fabrikası()).üzerine_yazma);
+    assert!(t.yapılandırma(&kimlik_fabrikası(), &motor()).üzerine_yazma);
 }
 
 /// `§9.6` adım tercihi kanonik yapılandırmaya geçer.
@@ -719,7 +772,7 @@ fn adim_tercihi_kucuk_buyuk_ciftini_ve_siniri_kurar() {
     t.adım_sınırı = true;
     t.adım_sarma = true;
 
-    let y = t.yapılandırma(&kimlik_fabrikası());
+    let y = t.yapılandırma(&kimlik_fabrikası(), &motor());
     let adım = y.sayısal_adım.clone().expect("adım kurulur");
     assert_eq!(
         adım.küçük,
@@ -769,7 +822,7 @@ fn adim_tercihinin_her_bilesimi_gecerli_yapilandirma_uretir() {
                         t.adım_sarma = sarma;
                         // Tezgâh her tercih değişiminde bu geçişi koşar.
                         t.türe_uyarla();
-                        let rapor = t.yapılandırma(&kimlik_fabrikası()).doğrula();
+                        let rapor = t.yapılandırma(&kimlik_fabrikası(), &motor()).doğrula();
                         assert!(
                             rapor.hatalar.is_empty(),
                             "{tür:?}/{ölçek:?}/hizala={hizala}/sınır={sınır}/sarma={sarma} \
@@ -795,7 +848,11 @@ fn metin_turunde_adim_kapanir() {
     t.değer_türü = TezgahDeğerKipi::Metin;
     t.türe_uyarla();
     assert!(!t.sayısal_adım);
-    assert!(t.yapılandırma(&kimlik_fabrikası()).sayısal_adım.is_none());
+    assert!(
+        t.yapılandırma(&kimlik_fabrikası(), &motor())
+            .sayısal_adım
+            .is_none()
+    );
 }
 
 /// Sınır kapanınca sarma da kapanır: sarma sonlu sınır çiftini ister.
@@ -837,7 +894,8 @@ fn varsayilan_tercihi_ture_gore_deger_uretir() {
     t.varsayılan_değer = true;
     t.türe_uyarla();
     assert!(matches!(
-        t.yapılandırma(&kimlik_fabrikası()).varsayılan_değer,
+        t.yapılandırma(&kimlik_fabrikası(), &motor())
+            .varsayılan_değer,
         gpui_bilesenleri::VarsayılanDeğer::Sabit(gpui_bilesenleri::Değer::Tamsayı(
             gpui_bilesenleri::TamsayıDeğeri::İşaretli(42)
         ))
@@ -867,7 +925,7 @@ fn bolum_gezinimi_yalniz_bolumlu_maskede_kurulur() {
     t.maske = TezgahMaskesi::Tarih;
     t.bölüm_gezinimi = true;
     t.türe_uyarla();
-    let y = t.yapılandırma(&kimlik_fabrikası());
+    let y = t.yapılandırma(&kimlik_fabrikası(), &motor());
     let Some(gpui_bilesenleri::GirişMaskesi::Tarih(maske)) = y.maske else {
         panic!("tarih maskesi kurulmalı");
     };
@@ -902,7 +960,7 @@ fn varsayilan_ve_bolum_tercihleri_gecerli_yapilandirma_uretir() {
                     t.sıfırlama = sıfırlama;
                     t.bölüm_gezinimi = bölüm;
                     t.türe_uyarla();
-                    let rapor = t.yapılandırma(&kimlik_fabrikası()).doğrula();
+                    let rapor = t.yapılandırma(&kimlik_fabrikası(), &motor()).doğrula();
                     assert!(
                         rapor.hatalar.is_empty(),
                         "{tür:?}/varsayılan={varsayılan}/bölüm={bölüm} geçersiz: {:?}",
@@ -1000,7 +1058,7 @@ fn dort_gorunurluk_durumu_kanonige_coz() {
     for durum in G::TÜMÜ {
         let mut t = TezgahTercihleri::default();
         t.görünürlük = durum;
-        let çözülmüş = t.yapılandırma(&kimlik).içerik_görünürlüğü;
+        let çözülmüş = t.yapılandırma(&kimlik, &motor()).içerik_görünürlüğü;
         let eşleşir = match durum {
             G::Açık => matches!(çözülmüş, İçerikGörünürlüğü::Açık),
             G::Gizli => matches!(çözülmüş, İçerikGörünürlüğü::Gizli { .. }),
@@ -1063,7 +1121,7 @@ fn her_tur_ve_icerik_turu_bilesimi_gecerli_yapilandirma_uretir() {
                     t.son_ek = true;
                     // Tezgâh her tercih değişiminde bu geçişi koşar.
                     t.türe_uyarla();
-                    let rapor = t.yapılandırma(&kimlik_fabrikası()).doğrula();
+                    let rapor = t.yapılandırma(&kimlik_fabrikası(), &motor()).doğrula();
                     assert!(
                         rapor.hatalar.is_empty(),
                         "{tür:?}/{içerik:?}/{maske:?}/{görünürlük:?} geçersiz \
@@ -1154,17 +1212,21 @@ fn sayisal_ve_tarih_turunde_icerik_turu_duze_doner() {
 #[test]
 fn sekme_duragi_tercihi_yapilandirmaya_gecer() {
     let t = TezgahTercihleri::default();
-    assert!(t.yapılandırma(&kimlik_fabrikası()).odak.sekme_durağı);
+    assert!(
+        t.yapılandırma(&kimlik_fabrikası(), &motor())
+            .odak
+            .sekme_durağı
+    );
 
     let mut t = TezgahTercihleri::default();
     t.sekme_durağı = false;
-    let y = t.yapılandırma(&kimlik_fabrikası());
+    let y = t.yapılandırma(&kimlik_fabrikası(), &motor());
     assert!(!y.odak.sekme_durağı);
     assert!(t.kod().contains("odak.sekme_durağı = false"));
 
     // Enter sonrakine geçerken sekme durağı kapalıysa `§29` uyarır.
     t.enter = EnterDavranışı::DeğeriİşleVeSonrakineGeç;
-    let rapor = t.yapılandırma(&kimlik_fabrikası()).doğrula();
+    let rapor = t.yapılandırma(&kimlik_fabrikası(), &motor()).doğrula();
     assert!(
         !rapor.uyarılar.is_empty(),
         "sekme durağı kapalıyken Enter geçişi uyarı üretmeli"
@@ -1188,7 +1250,7 @@ fn uc_yuva_dolunca_dorduncusu_kurulamaz() {
 
     // Dördüncüsü kurulsa bile yapılandırma `§23` sınırını aşmaz.
     t.seçici = true;
-    let y = t.yapılandırma(&kimlik_fabrikası());
+    let y = t.yapılandırma(&kimlik_fabrikası(), &motor());
     let yuvalar = y.yardımcı_eylemler.as_ref().expect("yuva listesi");
     assert_eq!(yuvalar.len(), 3, "sınır aşılmamalı");
     assert!(y.doğrula().hatalar.is_empty());
@@ -1222,7 +1284,7 @@ fn secici_ve_odak_politikasi_bilesimleri_gecerli_kalir() {
                     t.etkin = etkin;
                     t.geçersiz_odak = odak;
                     t.türe_uyarla();
-                    let rapor = t.yapılandırma(&kimlik_fabrikası()).doğrula();
+                    let rapor = t.yapılandırma(&kimlik_fabrikası(), &motor()).doğrula();
                     assert!(
                         rapor.hatalar.is_empty(),
                         "{tür:?}/seçici={seçici}/etkin={etkin}/{odak:?} geçersiz \
@@ -1428,7 +1490,7 @@ fn tercih_uzayinda_hicbir_bilesim_gecersiz_yapilandirma_uretmez() {
 
         // Tezgâh her tercih değişiminde bu geçişi koşar.
         t.türe_uyarla();
-        let rapor = t.yapılandırma(&kimlik_fabrikası()).doğrula();
+        let rapor = t.yapılandırma(&kimlik_fabrikası(), &motor()).doğrula();
         assert!(
             rapor.hatalar.is_empty(),
             "tur {tur}: {:?} geçersiz yapılandırma üretti: {:?}\n{t:#?}",
@@ -1446,11 +1508,19 @@ fn tercih_uzayinda_hicbir_bilesim_gecersiz_yapilandirma_uretmez() {
 #[test]
 fn ilk_hatada_dur_tercihi_yapilandirmaya_gecer() {
     let t = TezgahTercihleri::default();
-    assert!(!t.yapılandırma(&kimlik_fabrikası()).doğrulama.ilk_hatada_dur);
+    assert!(
+        !t.yapılandırma(&kimlik_fabrikası(), &motor())
+            .doğrulama
+            .ilk_hatada_dur
+    );
 
     let mut t = TezgahTercihleri::default();
     t.ilk_hatada_dur = true;
-    assert!(t.yapılandırma(&kimlik_fabrikası()).doğrulama.ilk_hatada_dur);
+    assert!(
+        t.yapılandırma(&kimlik_fabrikası(), &motor())
+            .doğrulama
+            .ilk_hatada_dur
+    );
     assert!(t.kod().contains("doğrulama.ilk_hatada_dur = true"));
 }
 
@@ -1468,7 +1538,7 @@ fn sayac_birimlerinin_ucu_de_kurulabilir() {
         let mut t = TezgahTercihleri::default();
         t.sayaç = true;
         t.sayaç_birimi = birim;
-        let y = t.yapılandırma(&kimlik_fabrikası());
+        let y = t.yapılandırma(&kimlik_fabrikası(), &motor());
         assert_eq!(y.sayaç.expect("sayaç açık").birim, birim);
         assert!(y.doğrula().hatalar.is_empty(), "{birim:?} geçersiz");
     }
@@ -1543,7 +1613,7 @@ fn yuva_kipi_etkinlik_ve_gonderim_bagi_gecer() {
     };
 
     let taban = TezgahTercihleri::default();
-    let y = taban.yapılandırma(&kimlik_fabrikası());
+    let y = taban.yapılandırma(&kimlik_fabrikası(), &motor());
     let yuvalar = y.yardımcı_eylemler.as_ref().expect("varsayılanda temizle");
     assert_eq!(
         yuvalar[0].görünürlük,
@@ -1560,7 +1630,7 @@ fn yuva_kipi_etkinlik_ve_gonderim_bagi_gecer() {
         let mut t = TezgahTercihleri::default();
         t.yuva_görünürlüğü = kip;
         t.yuvalar_etkin = false;
-        let y = t.yapılandırma(&kimlik_fabrikası());
+        let y = t.yapılandırma(&kimlik_fabrikası(), &motor());
         let yuvalar = y.yardımcı_eylemler.as_ref().expect("yuva listesi");
         assert!(yuvalar.iter().all(|yuva| yuva.görünürlük == kip));
         assert!(yuvalar.iter().all(|yuva| !yuva.etkin));
@@ -1571,7 +1641,7 @@ fn yuva_kipi_etkinlik_ve_gonderim_bagi_gecer() {
     let mut t = TezgahTercihleri::default();
     t.arama = true;
     t.arama_gönderime_bağlı = true;
-    let y = t.yapılandırma(&kimlik_fabrikası());
+    let y = t.yapılandırma(&kimlik_fabrikası(), &motor());
     for yuva in y.yardımcı_eylemler.as_ref().expect("yuva listesi").iter() {
         let beklenen = if yuva.tür == YardımcıEylemTürü::AramayıBaşlat {
             YardımcıEylemÇalışması::AlanınGönderimineBağlı
@@ -1598,7 +1668,7 @@ fn urun_eylemi_yuvaya_kurulabilir() {
 
     let mut t = TezgahTercihleri::default();
     t.ürün_eylemi = true;
-    let y = t.yapılandırma(&kimlik_fabrikası());
+    let y = t.yapılandırma(&kimlik_fabrikası(), &motor());
     let yuvalar = y.yardımcı_eylemler.as_ref().expect("yuva listesi");
     let ürün = yuvalar
         .iter()
@@ -1626,13 +1696,13 @@ fn erisilebilir_ad_eksenleri_uyari_uretir() {
     use gpui_bilesenleri::GirişYapılandırmaUyarısı as U;
 
     let taban = TezgahTercihleri::default();
-    let rapor = taban.yapılandırma(&kimlik_fabrikası()).doğrula();
+    let rapor = taban.yapılandırma(&kimlik_fabrikası(), &motor()).doğrula();
     assert!(!rapor.uyarılar.contains(&U::ErişilebilirAdYok));
     assert!(!rapor.uyarılar.contains(&U::YardımcıEylemAdsız));
 
     let mut t = TezgahTercihleri::default();
     t.erişilebilir_ad = false;
-    let rapor = t.yapılandırma(&kimlik_fabrikası()).doğrula();
+    let rapor = t.yapılandırma(&kimlik_fabrikası(), &motor()).doğrula();
     assert!(rapor.uyarılar.contains(&U::ErişilebilirAdYok));
     // Yuva adları hâlâ kurulu: iki eksen bağımsız.
     assert!(!rapor.uyarılar.contains(&U::YardımcıEylemAdsız));
@@ -1640,7 +1710,7 @@ fn erisilebilir_ad_eksenleri_uyari_uretir() {
 
     let mut t = TezgahTercihleri::default();
     t.yuva_adları = false;
-    let rapor = t.yapılandırma(&kimlik_fabrikası()).doğrula();
+    let rapor = t.yapılandırma(&kimlik_fabrikası(), &motor()).doğrula();
     assert!(rapor.uyarılar.contains(&U::YardımcıEylemAdsız));
     assert!(!rapor.uyarılar.contains(&U::ErişilebilirAdYok));
 }
@@ -1650,12 +1720,12 @@ fn erisilebilir_ad_eksenleri_uyari_uretir() {
 fn bolut_kendi_sinirini_tasiyabilir() {
     let mut t = TezgahTercihleri::default();
     t.başlangıç_bölütü = Some(gpui_bilesenleri_galeri::TezgahBölütü::SabitMetin);
-    let y = t.yapılandırma(&kimlik_fabrikası());
+    let y = t.yapılandırma(&kimlik_fabrikası(), &motor());
     let kuşak = y.bitişik_bölütler.as_ref().expect("kuşak kuruldu");
     assert!(kuşak.başlangıç.as_ref().expect("başlangıç").kendi_sınırı);
 
     t.bölüt_sınırı = false;
-    let y = t.yapılandırma(&kimlik_fabrikası());
+    let y = t.yapılandırma(&kimlik_fabrikası(), &motor());
     let kuşak = y.bitişik_bölütler.as_ref().expect("kuşak kuruldu");
     assert!(!kuşak.başlangıç.as_ref().expect("başlangıç").kendi_sınırı);
     assert!(y.doğrula().hatalar.is_empty());
@@ -1673,7 +1743,11 @@ fn yer_tutucu_kod_panelinde_yazilir() {
     assert!(taban.yer_tutucu.is_none(), "taban yer tutucu kurmaz");
 
     let t = TezgahTercihleri::default();
-    assert!(t.yapılandırma(&kimlik_fabrikası()).yer_tutucu.is_some());
+    assert!(
+        t.yapılandırma(&kimlik_fabrikası(), &motor())
+            .yer_tutucu
+            .is_some()
+    );
     assert!(
         t.kod().contains("yer_tutucu = Some("),
         "açık yer tutucu kod panelinde görünmeli"
@@ -1681,7 +1755,11 @@ fn yer_tutucu_kod_panelinde_yazilir() {
 
     let mut t = TezgahTercihleri::default();
     t.yer_tutucu = false;
-    assert!(t.yapılandırma(&kimlik_fabrikası()).yer_tutucu.is_none());
+    assert!(
+        t.yapılandırma(&kimlik_fabrikası(), &motor())
+            .yer_tutucu
+            .is_none()
+    );
     assert!(!t.kod().contains("yer_tutucu = Some("));
 }
 
@@ -1730,7 +1808,7 @@ fn onem_kuraldan_turer_zemin_tercihi_ayri_kalir() {
         t.zorunlu = true;
         t.doğrulama_önemi = önem;
         t.önem_zemini = true;
-        let y = t.yapılandırma(&kimlik_fabrikası());
+        let y = t.yapılandırma(&kimlik_fabrikası(), &motor());
         assert!(y.doğrula().hatalar.is_empty());
         // Önem kuralın üzerinde taşınır: alanın üzerinde bir yazma yolu yok.
         assert!(
@@ -1760,7 +1838,7 @@ fn sure_turu_ve_bicimi_kurulabilir() {
     let mut t = TezgahTercihleri::default();
     t.değer_türü = TezgahDeğerKipi::Süre;
     t.türe_uyarla();
-    let y = t.yapılandırma(&kimlik_fabrikası());
+    let y = t.yapılandırma(&kimlik_fabrikası(), &motor());
     assert!(matches!(
         y.giriş_türü,
         gpui_bilesenleri::GirişTürü::TarihZaman(tanım)
@@ -1804,7 +1882,7 @@ fn sure_turu_ve_bicimi_kurulabilir() {
 fn kademeli_yuva_kipi_isaretci_taklidi_olmadan_kurulur() {
     let mut t = TezgahTercihleri::default();
     t.yuva_görünürlüğü = gpui_bilesenleri::YardımcıEylemGörünürlüğü::EtkileşimdeKademeli;
-    let y = t.yapılandırma(&kimlik_fabrikası());
+    let y = t.yapılandırma(&kimlik_fabrikası(), &motor());
     assert!(y.doğrula().hatalar.is_empty());
     assert_eq!(
         y.yardımcı_eylemler
@@ -1824,7 +1902,11 @@ fn dort_uyarinin_dordu_de_tetiklenebilir() {
 
     let mut görülen = std::collections::BTreeSet::new();
     let ekle = |t: &TezgahTercihleri, görülen: &mut std::collections::BTreeSet<String>| {
-        for u in t.yapılandırma(&kimlik_fabrikası()).doğrula().uyarılar {
+        for u in t
+            .yapılandırma(&kimlik_fabrikası(), &motor())
+            .doğrula()
+            .uyarılar
+        {
             görülen.insert(format!("{u:?}"));
         }
     };
@@ -2221,7 +2303,10 @@ fn yogunluk_ve_hareket_tercihi_baglama_gecer() {
 /// doğru çözülmesi hareket düğmesinin görünür etkisidir.
 #[test]
 fn hareket_kapali_iken_platform_hizi_imleci_sabitler() {
-    use gpui_bilesenleri::{HareketTercihi, MetinİmleciHareketKaynağı, MetinİmleciHareketi};
+    use gpui_bilesenleri::{
+        HareketTercihi, MetinİmleciHareketKaynağı, MetinİmleciHareketi, MetinİmleciÇözümleyicisi,
+        PlatformMetinİmleciTercihi, metin_imleci_çözümleyicisi,
+    };
     use gpui_bilesenleri_galeri::İmleçHızı;
 
     let mut tema = TezgahTeması::default();
@@ -2230,27 +2315,31 @@ fn hareket_kapali_iken_platform_hizi_imleci_sabitler() {
     tema.sürümü_artır();
     let anlık = gpui_bilesenleri_galeri::tezgah_teması(&tema);
 
-    let çözüm = gpui_bilesenleri::metin_imleci_hareketini_çöz(
-        anlık.metin_imleci.hareket,
-        anlık.bağlam.hareket,
-        None,
-    );
-    assert_eq!(çözüm.hareket, MetinİmleciHareketi::Sabit);
-    assert_eq!(çözüm.kaynak, MetinİmleciHareketKaynağı::HareketTercihi);
+    let çözüm = metin_imleci_çözümleyicisi()
+        .çöz(
+            anlık.metin_imleci.hareket,
+            anlık.bağlam.hareket,
+            PlatformMetinİmleciTercihi::Bildirilmedi,
+        )
+        .expect("tema adayı yokken hareket tercihi süre doğrulaması istemez");
+    assert_eq!(çözüm.hareket(), MetinİmleciHareketi::Sabit);
+    assert_eq!(çözüm.kaynak(), MetinİmleciHareketKaynağı::HareketTercihi);
 
     // Açık tema tercihi hareket kapalıyken bile kazanır: ürün bilerek
     // seçmiştir ve sıra `ORT-004`ündür.
     tema.imleç_hızı = İmleçHızı::Hızlı;
     tema.sürümü_artır();
     let açık = gpui_bilesenleri_galeri::tezgah_teması(&tema);
-    let çözüm = gpui_bilesenleri::metin_imleci_hareketini_çöz(
-        açık.metin_imleci.hareket,
-        açık.bağlam.hareket,
-        None,
-    );
-    assert_eq!(çözüm.kaynak, MetinİmleciHareketKaynağı::Tema);
+    let çözüm = metin_imleci_çözümleyicisi()
+        .çöz(
+            açık.metin_imleci.hareket,
+            açık.bağlam.hareket,
+            PlatformMetinİmleciTercihi::Bildirilmedi,
+        )
+        .expect("açık tema adayı geçerli sürelerle kurulur");
+    assert_eq!(çözüm.kaynak(), MetinİmleciHareketKaynağı::Tema);
     assert!(matches!(
-        çözüm.hareket,
+        çözüm.hareket(),
         MetinİmleciHareketi::YanıpSönen { .. }
     ));
 }

@@ -16,6 +16,21 @@ use gpui_bilesenleri::{
 };
 use gpui_bilesenleri_galeri::TezgahTercihleri;
 
+/// Testlerin `ORT-002` doğrulama kapısı; kimlikler yalnız motordan doğar.
+fn motor() -> std::sync::Arc<gpui_bilesenleri_temel::UnicodeMetinMotoru> {
+    use std::sync::OnceLock;
+    static MOTOR: OnceLock<std::sync::Arc<gpui_bilesenleri_temel::UnicodeMetinMotoru>> =
+        OnceLock::new();
+    MOTOR
+        .get_or_init(|| {
+            gpui_bilesenleri_temel::UnicodeVeYerelMetinHizmetleri::yerlesik(
+                ÖrnekKimliğiFabrikası::yeni_süreç_kapsamı().expect("test kimlik kapsamı"),
+            )
+            .motor()
+        })
+        .clone()
+}
+
 fn kimlik_fabrikası() -> ÖrnekKimliğiFabrikası {
     ÖrnekKimliğiFabrikası::yeni_süreç_kapsamı().expect("test kimlik kapsamı")
 }
@@ -27,7 +42,9 @@ fn ankraj_tercihi_kanonik_alana_cevrilir() {
     t.gösterge_ankrajı = Some(DurumGöstergesiYerleşimTercihi::UygunsaÜstKöşe);
     t.gösterge_açıklaması = DurumGöstergesiAçıklamaTercihi::SağlayıcıVarsayılanı;
 
-    let yapılandırma = t.yapılandırma(&kimlik_fabrikası()).durum_göstergesi;
+    let yapılandırma = t
+        .yapılandırma(&kimlik_fabrikası(), &motor())
+        .durum_göstergesi;
     let yapılandırma = yapılandırma.expect("ankraj seçiliyken alan kurulur");
     assert_eq!(
         yapılandırma.yerleşim,
@@ -49,7 +66,7 @@ fn ankrajsiz_yapilandirmada_alan_yok() {
     let mut t = TezgahTercihleri::default();
     t.gösterge_ankrajı = None;
     assert!(
-        t.yapılandırma(&kimlik_fabrikası())
+        t.yapılandırma(&kimlik_fabrikası(), &motor())
             .durum_göstergesi
             .is_none()
     );
@@ -212,22 +229,32 @@ fn secili_ankraja_yeniden_basmak_kapatir() {
 
 /// `F2.4` açıklama yüzeyinin kurulamama nedeni fiziksel bir eksikliktir.
 ///
-/// `GirişYüzeyBağı` fiziksel API'de yok ve `GirişYapılandırmaHatası`
-/// `GirişYüzeyBağıEksik` varyantını taşımıyor. Bu yüzden ekranda
-/// gösterilecek şey "sözleşmenin ürettiği kuruluş reddi" değil, "kanonikte
-/// beklenen, fiziksel API'de henüz bulunmayan sonuç" etiketidir. Yerel sahte
-/// balon ve sessiz `Yok` fallback'i `§16.2.4` ile yasaktır.
+/// `BİL-010 21.x` yüzeyinde `GirişYapılandırmaHatası` artık
+/// `GirişYüzeyBağıEksik` varyantını taşıyor; ama `GirişYüzeyBağı` **tipi**
+/// hâlâ fiziksel değil. Ekranda gösterilecek şey bu yüzden hâlâ "kanonikte
+/// beklenen, fiziksel API'de henüz bulunmayan yüzey" etiketidir. Yerel sahte
+/// balon ve sessiz `Yok` fallback'i `§16.2.4` ile yasaktır. Tip
+/// fizikselleştiğinde bu test düşer ve F2.4 yeniden değerlendirilir.
 #[test]
 fn aciklama_yuzeyi_fiziksel_degil() {
-    let kaynak = include_str!("../../../../gpui_bilesenleri/crates/gpui-bilesenleri/src/metin_girisi/api.rs");
+    let kaynak = include_str!(
+        "../../../../gpui_bilesenleri/crates/gpui-bilesenleri/src/metin_girisi/api.rs"
+    );
     let kod: String = kaynak
         .lines()
         .filter(|satır| !satır.trim_start().starts_with("//"))
         .collect::<Vec<_>>()
         .join("\n");
+    // Hata varyantı fizikseldir; kuruluş reddi artık gerçek kanaldan gelir.
     assert!(
-        !kod.contains("GirişYüzeyBağı"),
-        "GirişYüzeyBağı fizikselleşmiş — F2.4 yeniden değerlendirilmeli"
+        kod.contains("GirişYüzeyBağıEksik"),
+        "GirişYüzeyBağıEksik varyantı kayboldu — F2.4 gerekçesi güncellenmeli"
+    );
+    // Yüzey tipi hâlâ fiziksel değil; tezgâh ekseni pasif ve gerekçeli kalır.
+    assert!(
+        !kod.replace("GirişYüzeyBağıEksik", "")
+            .contains("GirişYüzeyBağı"),
+        "GirişYüzeyBağı tipi fizikselleşmiş — F2.4 yeniden değerlendirilmeli"
     );
 
     // Tercih seçilebilir kalır: yapılandırma alanı gerçek, açılmayan şey
@@ -235,7 +262,7 @@ fn aciklama_yuzeyi_fiziksel_degil() {
     let mut t = TezgahTercihleri::default();
     t.gösterge_açıklaması = DurumGöstergesiAçıklamaTercihi::SağlayıcıVarsayılanı;
     let yapılandırma = t
-        .yapılandırma(&kimlik_fabrikası())
+        .yapılandırma(&kimlik_fabrikası(), &motor())
         .durum_göstergesi
         .expect("ankraj varsayılanda seçili");
     assert_eq!(

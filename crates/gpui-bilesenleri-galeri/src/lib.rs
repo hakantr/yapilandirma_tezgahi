@@ -10,17 +10,19 @@ use gpui::{
     Context, Entity, IntoElement, Render, ScrollHandle, Window, div, point, prelude::*, px, rgb,
 };
 use gpui_bilesenleri::{
-    BileşenKimliği, EksikGirişPolitikası, GirişKutusu, GirişMaskesi,
-    GirişYapılandırması, MetinGirişMaskesi, RakamKümesi, Sabitİçerik, SayaçYapılandırması,
-    SayımBirimi, TanımKimliği, TarihGirişMaskesi, UzunlukSınırı, UzunlukSınırıDavranışı,
-    YardımcıEylemTürü, YardımcıEylemYuvası, medya_fallback_planı, ÖrnekKimliğiFabrikası,
-    İçerikGörünürlüğü,
+    BileşenKimliği, EksikGirişPolitikası, GirişKutusu, GirişMaskesi, GirişYapılandırması,
+    MetinGirişMaskesi, RakamKümesi, Sabitİçerik, SayaçYapılandırması, SayımBirimi, TanımKimliği,
+    TarihGirişMaskesi, UzunlukSınırı, UzunlukSınırıDavranışı, YardımcıEylemTürü,
+    YardımcıEylemYuvası, medya_fallback_planı, ÖrnekKimliğiFabrikası, İçerikGörünürlüğü,
 };
 use std::{cell::Cell, rc::Rc, sync::Arc};
 
 mod galeri;
 mod metin_girisi_profili;
 mod metin_girisi_tezgahi;
+// `ORT-002`/`ORT-021` uygulama-kökü hizmet sahipliği. Kök burada bir kez
+// kurulur; bileşenler yalnız verilen capability değerlerini tüketir.
+mod metin_hizmetleri;
 mod onboarding;
 mod palet;
 // Alanı gözleyen panel entity'leri: kök alanın durum değişimini dinlemez,
@@ -37,15 +39,25 @@ mod yazi_tipleri;
 // yüzeyi buradan geçer.
 pub use gpui_bilesenleri::{
     GizlilikKapılıYetenek, GmtFarkı, MetinİmleciHareketKaynağı, MetinİmleciHareketi,
-    OtomatikDoldurmaAmacı, OtomatikDoldurmaHatası, PlatformMetinİmleciTercihi,
-    PlatformOtomatikDoldurmaPortu, PlatformSaatDilimiPortu, PlatformİmleçPortu, PlatformİzinDurumu,
-    SaatDilimiKaynağı, SaatDilimiKimliği, SaatDilimiTercihi, metin_imleci_hareketini_çöz,
+    MetinİmleciÇözümHatası, MetinİmleciÇözümleyicisi, OtomatikDoldurmaAmacı,
+    OtomatikDoldurmaHatası, PlatformMetinİmleciTercihi, PlatformOtomatikDoldurmaPortu,
+    PlatformSaatDilimiPortu, PlatformİmleçPortu, PlatformİzinDurumu, SaatDilimiKaynağı,
+    SaatDilimiKimliği, SaatDilimiTercihi, TemaMetinİmleciAdayı, metin_imleci_çözümleyicisi,
     saat_dilimini_çöz, ÇözülmüşMetinİmleciHareketi, ÇözülmüşSaatDilimi, İmleçTokenları,
 };
+
+// Sarmalayıcı platform portları `SaatDilimiKimliği` gibi kimlikleri elle
+// mühürleyemez; doğrulama kapısı `ORT-002` motorudur ve katman sınırı gereği
+// galeri üzerinden dışa açılır.
+pub use gpui_bilesenleri_temel::UnicodeMetinMotoru;
 
 pub use galeri::*;
 pub use metin_girisi_profili::*;
 pub use metin_girisi_tezgahi::*;
+pub(crate) use metin_hizmetleri::{
+    MetinHizmetleriKökü, SaatDilimiSeçenekleri, TezgahÇözümKaydı, TezgahİletiÇözücüsü,
+    YerelKökHatası, son_çözüm_hatası_metni, yerel_kök_hatası_metni,
+};
 pub use onboarding::*;
 pub use palet::*;
 pub use paneller::*;
@@ -170,10 +182,86 @@ impl gpui_bilesenleri::EşzamansızDoğrulamaPortu for GösterimDoğrulamaPortu 
 }
 
 /// Masaüstü ve WASM'in aynı katalog ve bilgi mimarisiyle açtığı galeri.
+/// `§30` tercih→kutu eşitlemesinin **kalıcı** ret kaydı.
+///
+/// Geçici olan yalnız **canlı işaretli** (`birleşim_utf8.is_some()`)
+/// `CompositionEtkin`dir; o buraya girmez, bekleyen kümeyle taşınır. Canlı
+/// işareti olmayan (asılı kompozisyon-ekseni) `CompositionEtkin` dâhil
+/// diğer her ret bu kalıcı typed kanala düşer. Buradaki kayıt exact typed
+/// hatayı ve hangi tercih kutusunda üretildiğini taşır; önizleme tanı
+/// satırı çizer, aynı kutunun sonraki başarılı eşitlemesi kaydı düşürür.
+#[derive(Clone, Debug, Eq, PartialEq)]
+pub(crate) struct TercihEşitlemeKaydı {
+    pub(crate) kutu: gpui::EntityId,
+    pub(crate) hata: gpui_bilesenleri::GirişHatası,
+}
+
+/// `§30` kalıcı eşitleme retinin exact sunum satırı; varyant adı korunur.
+pub(crate) fn tercih_eşitleme_hatası_metni(kayıt: &TercihEşitlemeKaydı) -> String {
+    format!(
+        "Tercih kutusu eşitlemesi kalıcı retle düştü: ‹{:?}›",
+        kayıt.hata
+    )
+}
+
 pub struct GaleriUygulaması {
     pub model: GaleriModeli,
     kimlik_fabrikası: ÖrnekKimliğiFabrikası,
+    /// `ORT-002`/`ORT-021` uygulama-kökü metin hizmetleri.
+    ///
+    /// Unicode hizmet kökü, yaşayan yerel bağlam, katalog kütüğü ve mühürlü
+    /// çözüm hizmeti uygulama kökünde **bir kez** kurulur; alanlar bileşen
+    /// başına kök kurmaz.
+    metin_hizmetleri: MetinHizmetleriKökü,
+    /// `§29` tezgâh alanının **kur anındaki** uyarı raporu
+    /// (`GirişKuruluşSonucu::rapor`). Çalışma-anı yeniden yapılandırmanın
+    /// rapor otoritesi bu kopya değildir: yaşayan alan kendi
+    /// `yapılandırma_raporu`nu taşır ve `§29` doğrulama kartı raporu
+    /// tercihten güncel üretir.
+    tezgah_kuruluş_raporu: Option<gpui_bilesenleri::GirişYapılandırmaRaporu>,
+    /// `§14` kuruluş sırasındaki varsayılan **sağlayıcı** hatası; entity'yi
+    /// öldürmez, exact typed olarak burada taşınır.
+    tezgah_varsayılan_değer_hatası: Option<gpui_bilesenleri::VarsayılanDeğerHatası>,
+    /// `§29` tezgâh alanı kuruluş başarısızlığı. Expect/panic ile yutulmaz;
+    /// önizleme bu exact sonucu çizer, tercih değişince yeniden denenir.
+    tezgah_kuruluş_hatası: Option<gpui_bilesenleri::GirişKuruluşHatası>,
+    /// Sergi/tercih kutuları kuruluş başarısızlığı; exact typed taşınır.
+    sergi_kuruluş_hatası: Option<gpui_bilesenleri::GirişKuruluşHatası>,
+    /// Yerel kök yenilemesinin terminal akıbeti (sürüm ekseni tükenmesi).
+    /// Sessiz doyurma yoktur; ret exact typed olarak burada durur,
+    /// [`Self::yerel_kök_hatası`] ile okunur ve saat dilimi kartında çizilir.
+    yerel_kök_hatası: Option<YerelKökHatası>,
+    /// Canlı UI çözüm yolunun typed-akıbet yuvası.
+    ///
+    /// `TezgahİletiÇözücüsü::çöz` sunum dizesini üretmeden **önce** son
+    /// hatayı buraya yazar; payload dizeye indirgenmeden kökte korunur ve
+    /// [`Self::son_ileti_çözüm_hatası`] ile okunur.
+    ileti_çözüm_hata_kaydı: Rc<std::cell::RefCell<Option<TezgahÇözümKaydı>>>,
+    /// `§30` dış-yazım reddiyle ertelenen tercih→kutu eşitlemeleri.
+    ///
+    /// Kümedeki kimlik, tercihin hedef metnini o kutuya henüz yazamadığı
+    /// bir tercih kutusudur; buraya giren tek akıbet **canlı işaretli**
+    /// (`birleşim_utf8.is_some()`) `CompositionEtkin`dir — yaşayan IME
+    /// birleşimi dış yazımla bozulamaz ve birleşimin her bitiş yolu işareti
+    /// düşürdüğü için erteleme sınırlıdır (diğer her ret kalıcı typed
+    /// kanala gider). Bekleyen kutunun metin olayı tercihe **geri
+    /// yazılmaz** — kullanıcının seçtiği hedefi birleşim metni ezemez;
+    /// olay önce ileri eşitlemeyi yeniden dener, hedef uygulanınca kayıt
+    /// düşer. Hedefin kendisi saklanmaz: ileri eşitleme hedefi her
+    /// denemede yaşayan tercihten türetir, bayat kopya oluşmaz.
+    bekleyen_tercih_eşitlemeleri: std::collections::HashSet<gpui::EntityId>,
+    /// `§30` tercih eşitlemesinin son **kalıcı** reddi (varsa), exact typed.
+    ///
+    /// Canlı işaretli (`birleşim_utf8.is_some()`) `CompositionEtkin`
+    /// dışındaki retler — terminal `SürümTükendi` de, asılı kompozisyon
+    /// ekseninin işaretsiz `CompositionEtkin`i de — bekleyen kayda dönüşmez
+    /// ve metin olaylarını bastırmaz; akıbetleri burada durur,
+    /// [`Self::tercih_eşitleme_hatası`] ile okunur ve önizleme tanı
+    /// satırında çizilir.
+    tercih_eşitleme_hatası: Option<TercihEşitlemeKaydı>,
     orta_kaydırma: ScrollHandle,
+    /// Tezgâh sol alt bloğunun sıradan flex-scroll tutamacı.
+    tezgah_sol_kaydırma: ScrollHandle,
     /// `BİL-010` yaşayan giriş alanları. Galeri metin düzenlemeyi kendisi
     /// uygulamaz; kanonik bileşeni tüketir.
     sergi_girişleri: Option<MetinGirişiAlanları>,
@@ -306,10 +394,27 @@ impl GaleriUygulaması {
             Ok(fabrika) => fabrika,
             Err(_) => panic!("galeri örnek kimliği üretim soyu kurulamıyor"),
         };
+        // Uygulama kökü hizmetleri **burada bir kez** kurulur. Açılışta
+        // platform portu henüz bağlı değildir; dilim tercihten portsuz
+        // çözülür, port kurulunca `platform_portlarını_kur` kökü eşitler.
+        let tezgah = TezgahTercihleri::default();
+        let açılış_dilimi = saat_dilimini_çöz(&tezgah.saat_dilimi_tercihi, None);
+        let metin_hizmetleri =
+            MetinHizmetleriKökü::kur(&kimlik_fabrikası, açılış_dilimi.kimlik.as_ref());
         Self {
             model: GaleriModeli::yerleşik_hedef(hedef),
             kimlik_fabrikası,
+            metin_hizmetleri,
+            tezgah_kuruluş_raporu: None,
+            tezgah_varsayılan_değer_hatası: None,
+            tezgah_kuruluş_hatası: None,
+            sergi_kuruluş_hatası: None,
+            yerel_kök_hatası: None,
+            ileti_çözüm_hata_kaydı: Rc::new(std::cell::RefCell::new(None)),
+            bekleyen_tercih_eşitlemeleri: std::collections::HashSet::new(),
+            tercih_eşitleme_hatası: None,
             orta_kaydırma: ScrollHandle::new(),
+            tezgah_sol_kaydırma: ScrollHandle::new(),
             sergi_girişleri: None,
             tezgah: TezgahTercihleri::default(),
             tezgah_alanı: None,
@@ -389,11 +494,15 @@ impl GaleriUygulaması {
             hedef: self.model.hedef,
         };
         let sistem_aileleri = self.sistem_ailelerini_al(bağlam);
+        // `YÖN-006.ACC-008`: kabuk başlıkları ham dizeden değil, `ORT-021`
+        // kök-kapsamlı hizmetinden çözülür.
+        let çözücü = self.tezgah_çözücüsü();
         gpui::div().size_full().child(sergiler::tezgah_ekranı(
             self.tezgah.clone(),
             içerik,
             sistem_aileleri,
             kabuk,
+            çözücü,
             bağlam,
         ))
     }
@@ -517,10 +626,20 @@ impl GaleriUygulaması {
     /// için sarmalayıcıya bir satır eklemek, davranışın oraya kaymasının ilk
     /// adımıdır. Politika buraya da girmez — öncelik sırası ve düşme kuralı
     /// her portun kendi çekirdek çözümündedir.
-    pub fn platform_portlarını_kur(&mut self, portlar: PlatformPortları) {
+    pub fn platform_portlarını_kur(
+        &mut self,
+        portlar: PlatformPortları,
+        bağlam: &mut Context<Self>,
+    ) {
         self.saat_dilimi_portu = portlar.saat_dilimi;
         self.imleç_portu = portlar.imleç;
         self.otomatik_doldurma_portu = portlar.otomatik_doldurma;
+        // Platform dilimi bağlandı: yaşayan yerel kök yeni çözümle
+        // eşitlenir. Eşitleme koşulsuz güvenlidir — sarmalayıcı bunu
+        // pencere açılmadan çağırır ama sözleşme bir çağrı sırasına
+        // dayanmaz: yaşayan alan varsa yeni bağlam ona da inilir, hiçbir
+        // alan eski kökü sessizce kullanmaz.
+        self.yerel_kökü_eşitle(bağlam);
     }
 
     /// `§25` platform otomatik doldurmayı sunuyor mu?
@@ -570,7 +689,11 @@ impl GaleriUygulaması {
         use gpui_bilesenleri::{
             DoğrulamaKaynağı, GeçerlilikSorunu, GeçerlilikSorunuKimliği, GeçerlilikÖnemi,
         };
-        let alan = self.tezgah_alanını_al(pencere, bağlam);
+        let Some(alan) = self.tezgah_alanını_al(pencere, bağlam) else {
+            // Alan kurulamadıysa besleme bağlanacak yer yoktur; exact
+            // kuruluş sonucu zaten galeri durumunda çizilidir.
+            return;
+        };
         alan.update(bağlam, |alan, bağlam| {
             let sorunlar = if hata {
                 vec![GeçerlilikSorunu {
@@ -601,6 +724,97 @@ impl GaleriUygulaması {
             &self.tezgah.saat_dilimi_tercihi,
             self.saat_dilimi_portu.as_deref(),
         )
+    }
+
+    /// Yaşayan yerel kökü çözülmüş dilimle eşitler.
+    ///
+    /// Kök değiştiyse `ORT-021` hizmeti tek atomda yeniden mühürlenmiştir;
+    /// yeni bağlam bütün yaşayan alanlara inilir ki hiçbir alan eski kökü
+    /// sessizce kullanmasın. Bağlamlar fabrika üretimidir, elle kurulmaz.
+    ///
+    /// **Bilinen sınır (`blocked_by_missing_public_product_seam`):** yeni
+    /// bağlamın alana inişi bugün `pub yerel` alan yazımıdır ve maske/
+    /// varsayılan/gösterim planlarını **birlikte** güncellemez; `kur`
+    /// hazırlığı da kendi iç `tr/latn/gregory/UTC` bağlamıyla koşar. Atomik
+    /// güncelleme, BİL-010'un kuruluşta enjekte yerel bağlam + typed
+    /// çalışma-anı değişim yüzeyini açmasını bekler
+    /// (`authorize_bil010_injected_locale_context_and_atomic_runtime_locale_update_surface`).
+    /// Karar atomunun eksen-ayrılığı hükmü: `MetinDamgası` ile
+    /// `YerelBağlamDamgası` ayrı nominal eksenlerdir (`ORT-002` sözleşmesi
+    /// aralarında eşitlik/dönüşüm tanımlamaz); enjekte yerel bağlamın
+    /// damgası metin damgasına eşitlenmez ve ondan türetilmez, çalışma-anı
+    /// yerel değişiminde metin damgası **sabit** kalır — yalnız
+    /// yerel-türevli planlar atomik yenilenir. O karar çözülene kadar bu
+    /// yazım cilalanmaz.
+    /// Eşitlemenin dayandığı çözülmüş dilimi döndürür: dilimi okuyan her
+    /// sunum yolu bu dönüşü kullanmalı ki ekrandaki dilim ile `ORT-021`
+    /// kökü hiçbir karede ayrışmasın (masaüstü portu bildirimi tazelik
+    /// penceresiyle kendiliğinden yenileyebilir).
+    fn yerel_kökü_eşitle(&mut self, bağlam: &mut Context<Self>) -> ÇözülmüşSaatDilimi {
+        let dilim = self.çözülmüş_saat_dilimi();
+        let yeni_kök = match self
+            .metin_hizmetleri
+            .yerel_kökü_gerekirse_yenile(&self.kimlik_fabrikası, dilim.kimlik.as_ref())
+        {
+            Ok(Some(yeni_kök)) => yeni_kök,
+            Ok(None) => return dilim,
+            Err(hata) => {
+                // Terminal akıbet: kök ve alanlar eski (hâlâ tutarlı)
+                // bağlamda kalır; exact sonuç durumda görünür durur.
+                // Bildirim yalnız geçişte üretilir — eşitleme artık kartın
+                // okuma yolundan da koşar ve terminal durumda her karede
+                // notify etmek çizimi döngüye sokar.
+                if self.yerel_kök_hatası != Some(hata) {
+                    self.yerel_kök_hatası = Some(hata);
+                    bağlam.notify();
+                }
+                return dilim;
+            }
+        };
+        if let Some(alan) = self.tezgah_alanı.clone() {
+            let kök = Arc::clone(&yeni_kök);
+            alan.update(bağlam, |alan, bağlam| {
+                alan.yerel = (*kök).clone();
+                bağlam.notify();
+            });
+        }
+        if let Some(alanlar) = self.sergi_girişleri.clone() {
+            alanlar.yerel_bağlamı_değiştir(&yeni_kök, bağlam);
+        }
+        dilim
+    }
+
+    /// Çizim ağacının `ORT-021` anahtar çözücüsü; kök-kapsamlı hizmeti sarar
+    /// ve typed akıbetleri kökün yaşayan yuvasına bağlar.
+    pub(crate) fn tezgah_çözücüsü(&self) -> TezgahİletiÇözücüsü {
+        self.metin_hizmetleri
+            .çözücü(Rc::clone(&self.ileti_çözüm_hata_kaydı))
+    }
+
+    /// Yerel kök yenilemesinin son terminal akıbeti (varsa), exact typed.
+    pub(crate) fn yerel_kök_hatası(&self) -> Option<YerelKökHatası> {
+        self.yerel_kök_hatası
+    }
+
+    /// Canlı UI çözüm yolunun son typed hatası (varsa).
+    ///
+    /// `çöz` sunum dizesini üretmeden önce buraya yazar; typed payload
+    /// dizeye indirgenmeden kökte gözlenebilir kalır.
+    pub(crate) fn son_ileti_çözüm_hatası(&self) -> Option<TezgahÇözümKaydı> {
+        self.ileti_çözüm_hata_kaydı.borrow().clone()
+    }
+
+    /// `§30` tercih eşitlemesinin son kalıcı reddi (varsa), exact typed.
+    pub(crate) fn tercih_eşitleme_hatası(&self) -> Option<TercihEşitlemeKaydı> {
+        self.tercih_eşitleme_hatası.clone()
+    }
+
+    /// Uygulama kökünün `ORT-002` motoru.
+    ///
+    /// Sarmalayıcı platform portları kimlik doğrulaması için bunu alır;
+    /// ikinci bir Unicode kökü kurmaz, kimlik de elle mühürlemez.
+    pub fn metin_motoru(&self) -> Arc<UnicodeMetinMotoru> {
+        self.metin_hizmetleri.motor()
     }
 
     /// Maske laboratuvarında hazır deseni desen alanına yazar.
@@ -675,25 +889,40 @@ impl GaleriUygulaması {
                 alanlar.temayı_değiştir(bağlam);
             }
         }
+        // `ORT-002 §5.2` dilim çözümü tercih değişince yeniden koşar. Yerel
+        // bağlam elle mutasyona uğratılmaz: kök değiştiyse hizmet ve bağlam
+        // tek atomda yenilenir, yeni kök bütün yaşayan alanlara inilir.
+        self.yerel_kökü_eşitle(bağlam);
+        // Yaşayan alan yokken **her** tercih değişimi yeni bir `kur`
+        // denemesidir: gerçek bir kuruluş reddi (ör. derlenemeyen desen)
+        // tercih düzeltilince yeniden denenmeli, eski exact sonuç yeni
+        // yapılandırmaya ait değildir.
+        if self.tezgah_alanı.is_none() {
+            self.tezgah_kuruluş_raporu = None;
+            self.tezgah_varsayılan_değer_hatası = None;
+            self.tezgah_kuruluş_hatası = None;
+        }
         if self.tezgah.değer_türü != önceki_tür {
             self.tezgah_alanı = None;
             self.tezgah_yardımcı_kimlikleri = None;
+            // Kuruluş ekseni de sıfırlanır: yeni tür yeni bir `kur`
+            // denemesidir, eski exact sonuç ona ait değildir.
+            self.tezgah_kuruluş_raporu = None;
+            self.tezgah_varsayılan_değer_hatası = None;
+            self.tezgah_kuruluş_hatası = None;
         } else if let Some(alan) = self.tezgah_alanı.clone() {
             let kimlikler = self
                 .tezgah_yardımcı_kimlikleri
                 .as_ref()
                 .expect("yaşayan tezgâh alanının yardımcı kimlikleri vardır");
-            let yapılandırma = self.tezgah.yapılandırma_kimliklerle(kimlikler);
+            let yapılandırma = self
+                .tezgah
+                .yapılandırma_kimliklerle(kimlikler, &self.metin_hizmetleri.motor());
             let tema = tezgah_teması(&self.tezgah.kutu_teması());
-            // `ORT-002 §5.2` dilim çözümü tercih değişince yeniden koşar ve
-            // yeni bir bağlam sürümü üretir.
-            let dilim = self.çözülmüş_saat_dilimi();
             let önem_zemini = self.tezgah.önem_zemini;
             alan.update(bağlam, |alan, bağlam| {
                 alan.yapılandırmayı_değiştir(yapılandırma, bağlam);
                 alan.temayı_değiştir(tema, bağlam);
-                alan.yerel.saat_dilimi = dilim.bağlam_metni();
-                alan.yerel.sürüm = alan.yerel.sürüm.saturating_add(1);
                 // `§28` durumu ve önemi **kurulamaz**: ikisi de `§16` sorun
                 // kümesinden türetilir ve tek yazarları `sorunları_uygula`dır
                 // (`§29.0`). Tezgâh onları doğrulama kuralı üzerinden üretir;
@@ -720,24 +949,112 @@ impl GaleriUygulaması {
         let Some(alanlar) = self.sergi_girişleri.clone() else {
             return;
         };
-        let eşitle = |kutu: &Entity<GirişKutusu>, hedef: &str, bağlam: &mut Context<Self>| {
-            kutu.update(bağlam, |kutu, bağlam| {
+        let hedefler = [
+            (alanlar.desen.clone(), self.tezgah.desen.clone()),
+            (alanlar.ön_ek_metni.clone(), self.tezgah.ön_ek_metni.clone()),
+            (
+                alanlar.son_ek_metni.clone(),
+                self.tezgah.son_ek_metni.clone(),
+            ),
+        ];
+        for (kutu, hedef) in hedefler {
+            let sonuç = kutu.update(bağlam, |kutu, bağlam| {
                 if kutu.metin() == hedef {
-                    return;
+                    return Ok(());
                 }
-                let uzunluk = kutu.metin().len();
-                kutu.durum.metni_aralıkta_değiştir(0..uzunluk, hedef);
-                bağlam.notify();
+                // Tampon doğrudan yazılmaz: `§30` dış değişiklik portu
+                // sürümlü uygular. Ret olağan bir typed akıbettir ve panic'e
+                // çevrilmez (birleşim sırasındaki bir tercih tıklaması
+                // uygulamayı düşürmemeli). Anlık görüntü aynı kirada
+                // alındığı için `EskiSürüm` bu yolda üretilemez.
+                let anlık = gpui_bilesenleri::MetinDüzenlemePortu::anlık_görüntü(kutu);
+                // Canlı işaretin tek güvenilir göstergesi anlık görüntünün
+                // birleşim aralığıdır: her commit yolu onu düşürür. Bileşenin
+                // kompozisyon-değeri ekseni ise yalnız `unmark_text`/iptal
+                // yollarında düşer ve `insertText`-commit (ör. ölü tuş ya da
+                // birleşimi işaret kaldırılmadan kesinleştiren platform)
+                // sonrasında **asılı kalabilir** — o durumda `CompositionEtkin`
+                // bir erteleme değil kalıcı akıbettir.
+                let canlı_birleşim = anlık.birleşim_utf8.is_some();
+                let sonuç = gpui_bilesenleri::MetinDüzenlemePortu::dış_değişikliği_uygula(
+                    kutu,
+                    gpui_bilesenleri::MetinDeğişikliği {
+                        utf8_aralığı: 0..anlık.metin.len(),
+                        yeni_metin: hedef.clone(),
+                    },
+                    anlık.değer_sürümü,
+                );
+                if sonuç.is_ok() {
+                    bağlam.notify();
+                }
+                sonuç.map(|_| ()).map_err(|hata| (hata, canlı_birleşim))
             });
-        };
-        let (desen, ön_ek, son_ek) = (
-            self.tezgah.desen.clone(),
-            self.tezgah.ön_ek_metni.clone(),
-            self.tezgah.son_ek_metni.clone(),
-        );
-        eşitle(&alanlar.desen, &desen, bağlam);
-        eşitle(&alanlar.ön_ek_metni, &ön_ek, bağlam);
-        eşitle(&alanlar.son_ek_metni, &son_ek, bağlam);
+            match sonuç {
+                Ok(()) => {
+                    self.bekleyen_tercih_eşitlemeleri.remove(&kutu.entity_id());
+                    // Kutu ve tercih yeniden uyumlu: bu kutuya ait kalıcı
+                    // ret kaydı (varsa) geçmiştir, satır söner.
+                    if self
+                        .tercih_eşitleme_hatası
+                        .as_ref()
+                        .is_some_and(|kayıt| kayıt.kutu == kutu.entity_id())
+                    {
+                        self.tercih_eşitleme_hatası = None;
+                        bağlam.notify();
+                    }
+                }
+                // Yalnız **canlı işaretli** `CompositionEtkin` geçici
+                // erteleme akıbetidir: yaşayan IME birleşimi dış yazımla
+                // bozulamaz ve birleşimin her bitiş yolu işaret aralığını
+                // düşürdüğü için erteleme sınırlıdır. Hedef kaybolmaz —
+                // bekleyen kayıt, kutunun bir sonraki metin olayında ileri
+                // eşitlemeyi yeniden denetir ve o olayın kutu metnini
+                // tercihe geri yazmasını bastırır; birleşim biterken seçilen
+                // tercih birleşim metnine ezilmez.
+                Err((gpui_bilesenleri::GirişHatası::CompositionEtkin, true)) => {
+                    self.bekleyen_tercih_eşitlemeleri.insert(kutu.entity_id());
+                }
+                // Diğer her ret **kalıcıdır**: `SürümTükendi` terminaldir
+                // (eşitleme bir daha başarılı olamaz), canlı işaretsiz
+                // `CompositionEtkin` ise asılı kompozisyon ekseninin
+                // akıbetidir ve ancak yeni bir birleşim döngüsü ya da
+                // `unmark_text` onu düşürene kadar sürer. İkisi de bekleyen
+                // kayda dönüşmez — dönüşseydi kutunun metin olayları
+                // süresiz bastırılırdı; exact typed akıbet burada gözlenir
+                // ve önizleme tanı satırında çizilir.
+                Err((hata, _)) => {
+                    self.bekleyen_tercih_eşitlemeleri.remove(&kutu.entity_id());
+                    let kayıt = TercihEşitlemeKaydı {
+                        kutu: kutu.entity_id(),
+                        hata,
+                    };
+                    if self.tercih_eşitleme_hatası.as_ref() != Some(&kayıt) {
+                        self.tercih_eşitleme_hatası = Some(kayıt);
+                        bağlam.notify();
+                    }
+                }
+            }
+        }
+    }
+
+    /// Ölçüm koşumlarının alan kapısı.
+    ///
+    /// Ölçüm varsayılan (bilinen-geçerli) tercihle koşar; kuruluş burada
+    /// düşerse bu bir ürün durumu değil ölçüm ortamı arızasıdır ve exact
+    /// typed sonuç mesajla taşınır — hata sessizce yutulup sahte sayı
+    /// üretilmez.
+    fn ölçüm_alanı(
+        &mut self,
+        pencere: &mut Window,
+        bağlam: &mut Context<Self>,
+    ) -> Entity<GirişKutusu> {
+        match self.tezgah_alanını_al(pencere, bağlam) {
+            Some(alan) => alan,
+            None => panic!(
+                "ölçüm tezgâh alanı kurulamadı: {:?}",
+                self.tezgah_kuruluş_hatası
+            ),
+        }
     }
 
     /// `ORT-018` `bil-010.input.commit` ölçümü.
@@ -752,7 +1069,7 @@ impl GaleriUygulaması {
         pencere: &mut Window,
         bağlam: &mut Context<Self>,
     ) -> Vec<f64> {
-        let alan = self.tezgah_alanını_al(pencere, bağlam);
+        let alan = self.ölçüm_alanı(pencere, bağlam);
         let mut süreler = Vec::with_capacity(tekrar as usize);
         for sıra in 0..(ısınma + tekrar) {
             let süre = alan.update(bağlam, |alan, bağlam| {
@@ -784,7 +1101,7 @@ impl GaleriUygulaması {
         pencere: &mut Window,
         bağlam: &mut Context<Self>,
     ) {
-        let alan = self.tezgah_alanını_al(pencere, bağlam);
+        let alan = self.ölçüm_alanı(pencere, bağlam);
         let metin = metin.to_owned();
         alan.update(bağlam, |alan, bağlam| {
             alan.durum.tümünü_seç();
@@ -814,12 +1131,23 @@ impl GaleriUygulaması {
         pencere: &mut Window,
         bağlam: &mut Context<Self>,
     ) -> f64 {
-        let alan = self.tezgah_alanını_al(pencere, bağlam);
+        let alan = self.ölçüm_alanı(pencere, bağlam);
         // Ölçüm içeriği sabitlenir: boş alanın kabulü dolu alanınkinden
         // ucuzdur ve iki hedefin sayısı karşılaştırılamaz hâle gelir.
-        alan.update(bağlam, |alan, _| {
-            alan.durum.ham_girişi_uygula(ÖLÇÜM_METNİ);
-            alan.maske_şablonunu_kur();
+        // İçerik gerçek giriş yolundan yazılır; ham tampona doğrudan yazım
+        // güncel yüzeyde yok.
+        alan.update(bağlam, |alan, bağlam| {
+            alan.durum.tümünü_seç();
+            let seçim = alan
+                .durum
+                .bayt_aralığını_utf16_çevir(alan.durum.seçim_baytları());
+            gpui::EntityInputHandler::replace_text_in_range(
+                alan,
+                Some(seçim),
+                ÖLÇÜM_METNİ,
+                pencere,
+                bağlam,
+            );
         });
         let mut koştur = |alan: &Entity<GirişKutusu>, sayı: u32, bağlam: &mut Context<Self>| {
             for _ in 0..sayı {
@@ -861,31 +1189,80 @@ impl GaleriUygulaması {
         &mut self,
         pencere: &mut Window,
         bağlam: &mut Context<Self>,
-    ) -> Entity<GirişKutusu> {
+    ) -> Option<Entity<GirişKutusu>> {
         if let Some(alan) = self.tezgah_alanı.clone() {
-            return alan;
+            return Some(alan);
+        }
+        // Kuruluş bir kez denenir; exact typed hata durur ve önizleme onu
+        // çizer. Tercih (tür) değişimi eksenleri sıfırlar ve yeniden dener.
+        if self.tezgah_kuruluş_hatası.is_some() {
+            return None;
         }
         let yardımcı_kimlikleri = YardımcıKimlikleri::yeni(&self.kimlik_fabrikası);
-        let yapılandırma = self.tezgah.yapılandırma_kimliklerle(&yardımcı_kimlikleri);
+        let yapılandırma = self
+            .tezgah
+            .yapılandırma_kimliklerle(&yardımcı_kimlikleri, &self.metin_hizmetleri.motor());
         // Önizleme seçili tercihi açılışta göstersin: boş kutu hizalamayı,
         // ayracı, gizlemeyi ve temizleme simgesini görünür kılmaz.
         let örnek = self.tezgah.örnek_değer();
         // Tezgâh kendi kâğıt paletini taşır; önizleme kutusu da o palete
         // göre çizilir ki ekranın bütünü tek bir tasarım dili konuşsun.
         let tema = tezgah_teması(&self.tezgah.kutu_teması());
-        let dilim = self.çözülmüş_saat_dilimi();
         let imleç_portu = self.imleç_portu.clone();
         let doldurma_portu = self.otomatik_doldurma_portu.clone();
         let katalog = galeri_simge_kataloğu();
         let bileşen =
             galeri_bileşen_kimliği(&self.kimlik_fabrikası, "galeri.metin_girisi", "tezgah");
-        let alan = bağlam.new(move |bağlam| {
-            let mut alan = GirişKutusu::yeni(bileşen, yapılandırma, örnek, tema, pencere, bağlam);
+        // `BİL-010 §29` fallible kuruluş: `ORT-002` kökü ve başlangıç
+        // damgası uygulama kökünden verilir; kutu kök kurmaz.
+        let sonuç = GirişKutusu::kur(
+            bileşen,
+            self.metin_hizmetleri.unicode(),
+            self.metin_hizmetleri.alan_damgası(&self.kimlik_fabrikası),
+            yapılandırma,
+            örnek,
+            tema,
+            pencere,
+            bağlam,
+        );
+        let gpui_bilesenleri::GirişKuruluşSonucu {
+            bileşen: alan,
+            rapor,
+            varsayılan_değer_hatası,
+        } = match sonuç {
+            Ok(sonuç) => sonuç,
+            Err(hata) => {
+                // Başarısız kuruluş yarım entity, abonelik ya da yaşayan
+                // durum bırakmaz (`kur` entity'yi ancak bütün fallible
+                // adımlardan sonra üretir); exact sonuç galeri durumuna
+                // iner. Önceki bir alandan kalan gözlem panelleri de
+                // düşürülür — aksi hâlde eski entity'yi tutamaç ve
+                // abonelikleriyle süresiz canlı tutarlardı; invariant
+                // koşulsuzdur, başarılı kuruluş panelleri baştan kurar.
+                self.tezgah_panelleri = None;
+                self.tezgah_kuruluş_hatası = Some(hata);
+                return None;
+            }
+        };
+        // Kuruluşun uyarı raporu ve varsayılan sağlayıcı akıbeti kayıpsız
+        // saklanır; sağlayıcı hatası entity'yi öldürmez.
+        self.tezgah_kuruluş_raporu = Some(rapor);
+        self.tezgah_varsayılan_değer_hatası = varsayılan_değer_hatası;
+        // Portlar, simge kataloğu ve yaşayan yerel kök hosttan verilir;
+        // yerel bağlam fabrika üretimidir, alan üzerinde elle kurulmaz.
+        //
+        // **Bilinen sınır (`blocked_by_missing_public_product_seam`):**
+        // `kur` hazırlığı (maske şablonu, varsayılan) bileşenin kendi iç
+        // `tr/latn/gregory/UTC` bağlamıyla koştu; buradaki yazım yalnız
+        // yaşayan bağlamı host köküne çevirir, hazırlık planlarını yeniden
+        // kurmaz. Kuruluşta enjekte yerel bağlam BİL-010'un açması gereken
+        // yüzeydir; o karar çözülene kadar bu dikiş cilalanmaz.
+        let yerel_kök = self.metin_hizmetleri.yerel_kök();
+        alan.update(bağlam, |alan, _| {
             alan.simge_kataloğu = Some(katalog);
-            alan.yerel.saat_dilimi = dilim.bağlam_metni();
+            alan.yerel = (*yerel_kök).clone();
             alan.imleç_portu = imleç_portu;
             alan.otomatik_doldurma_portu = doldurma_portu;
-            alan
         });
         self.tezgah_yardımcı_kimlikleri = Some(yardımcı_kimlikleri);
         // Alanı gözleyen paneller alanla birlikte kurulur. `§16.2` gözlem
@@ -938,7 +1315,7 @@ impl GaleriUygulaması {
             }
         }
         self.tezgah_alanı = Some(alan.clone());
-        alan
+        Some(alan)
     }
 
     /// Önbellekli sağ kolonun geçersizleme yolu.
@@ -993,7 +1370,11 @@ impl GaleriUygulaması {
         {
             return Rc::clone(rapor);
         }
-        let rapor = Rc::new(self.tezgah.yapılandırma(&self.kimlik_fabrikası).doğrula());
+        let rapor = Rc::new(
+            self.tezgah
+                .yapılandırma(&self.kimlik_fabrikası, &self.metin_hizmetleri.motor())
+                .doğrula(),
+        );
         self.rapor_önbelleği = Some((self.tercih_sürümü, Rc::clone(&rapor)));
         rapor
     }
@@ -1034,7 +1415,24 @@ impl GaleriUygulaması {
         pencere: &mut Window,
         bağlam: &mut Context<Self>,
     ) -> Tezgahİçeriği {
-        let alan = self.tezgah_alanını_al(pencere, bağlam);
+        // Tanı **aynı karede** görünür: kanonik anahtar sunumdan önce
+        // yoklanır, sistemik akıbet yuvaya şimdi düşer ve satır bu karenin
+        // render girdisiyle çizilir — okuma yazmadan önce kalmaz, ikinci
+        // kare planına da gerek yoktur. Kuruluş-hatası yolu da dâhil:
+        // yoklama alan denetiminden önce koşar. Anahtar-yerel akıbetler
+        // kendi öğelerinde işaretle zaten görünür.
+        self.tezgah_çözücüsü().yokla();
+        let Some(alan) = self.tezgah_alanını_al(pencere, bağlam) else {
+            // Kuruluş düştü: yarım entity/panel yok. Önizleme exact typed
+            // sonucu ve (varsa) sistemik çözüm tanısını birlikte çizer;
+            // tercih değişimi yeni bir deneme başlatır.
+            return metin_girisi_profili::kuruluş_hatası_içeriği(
+                self.tezgah_kuruluş_hatası.as_ref(),
+                self.son_ileti_çözüm_hatası(),
+                self.tercih_eşitleme_hatası(),
+                self.tezgah_sol_kaydırma.clone(),
+            );
+        };
         let paneller = self
             .tezgah_panelleri
             .clone()
@@ -1052,11 +1450,46 @@ impl GaleriUygulaması {
                 alan,
                 paneller: &paneller,
                 kod,
+                sol_kaydırma: self.tezgah_sol_kaydırma.clone(),
                 en_fazla_yarıçap,
                 köşe_izi: self.köşe_izi.clone(),
+                son_çözüm_hatası: self.son_ileti_çözüm_hatası(),
+                tercih_eşitleme_hatası: self.tercih_eşitleme_hatası(),
             },
             bağlam,
         )
+    }
+
+    /// `BİL-010` sergi/tercih kutularını bir kez kurar.
+    ///
+    /// Kuruluş fallible'dır: başarısızlık exact typed olarak durumda
+    /// saklanır ve yarım alan kümesi yaşatılmaz; ikinci deneme yapılmaz.
+    fn sergi_girişlerini_al(
+        &mut self,
+        pencere: &mut Window,
+        bağlam: &mut Context<Self>,
+    ) -> Option<MetinGirişiAlanları> {
+        if let Some(alanlar) = self.sergi_girişleri.clone() {
+            return Some(alanlar);
+        }
+        if self.sergi_kuruluş_hatası.is_some() {
+            return None;
+        }
+        match MetinGirişiAlanları::kur(
+            &self.metin_hizmetleri,
+            &self.kimlik_fabrikası,
+            pencere,
+            bağlam,
+        ) {
+            Ok(alanlar) => {
+                self.sergi_girişleri = Some(alanlar.clone());
+                Some(alanlar)
+            }
+            Err(hata) => {
+                self.sergi_kuruluş_hatası = Some(hata);
+                None
+            }
+        }
     }
 
     /// Sağ kolonun bölüm listesi; profilin `§9` tür süzgecinden geçmiş.
@@ -1070,16 +1503,19 @@ impl GaleriUygulaması {
         pencere: &mut Window,
         bağlam: &mut Context<Self>,
     ) -> Vec<TezgahBölümü> {
-        let alanlar = match self.sergi_girişleri.clone() {
-            Some(alanlar) => alanlar,
-            None => {
-                let alanlar = MetinGirişiAlanları::kur(&self.kimlik_fabrikası, pencere, bağlam);
-                self.sergi_girişleri = Some(alanlar.clone());
-                alanlar
-            }
+        let Some(alanlar) = self.sergi_girişlerini_al(pencere, bağlam) else {
+            // Sergi alanları kurulamadı: exact typed sonuç durumda durur,
+            // bölüm listesi boş döner — yarım alan kümesiyle çizim yapılmaz.
+            return Vec::new();
         };
         let tercih = self.tezgah.clone();
-        let saat_dilimi = self.çözülmüş_saat_dilimi();
+        // Kartın dilim okuması eşitlemeden geçer: masaüstü portu bildirimi
+        // tazelik penceresi dolunca kendiliğinden yeniler; kök yalnız
+        // tercih/port olaylarında eşitlenseydi kart yeni platform dilimini
+        // gösterirken `ORT-021` kökü eskide kalabilirdi. Değişim yoksa bu
+        // çağrı tek port okumasıdır.
+        let saat_dilimi = self.yerel_kökü_eşitle(bağlam);
+        let dilim_seçenekleri = self.metin_hizmetleri.dilim_seçenekleri();
         let doldurma_var = self.otomatik_doldurma_kullanılabilir(bağlam);
         let portlar = self.port_durumu(bağlam);
         // `§29` raporu tercih sürümüne bağlıdır: kart sonucu okur.
@@ -1089,6 +1525,8 @@ impl GaleriUygulaması {
                 tercih: &tercih,
                 alanlar: &alanlar,
                 saat_dilimi: &saat_dilimi,
+                dilim_seçenekleri: &dilim_seçenekleri,
+                yerel_kök_hatası: self.yerel_kök_hatası(),
                 doldurma_var,
                 portlar,
                 sayısal: tercih.sayısal_mı(),
@@ -1178,13 +1616,17 @@ impl GaleriUygulaması {
         let genişlik = u32::from(pencere.viewport_size().width);
         let yerleşim = yerleşimi_çöz(genişlik, self.model.eksenler.metin_ölçeği);
         self.model.yerleşim = yerleşim;
-        let sergi_girişi = match self.sergi_girişleri.clone() {
-            Some(alanlar) => alanlar,
-            None => {
-                let alanlar = MetinGirişiAlanları::kur(&self.kimlik_fabrikası, pencere, bağlam);
-                self.sergi_girişleri = Some(alanlar.clone());
-                alanlar
-            }
+        let Some(sergi_girişi) = self.sergi_girişlerini_al(pencere, bağlam) else {
+            // Sergi alanları kurulamadı: katalog yerine exact typed sonuç
+            // çizilir; yarım alan kümesiyle sergi kurulmaz.
+            return div()
+                .size_full()
+                .p_5()
+                .child(format!(
+                    "Sergi giriş alanları kurulamadı: {:?}",
+                    self.sergi_kuruluş_hatası
+                ))
+                .into_any_element();
         };
         let tezgah_tercihi = self.tezgah.clone();
         let dar = yerleşim == GaleriYerleşimKipi::Dar;
@@ -1411,12 +1853,14 @@ impl GaleriUygulaması {
             } else {
                 None
             };
+            let tezgah_çözücüsü = tezgah_içeriği.is_some().then(|| self.tezgah_çözücüsü());
             let canlı_sergi = sergiler::aile_sergisi(
                 seçili.as_ref(),
                 sergiler::SergiDurumu {
                     girişi: sergi_girişi.clone(),
                     tezgah: tezgah_tercihi,
                     tezgah_içeriği,
+                    tezgah_çözücüsü,
                     düğme_sayacı: self.sergi_düğme_sayacı,
                     seçili: self.sergi_seçimi,
                     onaylı: self.sergi_onaylı,
@@ -1574,6 +2018,7 @@ impl GaleriUygulaması {
                     tezgah: tezgah_tercihi,
                     // Genel bakış tezgâh gövdesini çizmez.
                     tezgah_içeriği: None,
+                    tezgah_çözücüsü: None,
                     düğme_sayacı: self.sergi_düğme_sayacı,
                     seçili: self.sergi_seçimi,
                     onaylı: self.sergi_onaylı,
@@ -1844,6 +2289,19 @@ pub struct MetinGirişiAlanları {
     /// `Arc` yalnız `MetinGirişiAlanları`nın klonlanabilir kalması içindir;
     /// abonelik yaşam süresi galeri görünümüne bağlıdır.
     _abonelikler: Arc<[gpui::Subscription]>,
+    /// `§29` kuruluş sonuçlarının kayıpsız kaydı: her alanın uyarı raporu
+    /// ve varsayılan sağlayıcı akıbeti. Sergi alanları açık başlangıç
+    /// metniyle kurulduğu için sağlayıcı ekseni beklenen durumda `None`dır;
+    /// eksen yine de taşınır, sessizce düşürülmez.
+    pub kuruluş_notları: Arc<[SergiKuruluşNotu]>,
+}
+
+/// Bir sergi alanının `GirişKuruluşSonucu` eksenleri (bileşen dışı).
+#[derive(Clone, Debug)]
+pub struct SergiKuruluşNotu {
+    pub alan: &'static str,
+    pub rapor: gpui_bilesenleri::GirişYapılandırmaRaporu,
+    pub varsayılan_değer_hatası: Option<gpui_bilesenleri::VarsayılanDeğerHatası>,
 }
 
 /// Maske tanımlama alanında kullanılabilecek hazır desenler.
@@ -1888,7 +2346,17 @@ impl MetinGirişiAlanları {
     /// son ek kutuları açık kipte kalıyordu.
     fn temayı_değiştir(&self, bağlam: &mut Context<GaleriUygulaması>) {
         let tema = galeri_teması();
-        for kutu in [
+        for kutu in self.kutular() {
+            let tema = tema.clone();
+            kutu.update(bağlam, |kutu, bağlam| {
+                kutu.temayı_değiştir(tema, bağlam)
+            });
+        }
+    }
+
+    /// Bütün yaşayan sergi kutuları; toplu tema/yerel güncellemeleri gezer.
+    fn kutular(&self) -> [&Entity<GirişKutusu>; 10] {
+        [
             &self.yalın,
             &self.arama,
             &self.parola,
@@ -1899,27 +2367,58 @@ impl MetinGirişiAlanları {
             &self.desen,
             &self.ön_ek_metni,
             &self.son_ek_metni,
-        ] {
-            let tema = tema.clone();
+        ]
+    }
+
+    /// Host yerel kökü değişince **bütün** kutulara yeni bağlamı indirir.
+    ///
+    /// Bağlam host fabrikasının ürünüdür; kutu üzerinde alan alan mutasyon
+    /// yapılmaz, yaşayan bağlam bütün olarak değiştirilir. Böylece hiçbir
+    /// kutu eski kökü sessizce kullanmaz.
+    ///
+    /// Bilinen sınır: bu iniş maske/varsayılan/gösterim planlarını birlikte
+    /// güncellemez (`blocked_by_missing_public_product_seam`, bkz.
+    /// `yerel_kökü_eşitle` notu).
+    fn yerel_bağlamı_değiştir(
+        &self,
+        kök: &Arc<gpui_bilesenleri::YerelMetinBağlamı>,
+        bağlam: &mut Context<GaleriUygulaması>,
+    ) {
+        for kutu in self.kutular() {
+            let kök = Arc::clone(kök);
             kutu.update(bağlam, |kutu, bağlam| {
-                kutu.temayı_değiştir(tema, bağlam)
+                kutu.yerel = (*kök).clone();
+                bağlam.notify();
             });
         }
     }
 
+    /// Sergi kutularını `BİL-010 §29` fallible kuruluş yolundan kurar.
+    ///
+    /// Herhangi bir alanın kuruluşu düşerse exact hata döner; o ana kadar
+    /// kurulan entity tutamaçları ve abonelikler erken dönüşle düşer
+    /// (GPUI aboneliği drop'ta çözülür) ve yarım bir alan kümesi
+    /// yaşatılmaz.
     fn kur(
+        hizmetler: &MetinHizmetleriKökü,
         kimlik_fabrikası: &ÖrnekKimliğiFabrikası,
         pencere: &mut Window,
         bağlam: &mut Context<GaleriUygulaması>,
-    ) -> Self {
+    ) -> Result<Self, gpui_bilesenleri::GirişKuruluşHatası> {
         let tema = galeri_teması();
         let katalog = galeri_simge_kataloğu();
+        let yerel_kök = hizmetler.yerel_kök();
+        // `§29` kuruluş eksenleri kayıpsız toplanır (rapor + varsayılan
+        // sağlayıcı akıbeti); `RefCell` yalnız iki kurucu kapanışın aynı
+        // listeye yazabilmesi içindir.
+        let notlar = std::cell::RefCell::new(Vec::new());
 
         let alan = |kimlik: &'static str,
                     mut yapılandırma: GirişYapılandırması,
                     metin: &'static str,
                     pencere: &mut Window,
-                    bağlam: &mut Context<GaleriUygulaması>| {
+                    bağlam: &mut Context<GaleriUygulaması>|
+         -> Result<Entity<GirişKutusu>, gpui_bilesenleri::GirişKuruluşHatası> {
             // `ORT-009` adsız alan erişilebilir ağaca girmez; sergi alanları
             // da adlı kurulur.
             if yapılandırma.erişilebilir_ad.is_none() {
@@ -1927,16 +2426,37 @@ impl MetinGirişiAlanları {
             }
             let tema = tema.clone();
             let katalog = katalog.clone();
+            let yerel_kök = Arc::clone(&yerel_kök);
             let (ad_alanı, yerel_ad) = kimlik
                 .rsplit_once('.')
                 .expect("galeri giriş tanımı ad alanı ve yerel ad taşır");
             let bileşen = galeri_bileşen_kimliği(kimlik_fabrikası, ad_alanı, yerel_ad);
-            bağlam.new(move |bağlam| {
-                let mut alan =
-                    GirişKutusu::yeni(bileşen, yapılandırma, metin, tema, pencere, bağlam);
+            let sonuç = GirişKutusu::kur(
+                bileşen,
+                hizmetler.unicode(),
+                hizmetler.alan_damgası(kimlik_fabrikası),
+                yapılandırma,
+                metin,
+                tema,
+                pencere,
+                bağlam,
+            )?;
+            notlar.borrow_mut().push(SergiKuruluşNotu {
+                alan: kimlik,
+                rapor: sonuç.rapor,
+                varsayılan_değer_hatası: sonuç.varsayılan_değer_hatası,
+            });
+            let alan = sonuç.bileşen;
+            alan.update(bağlam, |alan, _| {
                 alan.simge_kataloğu = Some(katalog);
-                alan
-            })
+                // Yaşayan yerel bağlam host kökünden gelir; kutu kendi
+                // kökünü kurmaz, bağlam alan alan mutasyona uğratılmaz.
+                // Bilinen sınır: `kur` hazırlığı bileşenin iç bağlamıyla
+                // koştu (`blocked_by_missing_public_product_seam`, bkz.
+                // `yerel_kökü_eşitle` notu).
+                alan.yerel = (*yerel_kök).clone();
+            });
+            Ok(alan)
         };
 
         let yalın = {
@@ -1955,7 +2475,7 @@ impl MetinGirişiAlanları {
                 birim: SayımBirimi::Grafem,
                 sınırı_göster: true,
             });
-            alan("galeri.metin_girisi.yalın", y, "", pencere, bağlam)
+            alan("galeri.metin_girisi.yalın", y, "", pencere, bağlam)?
         };
 
         let arama = {
@@ -1975,7 +2495,7 @@ impl MetinGirişiAlanları {
                 ]
                 .as_slice(),
             ));
-            alan("galeri.metin_girisi.arama", y, "", pencere, bağlam)
+            alan("galeri.metin_girisi.arama", y, "", pencere, bağlam)?
         };
 
         let parola = {
@@ -2004,7 +2524,7 @@ impl MetinGirişiAlanları {
                 "gizli-değer",
                 pencere,
                 bağlam,
-            )
+            )?
         };
 
         let maskeli = {
@@ -2020,17 +2540,20 @@ impl MetinGirişiAlanları {
                 yardımcı_kimlikleri.al(&YardımcıEylemTürü::Temizle),
                 YardımcıEylemTürü::Temizle,
             ));
-            alan("galeri.metin_girisi.maskeli", y, "", pencere, bağlam)
+            alan("galeri.metin_girisi.maskeli", y, "", pencere, bağlam)?
         };
 
         let tarih = {
             let mut y = GirişYapılandırması::tek_satırlı_metin();
             let yardımcı_kimlikleri = YardımcıKimlikleri::yeni(kimlik_fabrikası);
-            y.giriş_türü = TezgahDeğerKipi::Tarih.kanonik_tür(gpui_bilesenleri::MetinİçerikTürü::Düz);
+            y.giriş_türü =
+                TezgahDeğerKipi::Tarih.kanonik_tür(gpui_bilesenleri::MetinİçerikTürü::Düz);
             y.yer_tutucu = Some(hazır_ileti("gg.aa.yyyy"));
             y.maske = Some(GirişMaskesi::Tarih(TarihGirişMaskesi {
                 desen: "gg.aa.yyyy".into(),
-                takvim: gpui_bilesenleri::TakvimKimliği(Arc::from("gregory")),
+                // Takvim kimliği elle mühürlenmez; hostun yaşayan yerel
+                // kökünün motor-doğrulanmış takvimi kullanılır.
+                takvim: hizmetler.yerel_kök().takvim().clone(),
                 eksik_giriş: Some(EksikGirişPolitikası::İzinVer),
                 rakam_kümesi: Some(RakamKümesi::Latin),
                 bölüm_gezinimi: None,
@@ -2039,7 +2562,7 @@ impl MetinGirişiAlanları {
                 yardımcı_kimlikleri.al(&YardımcıEylemTürü::SeçiciyiAç),
                 YardımcıEylemTürü::SeçiciyiAç,
             ));
-            alan("galeri.metin_girisi.tarih", y, "", pencere, bağlam)
+            alan("galeri.metin_girisi.tarih", y, "", pencere, bağlam)?
         };
 
         let tutar = {
@@ -2050,7 +2573,7 @@ impl MetinGirişiAlanları {
                 TezgahDeğerKipi::Ondalık.kanonik_tür(gpui_bilesenleri::MetinİçerikTürü::Düz);
             y.ön_ek = Some(Sabitİçerik::metin("₺", false));
             y.son_ek = Some(Sabitİçerik::metin("KDV dahil", false));
-            alan("galeri.metin_girisi.tutar", y, "", pencere, bağlam)
+            alan("galeri.metin_girisi.tutar", y, "", pencere, bağlam)?
         };
 
         // Tezgâhın metin girdileri. Üçü de kanonik `GirişKutusu`dır: galeri
@@ -2077,19 +2600,19 @@ impl MetinGirişiAlanları {
             "Maske deseni: \\0(000) 000 00 00",
             HAZIR_DESENLER[0].1,
             bağlam,
-        );
+        )?;
         let ön_ek_metni = metin_tercihi(
             "galeri.metin_girisi.ön-ek",
             "Ön ek metni",
             metin_girisi_tezgahi::VARSAYILAN_ÖN_EK,
             bağlam,
-        );
+        )?;
         let son_ek_metni = metin_tercihi(
             "galeri.metin_girisi.son-ek",
             "Son ek metni",
             metin_girisi_tezgahi::VARSAYILAN_SON_EK,
             bağlam,
-        );
+        )?;
 
         // Bu alanların metni değiştikçe tezgâh tercihi ve önizleme yenilenir.
         let abone = |hedef: &Entity<GirişKutusu>,
@@ -2100,6 +2623,16 @@ impl MetinGirişiAlanları {
                     olay,
                     gpui_bilesenleri::GirişOlayı::DüzenlemeMetniDeğişti { .. }
                 ) {
+                    // Bekleyen ileri eşitleme varken kutunun metni tercihe
+                    // geri yazılmaz: birleşim sırasında seçilen hedef,
+                    // birleşim metninin olayıyla sessizce geri alınıyordu.
+                    // Önce ileri yön yeniden denenir (birleşim bittiyse
+                    // hedef şimdi uygulanır ve kayıt düşer); tercih yazımı
+                    // ancak bekleyen düştükten sonraki olaylarda sürer.
+                    if bu.bekleyen_tercih_eşitlemeleri.contains(&hedef.entity_id()) {
+                        bu.tercih_alanlarını_eşitle(bağlam);
+                        return;
+                    }
                     let metin = hedef.read(bağlam).metin().to_owned();
                     bu.tezgahı_değiştir(move |t| yaz(t, metin), bağlam);
                 }
@@ -2120,10 +2653,10 @@ impl MetinGirişiAlanları {
                 "Seçilebilir, yazılamaz",
                 pencere,
                 bağlam,
-            )
+            )?
         };
 
-        Self {
+        Ok(Self {
             yalın,
             arama,
             parola,
@@ -2135,7 +2668,8 @@ impl MetinGirişiAlanları {
             ön_ek_metni,
             son_ek_metni,
             _abonelikler: abonelikler.into(),
-        }
+            kuruluş_notları: notlar.into_inner().into(),
+        })
     }
 }
 

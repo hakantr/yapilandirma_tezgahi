@@ -11,7 +11,7 @@
 //! (`§9`: kurulamayan eksen hiç `child` üretmez, kapanan eksen pasif ve
 //! gerekçeli kalır — ikisi de profilin kararıdır).
 
-use gpui::AnyElement;
+use gpui::{AnyElement, ScrollHandle};
 use gpui_bilesenleri_kabuk::YerelleştirmeAnahtarı;
 
 /// Bir yapılandırma bölümünün hangi akışa düştüğü.
@@ -62,6 +62,13 @@ pub struct Tezgahİçeriği {
     pub önizleme: Vec<AnyElement>,
     /// Sol kolonun alt blokları: türetilmiş durumlar, gözlem panelleri.
     pub sol_ek: Vec<AnyElement>,
+    /// Alt bloğun sıradan flex-scroll yerine ölçüm amaçlı sanal liste olup
+    /// olmadığı. Sanal yol kendi kaydırmasını taşır; kabuk ikinci bir
+    /// `overflow_y_scroll` katmanı kurmaz.
+    pub sol_sanal: bool,
+    /// Sıradan sol kaydırmanın kararlı tutamacı. Ölçüm aynı üst düzey öğeyi
+    /// A ve B yollarında görünür kılabilsin diye profil sınırından geçer.
+    pub sol_kaydırma: ScrollHandle,
     /// "Karşılığı olan kod" paneli; sol kolonun en altında durur.
     pub kod: Option<AnyElement>,
     /// Sağ kolonun hazır çizimi.
@@ -75,7 +82,9 @@ pub struct Tezgahİçeriği {
 }
 
 /// Bir akışa düşen bölümleri sırasını bozmadan ayırır.
-pub fn akış_bölümleri(bölümler: &mut Vec<TezgahBölümü>, akış: Akış) -> Vec<TezgahBölümü> {
+pub fn akış_bölümleri(
+    bölümler: &mut Vec<TezgahBölümü>, akış: Akış
+) -> Vec<TezgahBölümü> {
     let mut kalan = Vec::with_capacity(bölümler.len());
     let mut seçilen = Vec::new();
     for bölüm in std::mem::take(bölümler) {

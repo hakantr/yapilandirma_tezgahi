@@ -1,9 +1,5 @@
-use gpui::SharedString;
 use gpui_bilesenleri_galeri::*;
-use gpui_bilesenleri_kabuk::{
-    BağlamSürümü, DilEtiketi, DilFallbackZinciri, EksikAnahtarPolitikası, TakvimKimliği, YazıYönü,
-    YerelMetinBağlamı, İletiHatası, İletiÇözümProfili, İletiÇözümleyicisi,
-};
+use gpui_bilesenleri_kabuk::BağlamSürümü;
 use std::{collections::BTreeSet, sync::Arc};
 
 #[test]
@@ -83,42 +79,74 @@ fn yon_006_acc_007_sergi_hatasi_kartta_yalitilir() {
     );
 }
 
-struct SahteÇözümleyici;
-impl İletiÇözümleyicisi for SahteÇözümleyici {
-    fn çöz(
-        &self,
-        istek: &gpui_bilesenleri_kabuk::İletiİsteği,
-        profil: &İletiÇözümProfili,
-    ) -> Result<SharedString, İletiHatası> {
-        Ok(format!("{}@{}", istek.anahtar.as_ref(), profil.locale.sürüm).into())
-    }
-}
-
-fn profil() -> İletiÇözümProfili {
-    İletiÇözümProfili {
-        locale: YerelMetinBağlamı {
-            dil_etiketi: DilEtiketi::yeni("tr").unwrap(),
-            saat_dilimi: Arc::from("Europe/Istanbul"),
-            takvim: TakvimKimliği(Arc::from("gregory")),
-            numaralandırma_sistemi: Arc::from("latn"),
-            yazı_yönü: YazıYönü::SoldanSağa,
-            sürüm: 9,
-        },
-        fallback: DilFallbackZinciri {
-            diller: [DilEtiketi::yeni("tr").unwrap()].into(),
-        },
-        eksik_anahtar: EksikAnahtarPolitikası::Hata,
-        katalog_sürümü: BağlamSürümü(1),
-    }
-}
-
+/// `YÖN-006.ACC-008` başlık çözümü **gerçek** `ORT-021` hizmetiyle koşar.
+///
+/// Sahte çözücü ve elle kurulmuş `YerelMetinBağlamı` yoktur:
+/// `İletiÇözümleyicisi` mühürlüdür, bağlam `ORT-002` fabrikasından doğar ve
+/// katalog gerçek kütüğe kaydedilir.
 #[test]
 fn yon_006_acc_008_baslik_ort_021_istegiyle_guncel_localede_cozulur() {
+    use gpui_bilesenleri_temel::{
+        CanlıBağlamDamgası, GüvenliMetin, UnicodeVeYerelMetinHizmetleri, ÖrnekKimliğiFabrikası,
+        İletiBütçesi, İletiDüğümü, İletiKataloğuKimliği, İletiKataloğuKütüğü, İletiKataloğuPaketi,
+        İletiÇözümHizmeti, İletiÇözümleyicisi, İletiŞablonu,
+    };
+
     let (sergiler, _) = yerleşik_kayıtlar();
     let istek = sergi_başlığı_isteği(&sergiler[0]);
     assert!(istek.argümanlar.is_empty());
-    let başlık = sergi_başlığını_çöz(&SahteÇözümleyici, &sergiler[0], &profil()).unwrap();
-    assert!(başlık.ends_with("@9"));
+
+    // Gerçek `ORT-002` kökü ve yaşayan yerel bağlam.
+    let fabrika = ÖrnekKimliğiFabrikası::yeni_süreç_kapsamı().expect("test kimlik kapsamı");
+    let unicode = UnicodeVeYerelMetinHizmetleri::yerlesik(
+        ÖrnekKimliğiFabrikası::yeni_süreç_kapsamı().expect("test kimlik kapsamı"),
+    );
+    let motor = unicode.motor();
+    let yerel = Arc::new(
+        unicode.yerel_bağlam_fabrikası().bağlam(
+            CanlıBağlamDamgası {
+                bağlam: fabrika.sonraki().expect("yerel kök kimliği"),
+                sürüm: BağlamSürümü(9),
+            },
+            motor.dil_etiketi("tr").expect("`tr` tanınır"),
+            motor
+                .numaralandırma_sistemi("latn")
+                .expect("`latn` tanınır"),
+            motor.takvim("gregory").expect("`gregory` tanınır"),
+            motor
+                .saat_dilimi("Europe/Istanbul")
+                .expect("`Europe/Istanbul` tanınır"),
+        ),
+    );
+
+    // İlk serginin başlık anahtarını taşıyan gerçek katalog paketi.
+    let kütük = İletiKataloğuKütüğü::muhurle(
+        fabrika.sonraki().expect("katalog kökü kimliği"),
+        İletiBütçesi::default(),
+    );
+    let şablon = İletiŞablonu {
+        anahtar: sergiler[0].başlık_anahtarı.clone(),
+        şema: Default::default(),
+        kök: Arc::from([İletiDüğümü::Sabit(GüvenliMetin::yeni(
+            "Metin Girişi",
+            false,
+            true,
+        ))]),
+    };
+    let _kayıt = kütük
+        .kaydet(İletiKataloğuPaketi {
+            kimlik: İletiKataloğuKimliği::yeni("galeri.sergi").expect("katalog kimliği"),
+            dil: yerel.dil().clone(),
+            sürüm: BağlamSürümü(1),
+            şablonlar: [(şablon.anahtar.clone(), şablon)].into(),
+        })
+        .expect("sergi kataloğu kaydedilir");
+    let hizmet = İletiÇözümHizmeti::muhurle(kütük, unicode.motor(), Arc::clone(&yerel));
+
+    let katalog = hizmet.etkin_katalog(&yerel).expect("katalog kayıtlı");
+    let başlık =
+        sergi_başlığını_çöz(&hizmet, &sergiler[0], &yerel, katalog).expect("başlık çözülür");
+    assert_eq!(başlık.as_ref(), "Metin Girişi");
 }
 
 #[test]
@@ -251,7 +279,7 @@ fn yon_006_metin_girisi_kanonik_bilesenden_tuketilir() {
 
     // Yaşayan alanlar kanonik bileşenden kurulur ve tipli yapılandırma alır.
     for kanonik in [
-        "GirişKutusu::yeni",
+        "GirişKutusu::kur",
         "GirişYapılandırması::tek_satırlı_metin",
         "GirişMaskesi::Metin",
         "GirişMaskesi::Tarih",
@@ -584,7 +612,9 @@ fn yon_006_gezinme_kullanici_adlarini_birincil_teknik_kimligi_ikincil_gosterir()
     assert!(render.contains("dar-aile-listesi"));
     assert!(render.contains("aile_görünen_adı"));
 
-    let sözleşme = include_str!("../../../../gpui_bilesenleri/sozlesmeler/GALERİ_VE_KANIT_UYGULAMASI_SÖZLEŞMESİ.md");
+    let sözleşme = include_str!(
+        "../../../../gpui_bilesenleri/sozlesmeler/GALERİ_VE_KANIT_UYGULAMASI_SÖZLEŞMESİ.md"
+    );
     assert!(sözleşme.contains("yerelleştirilmiş anlamlı bileşen"));
     assert!(sözleşme.contains("tek başına kart, liste satırı, sayfa başlığı"));
     assert!(sözleşme.contains("sol aile listesi kalıcı ve kendi içinde kaydırılabilirdir"));
