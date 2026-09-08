@@ -776,6 +776,93 @@ fn düğme_sergisi(
                 "Vurgu ve erişim kanonik · Etkinleştirme: {düğme_sayacı}"
             )),
     )
+    .child(cjk_düğme_sergisi())
+}
+
+fn cjk_düğme_sergisi() -> AnyElement {
+    match crate::cjk_dugme_kaniti::bil040_cjk_sergi_kanıtı() {
+        Ok(kanıt) => div()
+            .id("bil-040-cjk-kanıtı")
+            .mt_5()
+            .border_t_1()
+            .border_color(rgb(kenarlık()))
+            .pt_4()
+            .child(
+                div()
+                    .text_sm()
+                    .text_color(rgb(0x111827))
+                    .child("CJK kısa etiket · kanonik sağlayıcı çıktısı"),
+            )
+            .child(
+                div()
+                    .id("bil-040-cjk-kaynak")
+                    .mt_2()
+                    .text_xs()
+                    .text_color(rgb(ikincil_metin()))
+                    .child(format!("Kanonik kaynak: {}", kanıt.kaynak)),
+            )
+            .child(
+                div()
+                    .mt_3()
+                    .flex()
+                    .flex_wrap()
+                    .gap_2()
+                    .child(
+                        div()
+                            .id("bil-040-cjk-kapali")
+                            .rounded_md()
+                            .border_1()
+                            .border_color(rgb(kenarlık()))
+                            .bg(rgb(0xffffff))
+                            .px_4()
+                            .py_2()
+                            .text_sm()
+                            .text_color(rgb(0x111827))
+                            .child(format!("Varsayılan kapalı · {}", kanıt.kapalı)),
+                    )
+                    .child(
+                        div()
+                            .id("bil-040-cjk-acik")
+                            .rounded_md()
+                            .border_1()
+                            .border_color(rgb(kabuk_vurgusu()))
+                            .bg(rgb(0xeff6ff))
+                            .px_4()
+                            .py_2()
+                            .text_sm()
+                            .text_color(rgb(0x1d4ed8))
+                            .child(format!("Açık profil · {}", kanıt.açık)),
+                    ),
+            )
+            .child(
+                div()
+                    .id("bil-040-cjk-eşleme-kanıtı")
+                    .mt_2()
+                    .text_xs()
+                    .text_color(rgb(ikincil_metin()))
+                    .child(format!(
+                        "Varsayılan kapalı={} · açıkta aralık={} · eklenen aralık kaynak tüketmez={} · erişilebilir ad/kopya kaynağı korunur={} · karakter matrisi korunur={}",
+                        kanıt.varsayılan_kapalı,
+                        kanıt.açıkta_aralık_eklendi,
+                        kanıt.eklenen_aralık_kaynak_tüketmiyor,
+                        kanıt.erişilebilir_ad_kaynağı_koruyor && kanıt.kopya_kaynağı_koruyor,
+                        kanıt.karakter_matrisi_korundu,
+                    )),
+            )
+            .into_any_element(),
+        Err(hata) => div()
+            .id("bil-040-cjk-kanıt-hatası")
+            .mt_5()
+            .rounded_md()
+            .border_1()
+            .border_color(rgb(0xdc2626))
+            .bg(rgb(0xfef2f2))
+            .p_3()
+            .text_sm()
+            .text_color(rgb(0x991b1b))
+            .child(format!("CJK sağlayıcı kanıtı üretilemedi: {hata}"))
+            .into_any_element(),
+    }
 }
 
 fn düğme_renkleri(vurgu: DüğmeVurgusu, erişim: ErişimDurumu) -> (u32, u32, u32) {
@@ -1790,7 +1877,7 @@ pub(crate) fn yuva_görünürlük_notu(
 ) -> Option<Div> {
     use gpui_bilesenleri::YardımcıEylemGörünürlüğü as G;
 
-    let değer_var = !alan.read(bağlam).metin().is_empty();
+    let değer_var = alan.read(bağlam).metin().utf8_bayt_uzunluğu() != 0;
     let değere_bağlı = matches!(yuva_görünürlüğü, G::DeğerVarken | G::DeğerVarkenKademeli);
     let mut satırlar: Vec<&'static str> = Vec::new();
     if !değer_var && değere_bağlı && açık_yuva_sayısı > 0 {
@@ -1837,15 +1924,19 @@ pub(crate) fn değer_durumu(
         gpui_bilesenleri::GirişDurumu::Gizli(_) => None,
     };
 
-    let boş = |metin: &str| {
-        if metin.is_empty() {
+    let boş = |metin: &gpui_bilesenleri_temel::PaylaşılanMetinDilimi| {
+        if metin.utf8_bayt_uzunluğu() == 0 {
             "‹boş›".to_owned()
         } else {
-            metin.to_owned()
+            crate::paylaşılan_metni_materyalize_et(metin)
+                .unwrap_or_else(|hata| format!("‹metin okunamadı: {hata}›"))
         }
     };
-    let değer = |değer: Option<&gpui_bilesenleri::AçıkGirişDeğeri>| {
-        değer.map_or_else(|| "‹yok›".to_owned(), crate::açık_değer_özeti)
+    let değer = |değer: Option<&gpui_bilesenleri::SürümlüAçıkGirişDeğeri>| {
+        değer.map_or_else(
+            || "‹yok›".to_owned(),
+            |değer| crate::açık_değer_özeti(değer.değer()),
+        )
     };
 
     // Girilen metin gizli kipte panele **yazılmaz**: kutuda maskelediğimiz
@@ -1857,15 +1948,14 @@ pub(crate) fn değer_durumu(
     let girilen = if gizli {
         "‹gizli›".to_owned()
     } else {
-        boş(açık.map_or("", gpui_bilesenleri::GirişÇekirdeği::düzenleme_metni))
+        açık.map_or_else(|| "‹boş›".to_owned(), |açık| boş(açık.düzenleme_metni()))
     };
     let dönülecek = if gizli {
         "‹gizli›".to_owned()
     } else {
-        boş(
-            açık
-                .map(gpui_bilesenleri::GirişÇekirdeği::düzenleme_başlangıcı)
-                .map_or("", gpui_bilesenleri::DüzenlemeBaşlangıcı::düzenleme_metni),
+        açık.map_or_else(
+            || "‹boş›".to_owned(),
+            |açık| boş(açık.düzenleme_başlangıcı().düzenleme_metni()),
         )
     };
     let kabul = değer(açık.and_then(gpui_bilesenleri::GirişÇekirdeği::kabul_edilmiş_değer));

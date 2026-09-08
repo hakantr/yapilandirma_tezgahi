@@ -17,6 +17,7 @@ use gpui_bilesenleri::{
 };
 use std::{cell::Cell, rc::Rc, sync::Arc};
 
+mod cjk_dugme_kaniti;
 mod galeri;
 mod kanit_raporu;
 mod metin_girisi_profili;
@@ -70,6 +71,42 @@ pub use paneller::*;
 pub use simgeler::*;
 pub use tezgah::*;
 pub use yazi_tipleri::*;
+
+/// Kalıcı `ORT-002` dilimini yalnız gerçekten sahipli metin isteyen galeri
+/// sınırında materyalize eder. Kanonik getter kopyasız kalır.
+pub(crate) fn paylaşılan_metni_materyalize_et(
+    dilim: &gpui_bilesenleri_temel::PaylaşılanMetinDilimi,
+) -> Result<String, gpui_bilesenleri_temel::UnicodeMetinHatası> {
+    let mut metin = String::with_capacity(dilim.utf8_bayt_uzunluğu());
+    dilim.utf8_parçalarını_ziyaret(&mut |baytlar| {
+        // Dilim `ORT-002` tarafından UTF-8 olarak mühürlüdür.
+        metin.push_str(std::str::from_utf8(baytlar).expect("mühürlü UTF-8"));
+        gpui_bilesenleri_temel::Utf8ParçaAkışı::Devam
+    })?;
+    Ok(metin)
+}
+
+/// Kalıcı dilimi ara `String` kurmadan bir tüketici dizesiyle karşılaştırır.
+pub(crate) fn paylaşılan_metin_dizeye_eşit_mi(
+    dilim: &gpui_bilesenleri_temel::PaylaşılanMetinDilimi,
+    beklenen: &str,
+) -> bool {
+    if dilim.utf8_bayt_uzunluğu() != beklenen.len() {
+        return false;
+    }
+    let mut ofset = 0usize;
+    let mut eşit = true;
+    let sonuç = dilim.utf8_parçalarını_ziyaret(&mut |baytlar| {
+        let son = ofset + baytlar.len();
+        if beklenen.as_bytes().get(ofset..son) != Some(baytlar) {
+            eşit = false;
+            return gpui_bilesenleri_temel::Utf8ParçaAkışı::Dur;
+        }
+        ofset = son;
+        gpui_bilesenleri_temel::Utf8ParçaAkışı::Devam
+    });
+    sonuç.is_ok() && eşit && ofset == beklenen.len()
+}
 
 /// Galerinin tükettiği kanonik bileşenlerin tuş bağlarını kaydeder.
 ///
@@ -1074,7 +1111,7 @@ impl GaleriUygulaması {
         ];
         for (kutu, hedef) in hedefler {
             let sonuç = kutu.update(bağlam, |kutu, bağlam| {
-                if kutu.metin() == hedef {
+                if crate::paylaşılan_metin_dizeye_eşit_mi(&kutu.metin(), &hedef) {
                     return Ok(());
                 }
                 // Tampon doğrudan yazılmaz: `§30` dış değişiklik portu
@@ -1086,7 +1123,7 @@ impl GaleriUygulaması {
                 let sonuç = gpui_bilesenleri::MetinDüzenlemePortu::dış_değişikliği_uygula(
                     kutu,
                     gpui_bilesenleri::MetinDeğişikliği {
-                        utf8_aralığı: 0..anlık.metin.len(),
+                        utf8_aralığı: 0..anlık.metin.utf8_bayt_uzunluğu(),
                         yeni_metin: hedef.clone(),
                     },
                     anlık.değer_sürümü,
@@ -2775,7 +2812,18 @@ impl MetinGirişiAlanları {
                         bu.tercih_alanlarını_eşitle(bağlam);
                         return;
                     }
-                    let metin = hedef.read(bağlam).metin().to_owned();
+                    let metin = match hedef.read(bağlam).gösterim_görünümü(true).materyalize_et()
+                    {
+                        Ok(metin) => metin,
+                        Err(hata) => {
+                            bu.tercih_eşitleme_hatası = Some(TercihEşitlemeKaydı {
+                                kutu: hedef.entity_id(),
+                                hata: Arc::new(hata),
+                            });
+                            bağlam.notify();
+                            return;
+                        }
+                    };
                     bu.tezgahı_değiştir(move |t| yaz(t, metin), bağlam);
                 }
             })
@@ -2843,7 +2891,7 @@ fn değer_sürümü(alan: &GirişKutusu) -> u64 {
 fn programatik_kabul_süresi(alan: &mut GirişKutusu, bağlam: &mut Context<GirişKutusu>) -> f64 {
     let yapılandırma_sürümü = alan.yapılandırma().yapılandırma_sürümü();
     let _ = alan.değeri_ata(
-        gpui_bilesenleri::AçıkGirişDeğeri::Metin(ÖLÇÜM_TASLAĞI.to_owned()),
+        gpui_bilesenleri::AçıkGirişDeğeriGirdisi::Metin(ÖLÇÜM_TASLAĞI.to_owned()),
         gpui_bilesenleri::AtamaNiyeti::DüzenlemeTaslağıOlarakAta,
         değer_sürümü(alan),
         yapılandırma_sürümü,
@@ -2851,7 +2899,7 @@ fn programatik_kabul_süresi(alan: &mut GirişKutusu, bağlam: &mut Context<Giri
     );
     let başlangıç = şimdi_ms();
     let _ = alan.değeri_ata(
-        gpui_bilesenleri::AçıkGirişDeğeri::Metin(ÖLÇÜM_METNİ.to_owned()),
+        gpui_bilesenleri::AçıkGirişDeğeriGirdisi::Metin(ÖLÇÜM_METNİ.to_owned()),
         gpui_bilesenleri::AtamaNiyeti::KabulEdilmişDeğeriDeğiştir,
         değer_sürümü(alan),
         yapılandırma_sürümü,

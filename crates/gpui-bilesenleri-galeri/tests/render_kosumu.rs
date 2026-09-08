@@ -50,6 +50,13 @@ fn metin_girisi_ailesi_cizilir(bağlam: &mut TestAppContext) {
 }
 
 #[gpui::test]
+fn bil040_cjk_dugme_sergisi_cizilir(bağlam: &mut TestAppContext) {
+    // Kapalı ve açık sonuçlar gerçek ORT-017 sağlayıcısından hazırlanıp
+    // BİL-040 aile sayfasının görünür GPUI ağacına bağlanır.
+    galeri_çiz(bağlam, GaleriHedefi::Masaüstü, Some("BİL-040"));
+}
+
+#[gpui::test]
 fn butun_bilesen_aileleri_cizilir(bağlam: &mut TestAppContext) {
     for aile in BİL_AİLELERİ {
         galeri_çiz(bağlam, GaleriHedefi::Masaüstü, Some(aile));

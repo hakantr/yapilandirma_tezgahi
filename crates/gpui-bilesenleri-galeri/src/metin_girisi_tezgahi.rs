@@ -633,14 +633,19 @@ pub fn değer_özeti(değer: &gpui_bilesenleri::Değer) -> String {
 ///
 /// Gizli değer bu enumda temsil edilemez; metin yalnız açık giriş
 /// çekirdeğinin salt-okunur getterından gelir.
-pub fn açık_değer_özeti(değer: &gpui_bilesenleri::AçıkGirişDeğeri) -> String {
-    use gpui_bilesenleri::AçıkGirişDeğeri;
+pub fn açık_değer_özeti(değer: &gpui_bilesenleri::AçıkGirişDeğeriGörünümü) -> String {
+    use gpui_bilesenleri::AçıkGirişDeğeriGörünümü;
     match değer {
-        AçıkGirişDeğeri::Null => "boş".to_owned(),
-        AçıkGirişDeğeri::Metin(metin) => metin.clone(),
-        AçıkGirişDeğeri::Tamsayı(sayı) => format!("{sayı:?}"),
-        AçıkGirişDeğeri::Ondalık(sayı) => format!("{sayı:?}"),
-        AçıkGirişDeğeri::TarihZaman(an) => format!("{an:?}"),
+        AçıkGirişDeğeriGörünümü::Null => "boş".to_owned(),
+        AçıkGirişDeğeriGörünümü::Metin(metin) => {
+            match crate::paylaşılan_metni_materyalize_et(metin) {
+                Ok(metin) => metin,
+                Err(hata) => format!("‹metin okunamadı: {hata}›"),
+            }
+        }
+        AçıkGirişDeğeriGörünümü::Tamsayı(sayı) => format!("{sayı:?}"),
+        AçıkGirişDeğeriGörünümü::Ondalık(sayı) => format!("{sayı:?}"),
+        AçıkGirişDeğeriGörünümü::TarihZaman(an) => format!("{an:?}"),
     }
 }
 

@@ -26,7 +26,7 @@ fn yon_006_acc_002_olcutsuz_sergi_yok_ve_kanitsiz_raporu_uretilir() {
 
 #[test]
 fn yon_006_acc_017_sergi_tanimi_getterlari_ve_kapali_hatalari_exacttir() {
-    let atıf = SözleşmeAtfı::yeni("BİL-010", "^27.1", "§1").expect("atıf");
+    let atıf = SözleşmeAtfı::yeni("BİL-010", "^28.0", "§1").expect("atıf");
     let ölçüt = KabulÖlçütüAtfı::yeni(atıf.clone(), "BİL-010.ACC-001").expect("ölçüt");
     let başlık = YerelleştirmeAnahtarı::yeni("galeri.sergi.bil010").expect("başlık");
     let eksenler = EksenDestekMatrisi {
@@ -76,7 +76,7 @@ fn yon_006_acc_017_sergi_tanimi_getterlari_ve_kapali_hatalari_exacttir() {
         kur("bil010/giris/bos", Arc::from([]), platformlar).unwrap_err(),
         SergiKayıtHatası::ÖlçütYok
     );
-    let başka_atıf = SözleşmeAtfı::yeni("ORT-002", "^5.0", "§1").expect("başka atıf");
+    let başka_atıf = SözleşmeAtfı::yeni("ORT-002", "^6.0", "§1").expect("başka atıf");
     let başka_ölçüt = KabulÖlçütüAtfı::yeni(başka_atıf, "ORT-002.ACC-001").expect("başka ölçüt");
     assert_eq!(
         kur("bil010/giris/yanlis", Arc::from([başka_ölçüt]), platformlar).unwrap_err(),
@@ -320,6 +320,10 @@ fn yon_006_temel_aileler_kanonik_ozelliklerle_canli_sergilenir() {
         "bil-040-birincil-düğme",
         "bil-040-ikincil-düğme",
         "bil-040-devre-dışı-düğme",
+        "bil-040-cjk-kaynak",
+        "bil-040-cjk-kapali",
+        "bil-040-cjk-acik",
+        "bil-040-cjk-eşleme-kanıtı",
     ] {
         assert!(sergiler.contains(kimlik), "eksik canlı sergi: {kimlik}");
     }

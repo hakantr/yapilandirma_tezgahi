@@ -1126,9 +1126,11 @@ mod testler {
                     "reddedilen ileri eşitleme bekleyen kayda düşmeli"
                 );
                 assert_eq!(uygulama.tezgah.desen, hedef);
-                assert_ne!(
-                    desen_kutusu.read(bağlam).metin(),
-                    hedef.as_str(),
+                assert!(
+                    !crate::paylaşılan_metin_dizeye_eşit_mi(
+                        &desen_kutusu.read(bağlam).metin(),
+                        hedef.as_str(),
+                    ),
                     "birleşim dış yazımla bozulmamalı"
                 );
             });
@@ -1165,9 +1167,11 @@ mod testler {
                     uygulama.tezgah.desen, hedef,
                     "birleşim bitişi tercihi ezmez; seçilen hedef kazanır"
                 );
-                assert_eq!(
-                    desen_kutusu.read(bağlam).metin(),
-                    hedef.as_str(),
+                assert!(
+                    crate::paylaşılan_metin_dizeye_eşit_mi(
+                        &desen_kutusu.read(bağlam).metin(),
+                        hedef.as_str(),
+                    ),
                     "kutu bekleyen hedefe eşitlenmeli"
                 );
                 assert!(
@@ -1252,9 +1256,11 @@ mod testler {
                 );
                 // Commit'in metin olayı bekleyen ileri eşitlemeyi yeniden
                 // denedi ve eksen kapandığı için hedef **uygulandı**.
-                assert_eq!(
-                    desen_kutusu.read(bağlam).metin(),
-                    hedef.as_str(),
+                assert!(
+                    crate::paylaşılan_metin_dizeye_eşit_mi(
+                        &desen_kutusu.read(bağlam).metin(),
+                        hedef.as_str(),
+                    ),
                     "bekleyen hedef commit sonrasında uygulanmalı; seçilen tercih kazanır"
                 );
                 assert!(
@@ -1278,9 +1284,11 @@ mod testler {
             uygulama.update(bağlam, |uygulama, bağlam| {
                 let seçim = hedef2.clone();
                 uygulama.tezgahı_değiştir(move |t| t.desen = seçim, bağlam);
-                assert_eq!(
-                    desen_kutusu.read(bağlam).metin(),
-                    hedef2.as_str(),
+                assert!(
+                    crate::paylaşılan_metin_dizeye_eşit_mi(
+                        &desen_kutusu.read(bağlam).metin(),
+                        hedef2.as_str(),
+                    ),
                     "kapalı eksende ileri eşitleme doğrudan uygulanır"
                 );
                 assert!(uygulama.bekleyen_tercih_eşitlemeleri.is_empty());

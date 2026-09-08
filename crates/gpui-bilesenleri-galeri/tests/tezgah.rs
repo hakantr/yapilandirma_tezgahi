@@ -1588,7 +1588,6 @@ fn her_olay_varyanti_akis_satirina_cevrilir() {
         },
         GirişOlayı::YardımcıEylemİstendi(YardımcıEylemTürü::Temizle),
         GirişOlayı::AramaGönderildi {
-            metin: "x".to_owned(),
             kaynak: AramaKaynağı::Alan,
             değer_sürümü: 5,
         },
