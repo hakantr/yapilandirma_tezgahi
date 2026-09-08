@@ -18,6 +18,7 @@ use gpui_bilesenleri::{
 use std::{cell::Cell, rc::Rc, sync::Arc};
 
 mod galeri;
+mod kanit_raporu;
 mod metin_girisi_profili;
 mod metin_girisi_tezgahi;
 // `ORT-002`/`ORT-021` uygulama-kökü hizmet sahipliği. Kök burada bir kez
@@ -54,6 +55,7 @@ pub use gpui_bilesenleri::{
 pub use gpui_bilesenleri_temel::UnicodeMetinMotoru;
 
 pub use galeri::*;
+pub use kanit_raporu::*;
 pub use metin_girisi_profili::*;
 pub use metin_girisi_tezgahi::*;
 pub(crate) use metin_hizmetleri::{
@@ -167,21 +169,70 @@ pub struct PlatformPortları {
 /// Gerçek sunucu değildir ve kart bunu açıkça yazar. Sonucun sürümü
 /// isteğin sürümüne eşitlenir ki `ORT-007` commit kapısından geçsin;
 /// bayatlık gösterimin konusu değildir.
-struct GösterimDoğrulamaPortu(Vec<gpui_bilesenleri::GeçerlilikSorunu>);
+struct GösterimDoğrulamaPortu {
+    başlatıcı: Arc<gpui_bilesenleri_temel::GpuiGörevBaşlatıcısı>,
+    hata: bool,
+}
 
 impl gpui_bilesenleri::EşzamansızDoğrulamaPortu for GösterimDoğrulamaPortu {
     fn doğrula(
         &self,
-        _metin: String,
-        değer_sürümü: u64,
-    ) -> std::pin::Pin<
-        Box<dyn std::future::Future<Output = Vec<gpui_bilesenleri::GeçerlilikSorunu>> + Send>,
+        istek: &gpui_bilesenleri::UzakDoğrulamaİsteği,
+        bağlam: &mut gpui::App,
+    ) -> Result<
+        gpui_bilesenleri_temel::EşzamansızGörev<gpui_bilesenleri::UzakDoğrulamaSonucu>,
+        gpui_bilesenleri_temel::İşHatası,
     > {
-        let mut sorunlar = self.0.clone();
-        for sorun in &mut sorunlar {
-            sorun.değer_sürümü = değer_sürümü;
+        use gpui_bilesenleri_temel::EşzamansızGörevBaşlatıcısı as _;
+
+        let anahtar = self
+            .başlatıcı
+            .anahtar(istek.alan.örnek, istek.iş_sınıfı.clone());
+        let sonuç = if self.hata {
+            gpui_bilesenleri::UzakDoğrulamaSonucu::Geçersiz(Self::sorun_özeti(
+                istek.kural,
+                "galeri.dogrulama.reddedildi",
+            ))
+        } else {
+            gpui_bilesenleri::UzakDoğrulamaSonucu::Geçerli
+        };
+        self.başlatıcı.app_bağlamlı(
+            anahtar,
+            istek.taşıma,
+            istek.yeniden_deneme.clone(),
+            istek.aynı_iş,
+            move |_| {
+                let sonuç = sonuç.clone();
+                async move { sonuç }
+            },
+            |_| gpui_bilesenleri_temel::EşzamansızYenidenDenemeKararı::Bitir,
+            bağlam,
+        )
+    }
+
+    fn başlatılamadı_özeti(
+        &self,
+        istek: &gpui_bilesenleri::UzakDoğrulamaİsteği,
+        _: &gpui_bilesenleri_temel::İşHatası,
+    ) -> gpui_bilesenleri::GüvenliSorunÖzeti {
+        Self::sorun_özeti(istek.kural, "galeri.dogrulama.baslatilamadi")
+    }
+}
+
+impl GösterimDoğrulamaPortu {
+    fn sorun_özeti(
+        kural: gpui_bilesenleri::GeçerlilikKuralıKimliği,
+        kod: &'static str,
+    ) -> gpui_bilesenleri::GüvenliSorunÖzeti {
+        gpui_bilesenleri::GüvenliSorunÖzeti {
+            kod: gpui_bilesenleri::GüvenliSorunKodu::denetimli(kod)
+                .expect("galeri güvenli sorun kodu geçerlidir"),
+            ileti_anahtarı: gpui_bilesenleri::YerelleştirmeAnahtarı::yeni(kod)
+                .expect("galeri ileti anahtarı geçerlidir"),
+            önem: gpui_bilesenleri::GeçerlilikÖnemi::Hata,
+            kaynak: gpui_bilesenleri::DoğrulamaKaynağı::Sunucu,
+            kural: Some(kural),
         }
-        Box::pin(async move { sorunlar })
     }
 }
 
@@ -199,7 +250,7 @@ impl gpui_bilesenleri::EşzamansızDoğrulamaPortu for GösterimDoğrulamaPortu 
 #[derive(Clone, Debug, Eq, PartialEq)]
 pub(crate) struct TercihEşitlemeKaydı {
     pub(crate) kutu: gpui::EntityId,
-    pub(crate) hata: gpui_bilesenleri::GirişHatası,
+    pub(crate) hata: Arc<gpui_bilesenleri::GirişHatası>,
 }
 
 /// `§30` kalıcı eşitleme retinin exact sunum satırı; varyant adı korunur.
@@ -275,7 +326,7 @@ pub struct GaleriUygulaması {
     /// Ret alanı **eski (tutarlı)** bağlamda bırakır; akıbet burada durur,
     /// önizleme tanı satırında çizilir ve uygulama hatası yaşarken her
     /// eşitleme turu inişi yeniden dener — başarıda kayıt düşer.
-    yerel_uygulama_hatası: Option<gpui_bilesenleri::GirişHatası>,
+    yerel_uygulama_hatası: Option<Arc<gpui_bilesenleri::GirişHatası>>,
     orta_kaydırma: ScrollHandle,
     /// Tezgâh sol alt bloğunun sıradan flex-scroll tutamacı.
     tezgah_sol_kaydırma: ScrollHandle,
@@ -311,6 +362,9 @@ pub struct GaleriUygulaması {
     imleç_portu: Option<Arc<dyn PlatformİmleçPortu>>,
     /// `§25` otomatik doldurma portu; alanlara kuruluşta verilir.
     otomatik_doldurma_portu: Option<Arc<dyn gpui_bilesenleri::PlatformOtomatikDoldurmaPortu>>,
+    /// Galeri gösterim beslemesinin tek ORT-007 bileşim kökü; ilk açık
+    /// istekte gerçek `App` yürütücüsünden tembel kurulur.
+    doğrulama_görev_kökü: Option<gpui_bilesenleri_temel::GpuiGörevBaşlatıcısıKökü>,
     /// Pencerenin tamamına uygulanan tema ve kip.
     ///
     /// `ORT-004` renk değerinin sahibi temadır; galeri kendi kabuğunu da
@@ -438,6 +492,7 @@ impl GaleriUygulaması {
             saat_dilimi_portu: None,
             imleç_portu: None,
             otomatik_doldurma_portu: None,
+            doğrulama_görev_kökü: None,
             // İki hedef iki farklı temayla açılır: aynı çekirdeğin farklı
             // temalarla nasıl göründüğü tek bakışta karşılaştırılabilsin.
             tezgah_ekranı: true,
@@ -678,10 +733,14 @@ impl GaleriUygulaması {
             otomatik_doldurma: self.otomatik_doldurma_kullanılabilir(bağlam),
             saat_dilimi: self.saat_dilimi_portu.is_some(),
             imleç: self.imleç_portu.is_some(),
-            uzak_doğrulama: self
-                .tezgah_alanı
-                .as_ref()
-                .is_some_and(|alan| alan.read(bağlam).doğrulama_portu.is_some()),
+            uzak_doğrulama: self.tezgah_alanı.as_ref().is_some_and(|alan| {
+                alan.read(bağlam)
+                    .yapılandırma()
+                    .bildirim()
+                    .doğrulama
+                    .uzak_port
+                    .is_some()
+            }),
         }
     }
 
@@ -699,32 +758,54 @@ impl GaleriUygulaması {
         pencere: &mut Window,
         bağlam: &mut Context<Self>,
     ) {
-        use gpui_bilesenleri::{
-            DoğrulamaKaynağı, GeçerlilikSorunu, GeçerlilikSorunuKimliği, GeçerlilikÖnemi,
-        };
         let Some(alan) = self.tezgah_alanını_al(pencere, bağlam) else {
             // Alan kurulamadıysa besleme bağlanacak yer yoktur; exact
             // kuruluş sonucu zaten galeri durumunda çizilidir.
             return;
         };
+        let kök = self.doğrulama_görev_kökü.get_or_insert_with(|| {
+            gpui_bilesenleri_temel::GpuiGörevBaşlatıcısıKökü::kur(
+                bağlam,
+                gpui_bilesenleri_temel::EşzamansızAyrıİşSınırı::denetimli(1)
+                    .expect("galeri görev sınırı pozitiftir"),
+            )
+        });
+        let port: Arc<dyn gpui_bilesenleri::EşzamansızDoğrulamaPortu> =
+            Arc::new(GösterimDoğrulamaPortu {
+                başlatıcı: kök.paylaşım(),
+                hata,
+            });
+        let iş_sınıfı = TanımKimliği::denetimli(
+            Arc::from("galeri"),
+            Arc::from("dogrulama-gosterim-beslemesi"),
+        )
+        .expect("galeri iş sınıfı geçerlidir");
         alan.update(bağlam, |alan, bağlam| {
-            let sorunlar = if hata {
-                vec![GeçerlilikSorunu {
-                    kimlik: GeçerlilikSorunuKimliği(9001),
-                    kaynak: DoğrulamaKaynağı::Sunucu,
-                    önem: GeçerlilikÖnemi::Hata,
-                    ileti: "Sunucu reddetti (gösterim)".into(),
-                    // Port sürümü isteğin sürümüne eşitler; buradaki değer
-                    // yer tutucudur.
-                    değer_sürümü: 0,
-                }]
-            } else {
-                Vec::new()
-            };
-            alan.doğrulama_portu = Some(std::sync::Arc::new(GösterimDoğrulamaPortu(sorunlar)));
+            let mut yapılandırma = alan.yapılandırma().bildirim().clone();
+            yapılandırma
+                .doğrulama
+                .kurallar
+                .retain(|kural| kural.kimlik != gpui_bilesenleri::GeçerlilikKuralıKimliği(9001));
+            yapılandırma
+                .doğrulama
+                .kurallar
+                .push(gpui_bilesenleri::GeçerlilikKuralı {
+                    kimlik: gpui_bilesenleri::GeçerlilikKuralıKimliği(9001),
+                    tetikleyici: gpui_bilesenleri::GeçerlilikTetikleyicisi::Açıkİstekte,
+                    önem: gpui_bilesenleri::GeçerlilikÖnemi::Hata,
+                    kural: gpui_bilesenleri::GeçerlilikKuralTürü::Özel(
+                        gpui_bilesenleri::ÖzelGeçerlilikKuralı {
+                            kimlik: "galeri-gosterim-beslemesi".to_owned(),
+                        },
+                    ),
+                    ileti: Some("Sunucu reddetti (gösterim)".into()),
+                    uzak_iş_sınıfı: Some(iş_sınıfı),
+                });
+            yapılandırma.doğrulama.uzak_port = Some(port);
+            alan.yapılandırmayı_değiştir(yapılandırma, bağlam);
             alan.eşzamansız_doğrulamayı_başlat(bağlam);
         });
-        // Port kapıları kartı `doğrulama_portu.is_some()` okur ve kolonun
+        // Port kapıları kartı yapılandırmanın `uzak_port`unu okur ve kolonun
         // içindedir. Kök artık alanı gözlemediği için buradaki değişim
         // açıkça bildirilir; sorunların kendisi panellerin işidir.
         self.kolonu_geçersizle(bağlam);
@@ -803,18 +884,18 @@ impl GaleriUygulaması {
         kök: &Arc<gpui_bilesenleri::YerelMetinBağlamı>,
         bağlam: &mut Context<Self>,
     ) {
-        let mut son_ret: Option<gpui_bilesenleri::GirişHatası> = None;
+        let mut son_ret: Option<Arc<gpui_bilesenleri::GirişHatası>> = None;
         if let Some(alan) = self.tezgah_alanı.clone() {
             let yeni = (**kök).clone();
             if let Err(hata) = alan.update(bağlam, |alan, bağlam| {
                 alan.yerel_bağlamı_değiştir(yeni, bağlam)
             }) {
-                son_ret = Some(hata);
+                son_ret = Some(Arc::new(hata));
             }
         }
         if let Some(alanlar) = self.sergi_girişleri.clone() {
             if let Some(hata) = alanlar.yerel_bağlamı_değiştir(kök, bağlam) {
-                son_ret = Some(hata);
+                son_ret = Some(Arc::new(hata));
             }
         }
         if self.yerel_uygulama_hatası != son_ret {
@@ -849,7 +930,7 @@ impl GaleriUygulaması {
     }
 
     /// Atomik yerel-bağlam inişinin son typed reddi (varsa).
-    pub(crate) fn yerel_uygulama_hatası(&self) -> Option<gpui_bilesenleri::GirişHatası> {
+    pub(crate) fn yerel_uygulama_hatası(&self) -> Option<Arc<gpui_bilesenleri::GirişHatası>> {
         self.yerel_uygulama_hatası.clone()
     }
 
@@ -876,17 +957,7 @@ impl GaleriUygulaması {
         };
         let desen = desen.to_owned();
         alanlar.desen.update(bağlam, |alan, bağlam| {
-            alan.durum.tümünü_seç();
-            let seçim = alan
-                .durum
-                .bayt_aralığını_utf16_çevir(alan.durum.seçim_baytları());
-            gpui::EntityInputHandler::replace_text_in_range(
-                alan,
-                Some(seçim),
-                &desen,
-                pencere,
-                bağlam,
-            );
+            bütün_metni_değiştir(alan, &desen, pencere, bağlam);
         });
         bağlam.notify();
     }
@@ -975,7 +1046,7 @@ impl GaleriUygulaması {
                 // `ORT-004` erişim durumu da türetilmiştir: kaynağı
                 // `salt_okunur`/`etkin` yapılandırmasıdır. Senaryo ekseni
                 // aynı sonuca ikinci bir yol açıyordu (`§29.0`).
-                alan.önem_zemini = önem_zemini;
+                alan.önem_zeminini_değiştir(önem_zemini, bağlam);
             });
         }
         self.tercih_alanlarını_eşitle(bağlam);
@@ -1060,7 +1131,7 @@ impl GaleriUygulaması {
                     self.bekleyen_tercih_eşitlemeleri.remove(&kutu.entity_id());
                     let kayıt = TercihEşitlemeKaydı {
                         kutu: kutu.entity_id(),
-                        hata,
+                        hata: Arc::new(hata),
                     };
                     if self.tercih_eşitleme_hatası.as_ref() != Some(&kayıt) {
                         self.tercih_eşitleme_hatası = Some(kayıt);
@@ -1107,13 +1178,7 @@ impl GaleriUygulaması {
         let mut süreler = Vec::with_capacity(tekrar as usize);
         for sıra in 0..(ısınma + tekrar) {
             let süre = alan.update(bağlam, |alan, bağlam| {
-                // Kabul kirliliği düşürür; her koşum aynı işi yapsın diye
-                // metin yeniden kirletilir, yoksa ikinci koşum kısa yoldan
-                // döner ve ölçüm gerçek maliyeti göstermez.
-                alan.durum.düzenleme_kirli = true;
-                let başlangıç = şimdi_ms();
-                alan.değeri_kabul_et_dışarıdan(pencere, bağlam);
-                şimdi_ms() - başlangıç
+                programatik_kabul_süresi(alan, bağlam)
             });
             if sıra >= ısınma {
                 süreler.push(süre);
@@ -1138,17 +1203,7 @@ impl GaleriUygulaması {
         let alan = self.ölçüm_alanı(pencere, bağlam);
         let metin = metin.to_owned();
         alan.update(bağlam, |alan, bağlam| {
-            alan.durum.tümünü_seç();
-            let seçim = alan
-                .durum
-                .bayt_aralığını_utf16_çevir(alan.durum.seçim_baytları());
-            gpui::EntityInputHandler::replace_text_in_range(
-                alan,
-                Some(seçim),
-                &metin,
-                pencere,
-                bağlam,
-            );
+            bütün_metni_değiştir(alan, &metin, pencere, bağlam);
         });
     }
 
@@ -1171,23 +1226,12 @@ impl GaleriUygulaması {
         // İçerik gerçek giriş yolundan yazılır; ham tampona doğrudan yazım
         // güncel yüzeyde yok.
         alan.update(bağlam, |alan, bağlam| {
-            alan.durum.tümünü_seç();
-            let seçim = alan
-                .durum
-                .bayt_aralığını_utf16_çevir(alan.durum.seçim_baytları());
-            gpui::EntityInputHandler::replace_text_in_range(
-                alan,
-                Some(seçim),
-                ÖLÇÜM_METNİ,
-                pencere,
-                bağlam,
-            );
+            bütün_metni_değiştir(alan, ÖLÇÜM_METNİ, pencere, bağlam);
         });
-        let mut koştur = |alan: &Entity<GirişKutusu>, sayı: u32, bağlam: &mut Context<Self>| {
+        let koştur = |alan: &Entity<GirişKutusu>, sayı: u32, bağlam: &mut Context<Self>| {
             for _ in 0..sayı {
                 alan.update(bağlam, |alan, bağlam| {
-                    alan.durum.düzenleme_kirli = true;
-                    alan.değeri_kabul_et_dışarıdan(pencere, bağlam);
+                    let _ = programatik_kabul_süresi(alan, bağlam);
                 });
             }
         };
@@ -1244,7 +1288,7 @@ impl GaleriUygulaması {
         let tema = tezgah_teması(&self.tezgah.kutu_teması());
         let imleç_portu = self.imleç_portu.clone();
         let doldurma_portu = self.otomatik_doldurma_portu.clone();
-        let katalog = galeri_simge_kataloğu();
+        let simge_çizimi = galeri_simge_çizim_bağlamı();
         let bileşen =
             galeri_bileşen_kimliği(&self.kimlik_fabrikası, "galeri.metin_girisi", "tezgah");
         // `BİL-010 §29` fallible kuruluş: `ORT-002` kökü ve başlangıç
@@ -1289,10 +1333,10 @@ impl GaleriUygulaması {
         // Portlar, simge kataloğu ve yaşayan yerel kök hosttan verilir;
         // yerel bağlam fabrika üretimidir, alan üzerinde elle kurulmaz.
         //
-        alan.update(bağlam, |alan, _| {
-            alan.simge_kataloğu = Some(katalog);
-            alan.imleç_portu = imleç_portu;
-            alan.otomatik_doldurma_portu = doldurma_portu;
+        alan.update(bağlam, |alan, bağlam| {
+            alan.simge_çizim_bağlamını_değiştir(Some(simge_çizimi), bağlam);
+            alan.platform_imleç_portunu_değiştir(imleç_portu, bağlam);
+            alan.otomatik_doldurma_portunu_değiştir(doldurma_portu, bağlam);
         });
         self.tezgah_yardımcı_kimlikleri = Some(yardımcı_kimlikleri);
         // Alanı gözleyen paneller alanla birlikte kurulur. `§16.2` gözlem
@@ -2507,7 +2551,7 @@ impl MetinGirişiAlanları {
         bağlam: &mut Context<GaleriUygulaması>,
     ) -> Result<Self, gpui_bilesenleri::GirişKuruluşHatası> {
         let tema = galeri_teması();
-        let katalog = galeri_simge_kataloğu();
+        let simge_çizimi = galeri_simge_çizim_bağlamı();
         let yerel_kök = hizmetler.yerel_kök();
         // `§29` kuruluş eksenleri kayıpsız toplanır (rapor + varsayılan
         // sağlayıcı akıbeti); `RefCell` yalnız iki kurucu kapanışın aynı
@@ -2526,7 +2570,7 @@ impl MetinGirişiAlanları {
                 yapılandırma.erişilebilir_ad = Some(hazır_ileti("Sergi giriş alanı"));
             }
             let tema = tema.clone();
-            let katalog = katalog.clone();
+            let simge_çizimi = simge_çizimi.clone();
             let yerel_kök = Arc::clone(&yerel_kök);
             let (ad_alanı, yerel_ad) = kimlik
                 .rsplit_once('.')
@@ -2551,8 +2595,8 @@ impl MetinGirişiAlanları {
                 varsayılan_değer_hatası: sonuç.varsayılan_değer_hatası,
             });
             let alan = sonuç.bileşen;
-            alan.update(bağlam, |alan, _| {
-                alan.simge_kataloğu = Some(katalog);
+            alan.update(bağlam, |alan, bağlam| {
+                alan.simge_çizim_bağlamını_değiştir(Some(simge_çizimi), bağlam);
             });
             Ok(alan)
         };
@@ -2773,6 +2817,48 @@ impl MetinGirişiAlanları {
 
 /// `ORT-018` ölçümünün sabit içeriği; masaüstü koşumuyla aynıdır.
 const ÖLÇÜM_METNİ: &str = "5386977934";
+const ÖLÇÜM_TASLAĞI: &str = "5386977935";
+
+fn bütün_metni_değiştir(
+    alan: &mut GirişKutusu,
+    metin: &str,
+    pencere: &mut Window,
+    bağlam: &mut Context<GirişKutusu>,
+) {
+    let uzunluk =
+        gpui::EntityInputHandler::text_length_utf16(alan, pencere, bağlam).unwrap_or_default();
+    gpui::EntityInputHandler::replace_text_in_range(alan, Some(0..uzunluk), metin, pencere, bağlam);
+}
+
+fn değer_sürümü(alan: &GirişKutusu) -> u64 {
+    match alan.durum() {
+        gpui_bilesenleri::GirişDurumu::Açık(açık) => açık.değer_sürümü(),
+        gpui_bilesenleri::GirişDurumu::Gizli(gizli) => gizli.değer_sürümü(),
+    }
+}
+
+/// Her turu kamusal `§14.3` taslak → kabul zincirinden geçirir; private
+/// kirlilik bayrağına veya private Enter yardımcısına dokunmaz. Dönüş yerel
+/// süre örneğidir, runtime/present kanıtı değildir.
+fn programatik_kabul_süresi(alan: &mut GirişKutusu, bağlam: &mut Context<GirişKutusu>) -> f64 {
+    let yapılandırma_sürümü = alan.yapılandırma().yapılandırma_sürümü();
+    let _ = alan.değeri_ata(
+        gpui_bilesenleri::AçıkGirişDeğeri::Metin(ÖLÇÜM_TASLAĞI.to_owned()),
+        gpui_bilesenleri::AtamaNiyeti::DüzenlemeTaslağıOlarakAta,
+        değer_sürümü(alan),
+        yapılandırma_sürümü,
+        bağlam,
+    );
+    let başlangıç = şimdi_ms();
+    let _ = alan.değeri_ata(
+        gpui_bilesenleri::AçıkGirişDeğeri::Metin(ÖLÇÜM_METNİ.to_owned()),
+        gpui_bilesenleri::AtamaNiyeti::KabulEdilmişDeğeriDeğiştir,
+        değer_sürümü(alan),
+        yapılandırma_sürümü,
+        bağlam,
+    );
+    şimdi_ms() - başlangıç
+}
 
 /// Platformun yüksek çözünürlüklü saati, milisaniye.
 ///

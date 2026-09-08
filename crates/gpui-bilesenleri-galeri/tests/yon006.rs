@@ -1,26 +1,107 @@
 use gpui_bilesenleri_galeri::*;
-use gpui_bilesenleri_kabuk::BağlamSürümü;
+use gpui_bilesenleri_kabuk::{BağlamSürümü, YerelleştirmeAnahtarı};
+use gpui_bilesenleri_uyum::{KabulÖlçütüAtfı, SözleşmeAtfı};
 use std::{collections::BTreeSet, sync::Arc};
 
 #[test]
 fn yon_006_acc_001_tum_aileler_sergili_ortler_gorunur_tuketicilidir() {
     let (sergiler, _) = yerleşik_kayıtlar();
-    let sözleşmeler: BTreeSet<&str> = sergiler.iter().map(|s| s.sözleşme.as_ref()).collect();
+    let sözleşmeler: BTreeSet<&str> = sergiler.iter().map(|s| s.sözleşme().kimlik()).collect();
     assert!(BİL_AİLELERİ.iter().all(|id| sözleşmeler.contains(id)));
     assert!(KAB_AİLELERİ.iter().all(|id| sözleşmeler.contains(id)));
     assert!(ORT_AİLELERİ.iter().all(|id| {
-        sergiler
-            .iter()
-            .any(|s| s.sözleşme.as_ref() == *id && s.görünür_tüketim)
+        sergiler.iter().any(|s| {
+            s.sözleşme().kimlik() == *id && (s.platformlar().masaüstü || s.platformlar().wasm)
+        })
     }));
 }
 
 #[test]
 fn yon_006_acc_002_olcutsuz_sergi_yok_ve_kanitsiz_raporu_uretilir() {
     let (sergiler, _) = yerleşik_kayıtlar();
-    assert!(sergiler.iter().all(|s| !s.ölçütler.is_empty()));
+    assert!(sergiler.iter().all(|s| !s.ölçütler().is_empty()));
     let eksik = kanıtsız_ölçütler(["BİL-010.ACC-001", "BİL-010.ACC-999"], &sergiler);
     assert!(eksik.contains("BİL-010.ACC-999"));
+}
+
+#[test]
+fn yon_006_acc_017_sergi_tanimi_getterlari_ve_kapali_hatalari_exacttir() {
+    let atıf = SözleşmeAtfı::yeni("BİL-010", "^27.1", "§1").expect("atıf");
+    let ölçüt = KabulÖlçütüAtfı::yeni(atıf.clone(), "BİL-010.ACC-001").expect("ölçüt");
+    let başlık = YerelleştirmeAnahtarı::yeni("galeri.sergi.bil010").expect("başlık");
+    let eksenler = EksenDestekMatrisi {
+        tema: true,
+        görünüm_profili: true,
+        yoğunluk: true,
+        metin_ölçeği: true,
+        yazı_yönü: true,
+        hareket: true,
+    };
+    let platformlar = PlatformDestekMatrisi {
+        masaüstü: true,
+        wasm: false,
+    };
+    let sergi = SergiTanımı::yeni(
+        SergiKimliği(Arc::from("bil010/giris/temel")),
+        başlık.clone(),
+        atıf.clone(),
+        Arc::from([ölçüt.clone()]),
+        eksenler,
+        platformlar,
+    )
+    .expect("geçerli sergi");
+    assert_eq!(sergi.kimlik().0.as_ref(), "bil010/giris/temel");
+    assert_eq!(sergi.başlık(), &başlık);
+    assert_eq!(sergi.sözleşme().kimlik(), "BİL-010");
+    assert_eq!(sergi.ölçütler(), &[ölçüt.clone()]);
+    assert_eq!(sergi.eksenler(), &eksenler);
+    assert_eq!(sergi.platformlar(), &platformlar);
+
+    let kur =
+        |kimlik: &str, ölçütler: Arc<[KabulÖlçütüAtfı]>, platformlar: PlatformDestekMatrisi| {
+            SergiTanımı::yeni(
+                SergiKimliği(Arc::from(kimlik)),
+                başlık.clone(),
+                atıf.clone(),
+                ölçütler,
+                eksenler,
+                platformlar,
+            )
+        };
+    assert_eq!(
+        kur("iki/parca", Arc::from([ölçüt.clone()]), platformlar).unwrap_err(),
+        SergiKayıtHatası::KimlikBiçimiGeçersiz
+    );
+    assert_eq!(
+        kur("bil010/giris/bos", Arc::from([]), platformlar).unwrap_err(),
+        SergiKayıtHatası::ÖlçütYok
+    );
+    let başka_atıf = SözleşmeAtfı::yeni("ORT-002", "^5.0", "§1").expect("başka atıf");
+    let başka_ölçüt = KabulÖlçütüAtfı::yeni(başka_atıf, "ORT-002.ACC-001").expect("başka ölçüt");
+    assert_eq!(
+        kur("bil010/giris/yanlis", Arc::from([başka_ölçüt]), platformlar).unwrap_err(),
+        SergiKayıtHatası::ÖlçütSözleşmeyleUyuşmuyor
+    );
+    assert_eq!(
+        kur(
+            "bil010/giris/platformsuz",
+            Arc::from([ölçüt]),
+            PlatformDestekMatrisi {
+                masaüstü: false,
+                wasm: false,
+            },
+        )
+        .unwrap_err(),
+        SergiKayıtHatası::DesteklenenPlatformYok
+    );
+    for hata in [
+        SergiKayıtHatası::KimlikBiçimiGeçersiz,
+        SergiKayıtHatası::ÖlçütYok,
+        SergiKayıtHatası::ÖlçütSözleşmeyleUyuşmuyor,
+        SergiKayıtHatası::DesteklenenPlatformYok,
+    ] {
+        assert!(!hata.güvenli_kod().is_empty());
+    }
 }
 
 #[test]
@@ -125,7 +206,7 @@ fn yon_006_acc_008_baslik_ort_021_istegiyle_guncel_localede_cozulur() {
         İletiBütçesi::default(),
     );
     let şablon = İletiŞablonu {
-        anahtar: sergiler[0].başlık_anahtarı.clone(),
+        anahtar: sergiler[0].başlık().clone(),
         şema: Default::default(),
         kök: Arc::from([İletiDüğümü::Sabit(GüvenliMetin::yeni(
             "Metin Girişi",

@@ -1247,7 +1247,7 @@ mod testler {
         görsel.update(|_, bağlam| {
             uygulama.update(bağlam, |uygulama, bağlam| {
                 assert!(
-                    desen_kutusu.read(bağlam).durum.composition.is_none(),
+                    desen_kutusu.read(bağlam).etkin_ime().is_none(),
                     "`insertText`-commit kompozisyon değerini düşürmeli; asılı eksen kalmamalı"
                 );
                 // Commit'in metin olayı bekleyen ileri eşitlemeyi yeniden
@@ -1318,99 +1318,28 @@ mod testler {
         }
     }
 
-    /// `CompositionEtkin` dışındaki eşitleme retleri **bekleyen kayda
-    /// dönüşmez**: terminal `SürümTükendi` sonrasında kutunun metin
-    /// olayları bastırılmaz, akıbet exact typed gözlenir ve tanı satırı
-    /// gerçekten boyanır; uyum yeniden kurulunca kayıt düşer, satır söner.
-    ///
-    /// Kanıt seviyesi dürüstçe: tükenme önkoşulu (`değer_sürümü =
-    /// u64::MAX`) pub durum alanından enjekte edilir — üretim süresinde
-    /// erişilmez; sınanan şey tükenmenin üretilebilirliği değil, kalıcı
-    /// retin bekleyen/typed/görünürlük ayrımıdır. Ters-yön olayı da testin
-    /// kendisi yayımlar: sınanan, kökün abonelik semantiğidir.
-    #[gpui::test]
-    fn kalici_esitleme_reti_bekleyene_donusmez_typed_gorunur(bağlam: &mut gpui::TestAppContext) {
-        bağlam.update(crate::bileşen_tuş_bağlarını_kur);
-        let (uygulama, görsel) = bağlam.add_window_view(|_, _| crate::GaleriUygulaması::yeni());
-        görsel.run_until_parked();
-        let desen_kutusu = görsel.update(|pencere, bağlam| {
-            uygulama.update(bağlam, |uygulama, bağlam| {
-                uygulama
-                    .sergi_girişlerini_al(pencere, bağlam)
-                    .expect("sergi alanları kurulur")
-                    .desen
-                    .clone()
-            })
-        });
-        assert!(
-            görsel.debug_bounds("tanı-tercih-eşitleme-hatası").is_none(),
-            "sağlıklı karede tanı satırı çizilmemeli"
-        );
-        // Terminal önkoşul: kutunun metin/IME sürüm ekseni tükenmiş.
-        görsel.update(|_, bağlam| {
-            desen_kutusu.update(bağlam, |kutu, _| {
-                kutu.durum.değer_sürümü = u64::MAX;
-            });
-        });
-        let hedef = crate::HAZIR_DESENLER[1].1.to_owned();
-        görsel.update(|_, bağlam| {
-            uygulama.update(bağlam, |uygulama, bağlam| {
-                let seçim = hedef.clone();
-                uygulama.tezgahı_değiştir(move |t| t.desen = seçim, bağlam);
-                assert!(
-                    uygulama.bekleyen_tercih_eşitlemeleri.is_empty(),
-                    "kalıcı ret bekleyen kayda dönüşmemeli"
-                );
-                let kayıt = uygulama
-                    .tercih_eşitleme_hatası()
-                    .expect("kalıcı ret exact typed gözlenmeli");
-                assert_eq!(kayıt.kutu, desen_kutusu.entity_id());
-                assert_eq!(
-                    kayıt.hata,
-                    gpui_bilesenleri::GirişHatası::SürümTükendi(
-                        gpui_bilesenleri::GirişSürümEkseni::MetinVeIme
-                    )
-                );
-                assert_eq!(
-                    uygulama.tezgah.desen, hedef,
-                    "tercih seçilen hedefi taşımaya devam eder"
-                );
-            });
-        });
-        görsel.run_until_parked();
-        assert!(
-            görsel.debug_bounds("tanı-tercih-eşitleme-hatası").is_some(),
-            "kalıcı retin tanı satırı gerçekten boyanmalı"
-        );
-        // Kutunun metin olayları bastırılmaz: ters yön (kutu → tercih)
-        // akmaya devam eder ve uyum kurulunca kalıcı ret kaydı düşer.
-        let kutu_metni = görsel.update(|_, bağlam| desen_kutusu.read(bağlam).metin().to_owned());
-        assert_ne!(kutu_metni, hedef, "tükenmiş kutu hedefe eşitlenmiş olamaz");
-        görsel.update(|_, bağlam| {
-            desen_kutusu.update(bağlam, |_, bağlam| {
-                bağlam.emit(gpui_bilesenleri::GirişOlayı::DüzenlemeMetniDeğişti {
-                    metin: String::new(),
-                    değer_sürümü: 0,
-                });
-            });
-        });
-        görsel.run_until_parked();
-        görsel.update(|_, bağlam| {
-            uygulama.update(bağlam, |uygulama, _| {
-                assert_eq!(
-                    uygulama.tezgah.desen, kutu_metni,
-                    "metin olayı bastırılmadan tercihe akmalı"
-                );
-                assert!(
-                    uygulama.tercih_eşitleme_hatası().is_none(),
-                    "uyum kurulunca kalıcı ret kaydı düşmeli"
-                );
-            });
-        });
-        görsel.run_until_parked();
-        assert!(
-            görsel.debug_bounds("tanı-tercih-eşitleme-hatası").is_none(),
-            "iyileşen karede tanı satırı sönmeli"
+    /// Terminal ret üretmek için artık dışarıya sürüm-mutasyon deliği
+    /// açılmaz. Galeri, sahipli hatayı typed kayıtta ve tanı metninde
+    /// kayıpsız taşıdığını doğrudan doğrular; terminal üretim ve atomiklik
+    /// kanıtı sağlayıcı sandığın kendi iç testlerinin sorumluluğundadır.
+    #[test]
+    fn kalici_esitleme_reti_typed_sunum_kaydinda_korunur() {
+        let kayıt = crate::TercihEşitlemeKaydı {
+            kutu: 1_u64.into(),
+            hata: Arc::new(gpui_bilesenleri::GirişHatası::SürümTükendi(
+                gpui_bilesenleri::GirişSürümEkseni::MetinVeIme,
+            )),
+        };
+
+        assert!(matches!(
+            kayıt.hata.as_ref(),
+            gpui_bilesenleri::GirişHatası::SürümTükendi(
+                gpui_bilesenleri::GirişSürümEkseni::MetinVeIme
+            )
+        ));
+        assert_eq!(
+            crate::tercih_eşitleme_hatası_metni(&kayıt),
+            "Tercih kutusu eşitlemesi kalıcı retle düştü: ‹SürümTükendi(MetinVeIme)›"
         );
     }
 
@@ -1494,7 +1423,7 @@ mod testler {
     ///
     /// Hata elle enjekte edilmez: derlenemeyen bir maske deseni gerçek
     /// tercih yüzeyinden kurulur ve `kur` exact
-    /// `Teknik { hata: GeçersizMaske }` ile reddeder. Önizleme typed sonucu
+    /// `Teknik { hata: Maske(GeçersizDesen) }` ile reddeder. Önizleme typed sonucu
     /// çizer; desen düzeltilince aynı türde yeni deneme geçer.
     #[gpui::test]
     fn kurulus_hatasi_yarim_durum_birakmaz(bağlam: &mut gpui::TestAppContext) {
@@ -1516,8 +1445,13 @@ mod testler {
                 match uygulama.tezgah_kuruluş_hatası.as_ref() {
                     Some(gpui_bilesenleri::GirişKuruluşHatası::Teknik { hata, .. }) => {
                         assert!(
-                            matches!(hata, gpui_bilesenleri::GirişHatası::GeçersizMaske),
-                            "derlenemeyen desen exact `GeçersizMaske` taşımalı: {hata:?}"
+                            matches!(
+                                hata,
+                                gpui_bilesenleri::GirişHatası::Maske(
+                                    gpui_bilesenleri::MaskeHatası::GeçersizDesen
+                                )
+                            ),
+                            "derlenemeyen desen exact `Maske(GeçersizDesen)` taşımalı: {hata:?}"
                         );
                     }
                     diğer => {

@@ -10,7 +10,8 @@ use gpui_bilesenleri_kabuk::{
 use gpui_bilesenleri_temel::{
     YerelMetinBağlamı, İletiKataloğuSnapshot, İletiÇözümHatası, İletiÇözümHizmeti,
 };
-use std::{collections::BTreeSet, sync::Arc, time::Duration};
+use gpui_bilesenleri_uyum::{KabulÖlçütüAtfı, SözleşmeAtfı};
+use std::{collections::BTreeSet, fmt, sync::Arc, time::Duration};
 
 pub const ORT_AİLELERİ: &[&str] = &[
     "ORT-001", "ORT-002", "ORT-003", "ORT-004", "ORT-005", "ORT-006", "ORT-007", "ORT-008",
@@ -138,14 +139,132 @@ impl GaleriKategorisi {
 }
 
 #[derive(Clone, Debug, Eq, PartialEq)]
-pub struct SergiTanımı {
-    pub kimlik: Arc<str>,
-    pub sözleşme: Arc<str>,
-    pub ölçütler: Arc<[Arc<str>]>,
-    pub başlık_anahtarı: YerelleştirmeAnahtarı,
+pub struct SergiKimliği(pub Arc<str>);
+
+#[derive(Clone, Copy, Debug, Eq, PartialEq)]
+pub struct EksenDestekMatrisi {
+    pub tema: bool,
+    pub görünüm_profili: bool,
+    pub yoğunluk: bool,
+    pub metin_ölçeği: bool,
+    pub yazı_yönü: bool,
+    pub hareket: bool,
+}
+
+#[derive(Clone, Copy, Debug, Eq, PartialEq)]
+pub struct PlatformDestekMatrisi {
     pub masaüstü: bool,
     pub wasm: bool,
-    pub görünür_tüketim: bool,
+}
+
+#[derive(Clone, Copy, Debug, Eq, PartialEq)]
+pub enum SergiKayıtHatası {
+    KimlikBiçimiGeçersiz,
+    ÖlçütYok,
+    ÖlçütSözleşmeyleUyuşmuyor,
+    DesteklenenPlatformYok,
+}
+
+impl SergiKayıtHatası {
+    pub const fn güvenli_kod(self) -> &'static str {
+        match self {
+            Self::KimlikBiçimiGeçersiz => "kimlik_bicimi_gecersiz",
+            Self::ÖlçütYok => "olcut_yok",
+            Self::ÖlçütSözleşmeyleUyuşmuyor => "olcut_sozlesmeyle_uyusmuyor",
+            Self::DesteklenenPlatformYok => "desteklenen_platform_yok",
+        }
+    }
+}
+
+impl fmt::Display for SergiKayıtHatası {
+    fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
+        f.write_str(self.güvenli_kod())
+    }
+}
+
+impl std::error::Error for SergiKayıtHatası {}
+
+#[derive(Clone, Debug, Eq, PartialEq)]
+pub struct SergiTanımı {
+    kimlik: SergiKimliği,
+    başlık: YerelleştirmeAnahtarı,
+    sözleşme: SözleşmeAtfı,
+    ölçütler: Arc<[KabulÖlçütüAtfı]>,
+    eksenler: EksenDestekMatrisi,
+    platformlar: PlatformDestekMatrisi,
+}
+
+impl SergiTanımı {
+    pub fn yeni(
+        kimlik: SergiKimliği,
+        başlık: YerelleştirmeAnahtarı,
+        sözleşme: SözleşmeAtfı,
+        ölçütler: impl Into<Arc<[KabulÖlçütüAtfı]>>,
+        eksenler: EksenDestekMatrisi,
+        platformlar: PlatformDestekMatrisi,
+    ) -> Result<Self, SergiKayıtHatası> {
+        if !sergi_kimliği_geçerli(&kimlik.0) {
+            return Err(SergiKayıtHatası::KimlikBiçimiGeçersiz);
+        }
+        let ölçütler = ölçütler.into();
+        if ölçütler.is_empty() {
+            return Err(SergiKayıtHatası::ÖlçütYok);
+        }
+        if ölçütler
+            .iter()
+            .any(|ölçüt| ölçüt.sözleşme().kimlik() != sözleşme.kimlik())
+        {
+            return Err(SergiKayıtHatası::ÖlçütSözleşmeyleUyuşmuyor);
+        }
+        if !platformlar.masaüstü && !platformlar.wasm {
+            return Err(SergiKayıtHatası::DesteklenenPlatformYok);
+        }
+        Ok(Self {
+            kimlik,
+            başlık,
+            sözleşme,
+            ölçütler,
+            eksenler,
+            platformlar,
+        })
+    }
+
+    pub fn kimlik(&self) -> &SergiKimliği {
+        &self.kimlik
+    }
+
+    pub fn başlık(&self) -> &YerelleştirmeAnahtarı {
+        &self.başlık
+    }
+
+    pub fn sözleşme(&self) -> &SözleşmeAtfı {
+        &self.sözleşme
+    }
+
+    pub fn ölçütler(&self) -> &[KabulÖlçütüAtfı] {
+        &self.ölçütler
+    }
+
+    pub fn eksenler(&self) -> &EksenDestekMatrisi {
+        &self.eksenler
+    }
+
+    pub fn platformlar(&self) -> &PlatformDestekMatrisi {
+        &self.platformlar
+    }
+}
+
+fn sergi_kimliği_geçerli(kimlik: &str) -> bool {
+    kimlik.len() <= 160
+        && kimlik.split('/').count() >= 3
+        && kimlik.split('/').all(|parça| {
+            !parça.is_empty()
+                && parça != "."
+                && parça != ".."
+                && parça
+                    .bytes()
+                    .all(|bayt| bayt.is_ascii_lowercase() || bayt.is_ascii_digit() || bayt == b'-')
+        })
 }
 
 #[derive(Clone, Debug, Eq, PartialEq)]
@@ -179,20 +298,43 @@ fn kategori(sözleşme: &str) -> GaleriKategorisi {
     }
 }
 
+fn aile_slugı(sözleşme: &str) -> String {
+    for (önek, slug) in [("BİL-", "bil-"), ("ORT-", "ort-"), ("KAB-", "kab-")] {
+        if let Some(numara) = sözleşme.strip_prefix(önek) {
+            return format!("{slug}{numara}");
+        }
+    }
+    panic!("yerleşik olmayan galeri ailesi: {sözleşme}");
+}
+
 fn aile_kaydı(sözleşme: &str, sıra: u16) -> (SergiTanımı, GaleriKatalogKaydı) {
-    let küçük = sözleşme.to_ascii_lowercase();
+    let küçük = aile_slugı(sözleşme);
     let başlık = anahtar(&format!("galeri.aile.{küçük}.başlık"));
-    let sergi: Arc<str> = format!("{küçük}/genel/varsayılan").into();
+    let sergi: Arc<str> = format!("{küçük}/genel/varsayilan").into();
+    let atıf = SözleşmeAtfı::yeni(sözleşme, aile_kabul_aralığı(sözleşme), "§1")
+        .expect("yerleşik aile sözleşme atfı geçerlidir");
+    let ölçüt = KabulÖlçütüAtfı::yeni(atıf.clone(), format!("{sözleşme}.ACC-001"))
+        .expect("yerleşik aile ölçüt atfı geçerlidir");
     (
-        SergiTanımı {
-            kimlik: Arc::clone(&sergi),
-            sözleşme: sözleşme.into(),
-            ölçütler: [format!("{sözleşme}.ACC-001").into()].into(),
-            başlık_anahtarı: başlık.clone(),
-            masaüstü: true,
-            wasm: true,
-            görünür_tüketim: true,
-        },
+        SergiTanımı::yeni(
+            SergiKimliği(Arc::clone(&sergi)),
+            başlık.clone(),
+            atıf,
+            Arc::from([ölçüt]),
+            EksenDestekMatrisi {
+                tema: true,
+                görünüm_profili: true,
+                yoğunluk: true,
+                metin_ölçeği: true,
+                yazı_yönü: true,
+                hareket: true,
+            },
+            PlatformDestekMatrisi {
+                masaüstü: true,
+                wasm: true,
+            },
+        )
+        .expect("yerleşik sergi kaydı geçerlidir"),
         GaleriKatalogKaydı {
             sözleşme: sözleşme.into(),
             başlık_anahtarı: başlık,
@@ -202,6 +344,39 @@ fn aile_kaydı(sözleşme: &str, sıra: u16) -> (SergiTanımı, GaleriKatalogKay
             sıra,
         },
     )
+}
+
+fn aile_kabul_aralığı(sözleşme: &str) -> &'static str {
+    match sözleşme {
+        "BİL-010" => "^27.1",
+        "BİL-040" => "^4.0",
+        "BİL-120" => "^9.0",
+        "BİL-140" => "^2.0",
+        "BİL-210" => "^6.0",
+        "ORT-001" => "^1.3",
+        "ORT-002" | "ORT-004" => "^5.0",
+        "ORT-003" => "^1.5",
+        "ORT-005" => "^6.0",
+        "ORT-006" => "^2.1",
+        "ORT-007" | "ORT-011" | "ORT-013" | "ORT-022" => "^2.0",
+        "ORT-016" => "^2.1",
+        "ORT-008" => "^2.2",
+        "ORT-009" => "^1.1",
+        "ORT-012" => "^2.1",
+        "ORT-015" => "^3.1",
+        "ORT-017" => "^4.3",
+        "ORT-018" => "^6.1",
+        "ORT-019" => "^5.1",
+        "ORT-020" => "^6.0",
+        "ORT-021" => "^4.2",
+        "BİL-020" | "BİL-030" | "BİL-050" | "BİL-060" | "BİL-070" | "BİL-080" | "BİL-090"
+        | "BİL-100" | "BİL-110" | "BİL-130" | "BİL-150" | "BİL-160" | "BİL-170" | "BİL-180"
+        | "BİL-190" | "BİL-200" | "BİL-220" | "BİL-230" | "BİL-250" | "BİL-260" | "BİL-270"
+        | "BİL-280" | "BİL-290" | "ORT-010" | "ORT-014" | "ORT-023" | "KAB-010" | "KAB-020"
+        | "KAB-030" | "KAB-040" | "KAB-050" | "KAB-060" | "KAB-070" | "KAB-080" | "KAB-090"
+        | "KAB-100" => "^1.0",
+        _ => panic!("yerleşik olmayan galeri ailesi: {sözleşme}"),
+    }
 }
 
 pub fn yerleşik_kayıtlar() -> (Vec<SergiTanımı>, Vec<GaleriKatalogKaydı>) {
@@ -393,7 +568,7 @@ pub fn sergiyi_yalıt(sonuç: Result<(), &str>) -> SergiKartıSonucu {
 
 pub fn sergi_başlığı_isteği(sergi: &SergiTanımı) -> İletiİsteği {
     İletiİsteği {
-        anahtar: sergi.başlık_anahtarı.clone(),
+        anahtar: sergi.başlık().clone(),
         argümanlar: Arc::from(Vec::<İletiArgümanı>::new()),
     }
 }
@@ -421,7 +596,7 @@ pub fn kanıtsız_ölçütler<'a>(
 ) -> BTreeSet<Arc<str>> {
     let bağlı: BTreeSet<&str> = sergiler
         .iter()
-        .flat_map(|s| s.ölçütler.iter().map(AsRef::as_ref))
+        .flat_map(|s| s.ölçütler().iter().map(KabulÖlçütüAtfı::ölçüt))
         .collect();
     ölçütler
         .into_iter()

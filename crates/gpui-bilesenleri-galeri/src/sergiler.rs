@@ -1832,7 +1832,10 @@ pub(crate) fn değer_durumu(
     let g = crate::görünüm();
     let t = crate::TezgahTokenları::paletten(crate::palet());
     let kutu = alan.read(bağlam);
-    let durum = &kutu.durum;
+    let açık = match kutu.durum() {
+        gpui_bilesenleri::GirişDurumu::Açık(açık) => Some(açık),
+        gpui_bilesenleri::GirişDurumu::Gizli(_) => None,
+    };
 
     let boş = |metin: &str| {
         if metin.is_empty() {
@@ -1841,28 +1844,32 @@ pub(crate) fn değer_durumu(
             metin.to_owned()
         }
     };
-    let değer = |değer: Option<&gpui_bilesenleri::Değer>| {
-        değer.map_or_else(|| "‹yok›".to_owned(), crate::değer_özeti)
+    let değer = |değer: Option<&gpui_bilesenleri::AçıkGirişDeğeri>| {
+        değer.map_or_else(|| "‹yok›".to_owned(), crate::açık_değer_özeti)
     };
 
     // Girilen metin gizli kipte panele **yazılmaz**: kutuda maskelediğimiz
     // değeri iki santim yana kopyalamak gizlemeyi anlamsız kılardı.
     let gizli = !matches!(
-        kutu.yapılandırma.bildirim().içerik_görünürlüğü,
+        kutu.yapılandırma().bildirim().içerik_görünürlüğü,
         gpui_bilesenleri::İçerikGörünürlüğü::Açık
     );
     let girilen = if gizli {
         "‹gizli›".to_owned()
     } else {
-        boş(&durum.düzenleme_metni)
+        boş(açık.map_or("", gpui_bilesenleri::GirişÇekirdeği::düzenleme_metni))
     };
     let dönülecek = if gizli {
         "‹gizli›".to_owned()
     } else {
-        boş(&durum.düzenleme_başlangıcı.düzenleme_metni)
+        boş(
+            açık
+                .map(gpui_bilesenleri::GirişÇekirdeği::düzenleme_başlangıcı)
+                .map_or("", gpui_bilesenleri::DüzenlemeBaşlangıcı::düzenleme_metni),
+        )
     };
-    let kabul = değer(durum.kabul_edilmiş_değer.as_ref());
-    let kirli = durum.düzenleme_kirli;
+    let kabul = değer(açık.and_then(gpui_bilesenleri::GirişÇekirdeği::kabul_edilmiş_değer));
+    let kirli = açık.is_some_and(gpui_bilesenleri::GirişÇekirdeği::düzenleme_kirli);
 
     let satır = |etiket: &'static str, içerik: String| {
         şerit_satırı()
@@ -1892,28 +1899,21 @@ pub(crate) fn değer_durumu(
         // konumu panelde yanıltıcı olurdu. Seçim public erişicilerden
         // okunur; iç seçim alanı artık dışa açık değil.
         .child(satır("Seçim", {
-            let aralık = durum.seçim_baytları();
-            let sınırlar = durum.grafem_sınırları();
-            let grafem = |bayt: usize| {
-                sınırlar
-                    .iter()
-                    .find(|konum| konum.utf8_bayt() == bayt)
-                    .map_or(0, |konum| konum.grafem_sırası())
-            };
-            let baş = grafem(aralık.start);
-            let son = grafem(aralık.end);
-            if durum.seçim_boş_mu() {
+            let seçim = açık.map_or_else(gpui_bilesenleri::MetinSeçimi::default, |açık| {
+                *açık.seçim()
+            });
+            let baş = seçim.başlangıç_grafem;
+            let son = seçim.bitiş_grafem;
+            if baş == son {
                 format!("imleç · grafem {baş}")
             } else {
                 format!(
                     "{}–{} grafem · {}",
                     baş.min(son),
                     baş.max(son),
-                    // Caret artan aralığın sonundaysa seçim ileri kuruldu.
-                    if durum.caret_baytı() == aralık.end {
-                        "ileri"
-                    } else {
-                        "geri"
+                    match seçim.yön {
+                        gpui_bilesenleri::SeçimYönü::İleri => "ileri",
+                        gpui_bilesenleri::SeçimYönü::Geri => "geri",
                     }
                 )
             }

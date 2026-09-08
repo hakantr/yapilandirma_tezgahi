@@ -60,6 +60,17 @@ fn tema() -> Arc<gpui_bilesenleri::TemaAnlıkGörüntüsü> {
     gpui_bilesenleri_galeri::galeri_teması()
 }
 
+/// Bu dosyadaki alanlar açık metindir; `GirişDurumu` kabuğunu özel alana
+/// uzanmadan, kanonik varyant ve erişiciler üzerinden açar.
+fn açık_durum(alan: &gpui_bilesenleri::GirişKutusu) -> &gpui_bilesenleri::GirişÇekirdeği {
+    match alan.durum() {
+        gpui_bilesenleri::GirişDurumu::Açık(durum) => durum,
+        gpui_bilesenleri::GirişDurumu::Gizli(_) => {
+            panic!("açık alan testi gizli durum kabuğu üretmemeli")
+        }
+    }
+}
+
 /// Testlerin enjekte yerel bağlamı; üretim köküyle aynı `tr/latn/gregory/UTC`
 /// hattından, fabrika üretimiyle kurulur.
 fn yerel(kök: &UnicodeVeYerelMetinHizmetleri) -> YerelMetinBağlamı {
@@ -377,11 +388,12 @@ fn ayni_yerel_baglama_gecis_gercek_noop(bağlam: &mut TestAppContext) {
     });
     let önce = görsel.update(|_, bağlam| {
         let a = alan.read(bağlam);
+        let durum = açık_durum(a);
         (
             a.metin().to_owned(),
-            a.durum.ham_giriş_metni.clone(),
-            a.durum.seçim_baytları(),
-            a.durum.değer_sürümü,
+            durum.ham_giriş_metni().to_owned(),
+            *durum.seçim(),
+            durum.değer_sürümü(),
         )
     });
     görsel.update(|_, bağlam| {
@@ -393,10 +405,11 @@ fn ayni_yerel_baglama_gecis_gercek_noop(bağlam: &mut TestAppContext) {
     görsel.run_until_parked();
     görsel.update(|_, bağlam| {
         let a = alan.read(bağlam);
+        let durum = açık_durum(a);
         assert_eq!(a.metin(), önce.0);
-        assert_eq!(a.durum.ham_giriş_metni, önce.1);
-        assert_eq!(a.durum.seçim_baytları(), önce.2);
-        assert_eq!(a.durum.değer_sürümü, önce.3);
+        assert_eq!(durum.ham_giriş_metni(), önce.1);
+        assert_eq!(*durum.seçim(), önce.2);
+        assert_eq!(durum.değer_sürümü(), önce.3);
     });
     assert_eq!(sayaç.load(Ordering::SeqCst), 0, "no-op bildirim üretmez");
 }
@@ -417,7 +430,7 @@ fn kompozisyonsuz_farkli_yerel_gecisi_basarili(bağlam: &mut TestAppContext) {
             gözlem.fetch_add(1, Ordering::SeqCst);
         })
     });
-    let sürüm_önce = görsel.update(|_, bağlam| alan.read(bağlam).durum.değer_sürümü);
+    let sürüm_önce = görsel.update(|_, bağlam| açık_durum(alan.read(bağlam)).değer_sürümü());
     görsel.update(|_, bağlam| {
         alan.update(bağlam, |alan, bağlam| {
             alan.yerel_bağlamı_değiştir(yerel_dil(&kök, "el"), bağlam)
@@ -429,7 +442,7 @@ fn kompozisyonsuz_farkli_yerel_gecisi_basarili(bağlam: &mut TestAppContext) {
         let a = alan.read(bağlam);
         assert_eq!(a.yerel_bağlam().dil().bcp47(), "el");
         assert!(a.metin().contains('Α'), "yeni yerelin planı uygulanır");
-        assert_eq!(a.durum.değer_sürümü, sürüm_önce + 1);
+        assert_eq!(açık_durum(a).değer_sürümü(), sürüm_önce + 1);
     });
     assert_eq!(
         sayaç.load(Ordering::SeqCst),
@@ -467,14 +480,15 @@ fn etkin_kompozisyonda_ret_kurtarma_ve_asili_eksen_yoklugu(bağlam: &mut TestApp
     });
     let önce = görsel.update(|_, bağlam| {
         let a = alan.read(bağlam);
-        assert!(a.durum.composition.is_some(), "kompozisyon gerçekten etkin");
+        let durum = açık_durum(a);
+        let ime = a.etkin_ime().expect("kompozisyon gerçekten etkin");
         (
             a.metin().to_owned(),
-            a.durum.ham_giriş_metni.clone(),
-            a.durum.seçim_baytları(),
-            a.durum.composition.clone(),
-            a.durum.ime_aralığı.clone(),
-            a.durum.değer_sürümü,
+            durum.ham_giriş_metni().to_owned(),
+            *durum.seçim(),
+            ime.metin.clone(),
+            ime.utf16_aralığı.clone(),
+            durum.değer_sürümü(),
             a.yerel_bağlam().dil().bcp47().to_owned(),
         )
     });
@@ -491,12 +505,14 @@ fn etkin_kompozisyonda_ret_kurtarma_ve_asili_eksen_yoklugu(bağlam: &mut TestApp
     }
     görsel.update(|_, bağlam| {
         let a = alan.read(bağlam);
+        let durum = açık_durum(a);
+        let ime = a.etkin_ime().expect("ret IME birleşimini korur");
         assert_eq!(a.metin(), önce.0, "metin korunur");
-        assert_eq!(a.durum.ham_giriş_metni, önce.1, "ham metin korunur");
-        assert_eq!(a.durum.seçim_baytları(), önce.2, "seçim korunur");
-        assert_eq!(a.durum.composition, önce.3, "kompozisyon değeri korunur");
-        assert_eq!(a.durum.ime_aralığı, önce.4, "IME aralığı korunur");
-        assert_eq!(a.durum.değer_sürümü, önce.5, "değer sürümü yanmaz");
+        assert_eq!(durum.ham_giriş_metni(), önce.1, "ham metin korunur");
+        assert_eq!(*durum.seçim(), önce.2, "seçim korunur");
+        assert_eq!(ime.metin, önce.3, "kompozisyon değeri korunur");
+        assert_eq!(ime.utf16_aralığı, önce.4, "IME aralığı korunur");
+        assert_eq!(durum.değer_sürümü(), önce.5, "değer sürümü yanmaz");
         assert_eq!(
             a.yerel_bağlam().dil().bcp47(),
             önce.6,
@@ -516,7 +532,7 @@ fn etkin_kompozisyonda_ret_kurtarma_ve_asili_eksen_yoklugu(bağlam: &mut TestApp
     görsel.update(|_, bağlam| {
         alan.update(bağlam, |alan, bağlam| {
             assert!(
-                alan.durum.composition.is_none(),
+                alan.etkin_ime().is_none(),
                 "`insertText`-commit kompozisyonu düşürür; sahte/asılı kompozisyon kalmaz"
             );
             alan.yerel_bağlamı_değiştir(yerel_dil(&kök, "el"), bağlam)
@@ -573,20 +589,23 @@ fn acik_maskeli_baslangic_tabani_ve_escape(bağlam: &mut TestAppContext) {
 
     görsel.update(|_, bağlam| {
         let a = alan.read(bağlam);
+        let durum = açık_durum(a);
         assert_eq!(a.metin(), "AB_", "kuruluş maskeyi ve büyütmeyi uygular");
         assert_eq!(
-            a.durum.ham_giriş_metni, "AB",
+            durum.ham_giriş_metni(),
+            "AB",
             "ham değer dönüştürülmüş girdidir"
         );
         assert_eq!(
-            a.durum.düzenleme_başlangıcı.düzenleme_metni, "AB_",
+            durum.düzenleme_başlangıcı().düzenleme_metni(),
+            "AB_",
             "başlangıç kaydı nihai şablonlu metindir"
         );
     });
 
     görsel.update(|pencere, bağlam| {
         alan.update(bağlam, |alan, bağlam| {
-            let odak = alan.odak.clone();
+            let odak = alan.odak().clone();
             pencere.focus(&odak, bağlam);
         });
     });
@@ -605,16 +624,14 @@ fn acik_maskeli_baslangic_tabani_ve_escape(bağlam: &mut TestAppContext) {
     görsel.run_until_parked();
     görsel.update(|_, bağlam| {
         let a = alan.read(bağlam);
+        let durum = açık_durum(a);
         assert_eq!(
             a.metin(),
             "AB_",
             "`Escape` şablonlu `\"AB_\"` tabanına döner"
         );
-        assert_eq!(a.durum.ham_giriş_metni, "AB", "ham değer de tabana döner");
-        assert!(
-            a.durum.composition.is_none() && a.durum.ime_aralığı.is_none(),
-            "IME ekseni temiz"
-        );
+        assert_eq!(durum.ham_giriş_metni(), "AB", "ham değer de tabana döner");
+        assert!(a.etkin_ime().is_none(), "IME ekseni temiz");
     });
 }
 

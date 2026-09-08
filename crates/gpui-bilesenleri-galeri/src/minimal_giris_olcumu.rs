@@ -9,7 +9,7 @@ use gpui::{Context, Entity, IntoElement, Render, Window, div, prelude::*, px, rg
 use gpui_bilesenleri::GirişKutusu;
 
 use crate::{
-    TezgahTercihleri, YardımcıKimlikleri, galeri_bileşen_kimliği, galeri_simge_kataloğu,
+    TezgahTercihleri, YardımcıKimlikleri, galeri_bileşen_kimliği, galeri_simge_çizim_bağlamı,
     tezgah_teması, ÖrnekKimliğiFabrikası,
 };
 
@@ -37,7 +37,7 @@ impl MinimalGirişÖlçümü {
             tezgah.yapılandırma_kimliklerle(&yardımcı_kimlikleri, &hizmetler.motor());
         let örnek = tezgah.örnek_değer();
         let tema = tezgah_teması(&tezgah.kutu_teması());
-        let katalog = galeri_simge_kataloğu();
+        let simge_çizimi = galeri_simge_çizim_bağlamı();
         // Ölçüm bilinen-geçerli varsayılan tercihle koşar; kuruluş burada
         // düşerse ölçüm ortamı arızasıdır ve exact typed sonuç mesajla
         // taşınır.
@@ -54,8 +54,8 @@ impl MinimalGirişÖlçümü {
         )
         .unwrap_or_else(|hata| panic!("minimal ölçüm alanı kurulamadı: {hata:?}"));
         let alan = sonuç.bileşen;
-        alan.update(bağlam, |alan, _| {
-            alan.simge_kataloğu = Some(katalog);
+        alan.update(bağlam, |alan, bağlam| {
+            alan.simge_çizim_bağlamını_değiştir(Some(simge_çizimi), bağlam);
         });
         Self {
             alan,
@@ -72,17 +72,7 @@ impl MinimalGirişÖlçümü {
     ) {
         let metin = metin.to_owned();
         self.alan.update(bağlam, |alan, bağlam| {
-            alan.durum.tümünü_seç();
-            let seçim = alan
-                .durum
-                .bayt_aralığını_utf16_çevir(alan.durum.seçim_baytları());
-            gpui::EntityInputHandler::replace_text_in_range(
-                alan,
-                Some(seçim),
-                &metin,
-                pencere,
-                bağlam,
-            );
+            crate::bütün_metni_değiştir(alan, &metin, pencere, bağlam);
         });
     }
 }

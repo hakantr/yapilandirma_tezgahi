@@ -629,6 +629,21 @@ pub fn değer_özeti(değer: &gpui_bilesenleri::Değer) -> String {
     }
 }
 
+/// Kamusal `§14.3` değer ailesinin galeri tanı özeti.
+///
+/// Gizli değer bu enumda temsil edilemez; metin yalnız açık giriş
+/// çekirdeğinin salt-okunur getterından gelir.
+pub fn açık_değer_özeti(değer: &gpui_bilesenleri::AçıkGirişDeğeri) -> String {
+    use gpui_bilesenleri::AçıkGirişDeğeri;
+    match değer {
+        AçıkGirişDeğeri::Null => "boş".to_owned(),
+        AçıkGirişDeğeri::Metin(metin) => metin.clone(),
+        AçıkGirişDeğeri::Tamsayı(sayı) => format!("{sayı:?}"),
+        AçıkGirişDeğeri::Ondalık(sayı) => format!("{sayı:?}"),
+        AçıkGirişDeğeri::TarihZaman(an) => format!("{an:?}"),
+    }
+}
+
 /// `ORT-004` metin düzenleme iç boşluğu seçimi.
 ///
 /// Kanonik alan kısmi bir **fark**tır: verilmeyen kenar tabandan gelir ve
@@ -690,24 +705,21 @@ pub struct TezgahOlayı {
 pub fn olay_özeti(olay: &gpui_bilesenleri::GirişOlayı) -> TezgahOlayı {
     use gpui_bilesenleri::GirişOlayı;
     let (ad, özet): (&'static str, String) = match olay {
-        GirişOlayı::DüzenlemeMetniDeğişti {
-            değer_sürümü, ..
-        } => ("DüzenlemeMetniDeğişti", format!("sürüm {değer_sürümü}")),
+        GirişOlayı::DüzenlemeMetniDeğişti { fark } => (
+            "DüzenlemeMetniDeğişti",
+            format!("sürüm {} → {}", fark.önceki_sürüm, fark.yeni_sürüm),
+        ),
         GirişOlayı::GeçiciDeğerDeğişti {
-            değer,
-            değer_sürümü,
+            tür, değer_sürümü
         } => (
             "GeçiciDeğerDeğişti",
-            format!(
-                "{} · sürüm {değer_sürümü}",
-                if değer.is_some() {
-                    "değer var"
-                } else {
-                    "boş"
-                }
-            ),
+            format!("{tür:?} · sürüm {değer_sürümü}"),
         ),
         GirişOlayı::DeğerKabulEdildi { neden, .. } => ("DeğerKabulEdildi", format!("{neden:?}")),
+        GirişOlayı::GizliDeğerKabulEdildi { neden, .. } => (
+            "GizliDeğerKabulEdildi",
+            format!("{neden:?} · tek kullanımlık teslim"),
+        ),
         GirişOlayı::KabulReddedildi { sorunlar } => {
             ("KabulReddedildi", format!("{} sorun", sorunlar.len()))
         }
@@ -786,6 +798,10 @@ pub fn çelişki_metni(hata: &GirişYapılandırmaHatası) -> &'static str {
         H::GeçersizDurumAçıklamaProfili => "Durum açıklama profili geçersiz",
         H::GeçersizSeçiciYüzeyProfili => "Seçici yüzey profili geçersiz",
         H::MaskeTokenTavanıAşıldı => "Maske token tavanı aşıldı",
+        H::UzakKuralTürüGeçersiz => "Uzak doğrulama kuralının türü geçersiz",
+        H::YinelenenUzakİşSınıfı => "Uzak doğrulama iş sınıfı yineleniyor",
+        H::UzakPortEksik => "Uzak doğrulama kuralı için sağlayıcı portu eksik",
+        H::GizliAlandaUzakKural => "Gizli alanda uzak doğrulama kuralı kullanılamaz",
     }
 }
 
@@ -807,6 +823,9 @@ pub fn uyarı_metni(uyarı: &GirişYapılandırmaUyarısı) -> &'static str {
         }
         U::ErişilebilirAdYok => {
             "Alanın erişilebilir adı yok · adı üst bileşen taşımıyorsa ağaçta görünmez"
+        }
+        U::GizliAlanaKaynaktanDeğerUlaştı => {
+            "Gizli alana açık kaynak değeri ulaştı · değer tampona alınmadı"
         }
     }
 }
@@ -2188,6 +2207,7 @@ impl TezgahTercihleri {
                 önem: self.doğrulama_önemi,
                 kural: GeçerlilikKuralTürü::Zorunlu,
                 ileti: Some("Bu alan zorunludur".into()),
+                uzak_iş_sınıfı: None,
             });
         }
         // `§29` birden çok kural varken ilk hatada durulur mu?
@@ -2235,6 +2255,7 @@ impl TezgahTercihleri {
                             en_fazla: Some(ondalık(100, 0)),
                         },
                         ileti: Some("Değer 0 ile 100 arasında olmalı".into()),
+                        uzak_iş_sınıfı: None,
                     });
             }
         }

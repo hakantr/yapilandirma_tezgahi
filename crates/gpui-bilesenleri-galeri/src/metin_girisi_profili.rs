@@ -54,7 +54,7 @@ pub struct MetinGirişiProfilGirdisi<'a> {
     pub(crate) tercih_eşitleme_hatası: Option<crate::TercihEşitlemeKaydı>,
     /// Atomik yerel-bağlam inişinin son typed reddi (varsa); alan eski
     /// (tutarlı) bağlamda kalmıştır ve tanı satırı exact varyantı çizer.
-    pub(crate) yerel_uygulama_hatası: Option<gpui_bilesenleri::GirişHatası>,
+    pub(crate) yerel_uygulama_hatası: Option<std::sync::Arc<gpui_bilesenleri::GirişHatası>>,
 }
 
 /// Solda ana eksen, sağda onu tamamlayan grup.
@@ -293,7 +293,7 @@ pub(crate) fn kuruluş_hatası_içeriği(
     hata: Option<&gpui_bilesenleri::GirişKuruluşHatası>,
     son_çözüm_hatası: Option<crate::TezgahÇözümKaydı>,
     tercih_eşitleme_hatası: Option<crate::TercihEşitlemeKaydı>,
-    yerel_uygulama_hatası: Option<gpui_bilesenleri::GirişHatası>,
+    yerel_uygulama_hatası: Option<std::sync::Arc<gpui_bilesenleri::GirişHatası>>,
     sol_kaydırma: ScrollHandle,
 ) -> Tezgahİçeriği {
     let g = crate::görünüm();
@@ -373,7 +373,7 @@ fn önizleme_blokları(
     sayısal: bool,
     son_çözüm_hatası: Option<crate::TezgahÇözümKaydı>,
     tercih_eşitleme_hatası: Option<crate::TercihEşitlemeKaydı>,
-    yerel_uygulama_hatası: Option<gpui_bilesenleri::GirişHatası>,
+    yerel_uygulama_hatası: Option<std::sync::Arc<gpui_bilesenleri::GirişHatası>>,
     bağlam: &mut Context<GaleriUygulaması>,
 ) -> Vec<gpui::AnyElement> {
     use crate::sergiler::{

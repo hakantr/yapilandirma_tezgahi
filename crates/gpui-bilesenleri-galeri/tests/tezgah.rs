@@ -1555,11 +1555,15 @@ fn her_olay_varyanti_akis_satirina_cevrilir() {
     };
     let olaylar = [
         GirişOlayı::DüzenlemeMetniDeğişti {
-            metin: "a".to_owned(),
-            değer_sürümü: 3,
+            fark: gpui_bilesenleri::DüzenlemeFarkı {
+                silinen: 0..0,
+                eklenen_grafem: 1,
+                önceki_sürüm: 2,
+                yeni_sürüm: 3,
+            },
         },
         GirişOlayı::GeçiciDeğerDeğişti {
-            değer: None,
+            tür: gpui_bilesenleri::GirişDeğerTürü::Metin,
             değer_sürümü: 4,
         },
         GirişOlayı::DeğerKabulEdildi {

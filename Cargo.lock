@@ -2184,7 +2184,10 @@ dependencies = [
  "gpui-bilesenleri",
  "gpui-bilesenleri-kabuk",
  "gpui-bilesenleri-temel",
+ "gpui-bilesenleri-uyum",
  "gpui_wgpu",
+ "serde",
+ "serde_json",
  "web-sys",
 ]
 
@@ -2218,6 +2221,15 @@ dependencies = [
 ]
 
 [[package]]
+name = "gpui-bilesenleri-kanit-makrolari"
+version = "0.1.0"
+dependencies = [
+ "proc-macro2",
+ "quote",
+ "syn 2.0.119",
+]
+
+[[package]]
 name = "gpui-bilesenleri-temel"
 version = "0.1.0"
 dependencies = [
@@ -2234,6 +2246,20 @@ dependencies = [
  "serde_json",
  "unicode-bidi",
  "unicode-segmentation",
+]
+
+[[package]]
+name = "gpui-bilesenleri-uyum"
+version = "0.1.0"
+dependencies = [
+ "getrandom 0.3.4",
+ "gpui",
+ "gpui-bilesenleri-kanit-makrolari",
+ "gpui-bilesenleri-temel",
+ "rustix 1.1.4",
+ "serde",
+ "serde_json",
+ "sha2",
 ]
 
 [[package]]
