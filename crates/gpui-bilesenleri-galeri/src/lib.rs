@@ -72,17 +72,53 @@ pub use simgeler::*;
 pub use tezgah::*;
 pub use yazi_tipleri::*;
 
+/// Galerinin tanı/tercih yüzeylerinde sahipli metne ayırdığı kesin UTF-8
+/// bütçesi. Galeri kanonik alanın ürün bütçesini genişletmez; bu sınırı aşan
+/// metin kısaltılarak başka bir değere dönüştürülmez, typed ret olarak kalır.
+pub const GALERİ_SAHİPLİ_METİN_UTF8_TAVANI: usize = 64 * 1024;
+
+/// Kalıcı metnin sahipli bir galeri tüketicisine aktarılma akıbeti.
+#[derive(Clone, Copy, Debug, Eq, PartialEq)]
+pub enum GaleriMetinMateryalizasyonHatası {
+    BütçeAşıldı { utf8_baytı: usize, tavan: usize },
+    Unicode(gpui_bilesenleri_temel::UnicodeMetinHatası),
+}
+
+impl std::fmt::Display for GaleriMetinMateryalizasyonHatası {
+    fn fmt(&self, biçimleyici: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
+        match self {
+            Self::BütçeAşıldı { utf8_baytı, tavan } => write!(
+                biçimleyici,
+                "galeri sahipli metin bütçesi aşıldı ({utf8_baytı} > {tavan} UTF-8 baytı)"
+            ),
+            Self::Unicode(hata) => write!(biçimleyici, "kalıcı metin okunamadı: {hata}"),
+        }
+    }
+}
+
+impl std::error::Error for GaleriMetinMateryalizasyonHatası {}
+
 /// Kalıcı `ORT-002` dilimini yalnız gerçekten sahipli metin isteyen galeri
-/// sınırında materyalize eder. Kanonik getter kopyasız kalır.
+/// sınırında ve kesin bütçeyle materyalize eder. Kanonik getter kopyasız
+/// kalır; taşan kaynak için hiçbir sahipli çıktı ayrılmaz.
 pub(crate) fn paylaşılan_metni_materyalize_et(
     dilim: &gpui_bilesenleri_temel::PaylaşılanMetinDilimi,
-) -> Result<String, gpui_bilesenleri_temel::UnicodeMetinHatası> {
-    let mut metin = String::with_capacity(dilim.utf8_bayt_uzunluğu());
-    dilim.utf8_parçalarını_ziyaret(&mut |baytlar| {
-        // Dilim `ORT-002` tarafından UTF-8 olarak mühürlüdür.
-        metin.push_str(std::str::from_utf8(baytlar).expect("mühürlü UTF-8"));
-        gpui_bilesenleri_temel::Utf8ParçaAkışı::Devam
-    })?;
+) -> Result<String, GaleriMetinMateryalizasyonHatası> {
+    let utf8_baytı = dilim.utf8_bayt_uzunluğu();
+    if utf8_baytı > GALERİ_SAHİPLİ_METİN_UTF8_TAVANI {
+        return Err(GaleriMetinMateryalizasyonHatası::BütçeAşıldı {
+            utf8_baytı,
+            tavan: GALERİ_SAHİPLİ_METİN_UTF8_TAVANI,
+        });
+    }
+    let mut metin = String::with_capacity(utf8_baytı);
+    dilim
+        .utf8_parçalarını_ziyaret(&mut |baytlar| {
+            // Dilim `ORT-002` tarafından UTF-8 olarak mühürlüdür.
+            metin.push_str(std::str::from_utf8(baytlar).expect("mühürlü UTF-8"));
+            gpui_bilesenleri_temel::Utf8ParçaAkışı::Devam
+        })
+        .map_err(GaleriMetinMateryalizasyonHatası::Unicode)?;
     Ok(metin)
 }
 
@@ -779,6 +815,14 @@ impl GaleriUygulaması {
                     .is_some()
             }),
         }
+    }
+
+    /// BİL-010 tezgâhında gerçekten yaşayan kanonik önizleme alanı.
+    ///
+    /// Host/kanıt tüketicisi bu tutamacı yalnız alan kurulduktan sonra alır;
+    /// galeri ayrı bir metin modeli veya vekil bileşen üretmez.
+    pub fn yaşayan_tezgah_alanı(&self) -> Option<Entity<GirişKutusu>> {
+        self.tezgah_alanı.clone()
     }
 
     /// `§16` tezgâhın dış doğrulama **gösterim beslemesi**.
@@ -2812,9 +2856,21 @@ impl MetinGirişiAlanları {
                         bu.tercih_alanlarını_eşitle(bağlam);
                         return;
                     }
-                    let metin = match hedef.read(bağlam).gösterim_görünümü(true).materyalize_et()
+                    let görünüm = hedef.read(bağlam).gösterim_görünümü(true);
+                    if görünüm.utf8_bayt_uzunluğu() > GALERİ_SAHİPLİ_METİN_UTF8_TAVANI {
+                        bu.tercih_eşitleme_hatası = Some(TercihEşitlemeKaydı {
+                            kutu: hedef.entity_id(),
+                            hata: Arc::new(gpui_bilesenleri::GirişHatası::KalıcıDönüşüm(
+                                gpui_bilesenleri_temel::KalıcıMetinDönüşümHatası::ÇıktıBütçesiAşıldı,
+                            )),
+                        });
+                        bağlam.notify();
+                        return;
+                    }
+                    let metin = match görünüm
+                        .bütçeli_materyalize_et(GALERİ_SAHİPLİ_METİN_UTF8_TAVANI)
                     {
-                        Ok(metin) => metin,
+                        Ok(metin) => metin.as_ref().to_owned(),
                         Err(hata) => {
                             bu.tercih_eşitleme_hatası = Some(TercihEşitlemeKaydı {
                                 kutu: hedef.entity_id(),

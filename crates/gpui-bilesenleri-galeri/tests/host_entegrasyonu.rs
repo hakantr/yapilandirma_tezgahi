@@ -763,6 +763,7 @@ fn yasak_kalintilar_kaynakta_sifir() {
         format!(".yerel.{}", "sürüm"),
         format!("impl İletiÇözümleyicisi {}", "for"),
         format!("İletiÇözüm{}", "Profili {"),
+        format!(".{}", "materyalize_et()"),
     ];
     for (ad, kaynak) in kaynaklar {
         for yasak in &yasaklar {

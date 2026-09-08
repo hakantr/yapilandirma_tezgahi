@@ -642,6 +642,46 @@ mod testler {
         ÖrnekKimliğiFabrikası::yeni_süreç_kapsamı().expect("test kimlik kapsamı")
     }
 
+    fn paylaşılan_dilim(metin: String) -> gpui_bilesenleri_temel::PaylaşılanMetinDilimi {
+        let utf8_baytı = metin.len();
+        let kimlikler = fabrika();
+        let örnek = kimlikler.sonraki().expect("test kimliği");
+        let hizmet = UnicodeVeYerelMetinHizmetleri::yerlesik(kimlikler);
+        let damga = hizmet.metin_damgası_fabrikası().damga(CanlıBağlamDamgası {
+            bağlam: örnek,
+            sürüm: BağlamSürümü(1),
+        });
+        let tampon = hizmet.motor().kalıcı_utf8_tamponunu_ilkle(metin, damga);
+        let snapshot = hizmet
+            .motor()
+            .utf8_snapshotını_ilkle_doğrula(tampon)
+            .expect("test metni mühürlenir");
+        snapshot
+            .görünüm()
+            .paylaşılan_dilim(0..utf8_baytı)
+            .expect("tam aralık geçerlidir")
+    }
+
+    #[test]
+    fn k03_sahipli_metin_exact_tavan_kabul_artı_bir_typed_rettir() {
+        let sınır = paylaşılan_dilim("x".repeat(crate::GALERİ_SAHİPLİ_METİN_UTF8_TAVANI));
+        assert_eq!(
+            crate::paylaşılan_metni_materyalize_et(&sınır)
+                .expect("exact tavan kabul edilir")
+                .len(),
+            crate::GALERİ_SAHİPLİ_METİN_UTF8_TAVANI,
+        );
+
+        let taşan = paylaşılan_dilim("x".repeat(crate::GALERİ_SAHİPLİ_METİN_UTF8_TAVANI + 1));
+        assert_eq!(
+            crate::paylaşılan_metni_materyalize_et(&taşan),
+            Err(crate::GaleriMetinMateryalizasyonHatası::BütçeAşıldı {
+                utf8_baytı: crate::GALERİ_SAHİPLİ_METİN_UTF8_TAVANI + 1,
+                tavan: crate::GALERİ_SAHİPLİ_METİN_UTF8_TAVANI,
+            }),
+        );
+    }
+
     /// Galeri kökünü render etmeyen boş pencere konağı.
     struct BoşKonak;
 

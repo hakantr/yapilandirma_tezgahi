@@ -2247,6 +2247,7 @@ dependencies = [
  "sha2",
  "unicode-bidi",
  "unicode-segmentation",
+ "writeable",
 ]
 
 [[package]]
