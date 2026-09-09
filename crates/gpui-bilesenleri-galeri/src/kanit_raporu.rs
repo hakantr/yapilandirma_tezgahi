@@ -1,8 +1,8 @@
 //! YÖN-005'in redakte temel raporunu salt-okunur galeri özetine indirger.
 //!
 //! Bu parser serialized veriyi typed makbuza yükseltmez. Yalnız fiziksel
-//! providerı bulunan Yapısal, Davranış ve Derleme kayıtlarını exact
-//! kardinaliteyle kabul eder; Rapor ve Sergi rolleri fail-closed kalır.
+//! providerı bulunan Yapısal, Davranış, Derleme ve Rapor kayıtlarını exact
+//! kardinaliteyle kabul eder; Sergi rolü fail-closed kalır.
 
 use gpui_bilesenleri_uyum::{DavranışKanıtKonumu, KanıtTürü};
 use serde::de::{self, DeserializeSeed, MapAccess, SeqAccess, Visitor};
@@ -11,6 +11,7 @@ use std::{collections::BTreeSet, fmt, path::Path, sync::Arc};
 
 const RAPOR_BAYT_TAVANI: usize = 4 * 1024 * 1024;
 const RAPOR_MAGIC: &str = "gpui-bilesenleri-kanit-raporu-v2";
+const BOŞ_SHA256: &str = "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855";
 
 #[derive(Clone, Debug, Eq, PartialEq)]
 pub struct KanıtRaporuÖzeti {
@@ -133,8 +134,9 @@ impl KanıtRaporuÖzeti {
             let tür = match metin(kayıt, "tür")? {
                 "davranış" => KanıtTürü::Davranış(DavranışKanıtKonumu::DışSandık),
                 "derleme" => KanıtTürü::Derleme,
+                "rapor" => KanıtTürü::Rapor,
                 "yapısal" => KanıtTürü::Yapısal,
-                "rapor" | "sergi" => return Err(KanıtRaporuHatası::SağlayıcıFizikselDeğil),
+                "sergi" => return Err(KanıtRaporuHatası::SağlayıcıFizikselDeğil),
                 _ => return Err(KanıtRaporuHatası::SağlayıcıFizikselDeğil),
             };
             let kaynak = nesne(
@@ -171,6 +173,9 @@ impl KanıtRaporuÖzeti {
                 parent_sha,
                 kaynak_konumu,
                 kaynak_sha,
+                kaynak.get("hedef"),
+                kimlik,
+                hedef,
             )?;
             özetler.push(KanıtKaydıÖzeti {
                 kimlik: Arc::from(kimlik),
@@ -224,6 +229,9 @@ fn koşumu_doğrula(
     parent_sha: &str,
     kaynak_konumu: &str,
     kaynak_sha: &str,
+    kaynak_hedefi: Option<&Value>,
+    kayıt_kimliği: &str,
+    kayıt_hedefi: &str,
 ) -> Result<(), KanıtRaporuHatası> {
     exact_alanlar(
         koşum,
@@ -313,16 +321,20 @@ fn koşumu_doğrula(
         return Err(KanıtRaporuHatası::KoşumBağıGeçersiz);
     }
     dizi(koşum, "seçilen_testler")?;
-    if !dizi(koşum, "rapor_birimleri")?.is_empty() {
-        return Err(KanıtRaporuHatası::KardinaliteGeçersiz);
-    }
     match tür {
         KanıtTürü::Davranış(_) => {
             davranış_koşumunu_doğrula(koşum, kaynak_konumu, kaynak_sha)
         }
         KanıtTürü::Derleme => derleme_koşumunu_doğrula(koşum),
         KanıtTürü::Yapısal => yapısal_koşumu_doğrula(koşum, kaynak_konumu, kaynak_sha),
-        KanıtTürü::Sergi | KanıtTürü::Rapor => Err(KanıtRaporuHatası::SağlayıcıFizikselDeğil),
+        KanıtTürü::Rapor => rapor_koşumunu_doğrula(
+            koşum,
+            kaynak_konumu,
+            kaynak_hedefi,
+            kayıt_kimliği,
+            kayıt_hedefi,
+        ),
+        KanıtTürü::Sergi => Err(KanıtRaporuHatası::SağlayıcıFizikselDeğil),
     }
 }
 
@@ -336,6 +348,7 @@ fn davranış_koşumunu_doğrula(
         != "exit_zero_ve_completion_olayı_doğrulandı"
         || seçilen.len() != 1
         || !dizi(koşum, "derleme_birimleri")?.is_empty()
+        || !dizi(koşum, "rapor_birimleri")?.is_empty()
         || !dizi(koşum, "yapısal_birimler")?.is_empty()
     {
         return Err(KanıtRaporuHatası::KardinaliteGeçersiz);
@@ -494,6 +507,7 @@ fn derleme_koşumunu_doğrula(koşum: &Map<String, Value>) -> Result<(), KanıtR
         || !koşum.get("libtest_keşfi").is_some_and(Value::is_null)
         || !dizi(koşum, "test_birimleri")?.is_empty()
         || !koşum.get("test_sayaçları").is_some_and(Value::is_null)
+        || !dizi(koşum, "rapor_birimleri")?.is_empty()
         || !dizi(koşum, "yapısal_birimler")?.is_empty()
     {
         return Err(KanıtRaporuHatası::KardinaliteGeçersiz);
@@ -597,6 +611,7 @@ fn yapısal_koşumu_doğrula(
         || !dizi(koşum, "test_birimleri")?.is_empty()
         || !koşum.get("test_sayaçları").is_some_and(Value::is_null)
         || !dizi(koşum, "derleme_birimleri")?.is_empty()
+        || !dizi(koşum, "rapor_birimleri")?.is_empty()
     {
         return Err(KanıtRaporuHatası::KardinaliteGeçersiz);
     }
@@ -656,6 +671,148 @@ fn yapısal_koşumu_doğrula(
     Ok(())
 }
 
+fn rapor_koşumunu_doğrula(
+    koşum: &Map<String, Value>,
+    kaynak_konumu: &str,
+    kaynak_hedefi: Option<&Value>,
+    kayıt_kimliği: &str,
+    kayıt_hedefi: &str,
+) -> Result<(), KanıtRaporuHatası> {
+    if kaynak_konumu != "tools/yon005_olcut_raporu.py"
+        || kayıt_kimliği != "yon005.rapor-provider"
+        || kayıt_hedefi != "YÖN-005.ACC-019"
+    {
+        return Err(KanıtRaporuHatası::KaynakBağıGeçersiz);
+    }
+    if metin_hata(koşum, "komut_kimliği", KanıtRaporuHatası::KoşumBağıGeçersiz)?
+        != "yon005.rapor.uyum-olcutleri"
+        || metin_hata(
+            koşum,
+            "komut_görünümü",
+            KanıtRaporuHatası::KoşumBağıGeçersiz,
+        )? != "python3 -I <registered-report-generator>"
+        || metin_hata(koşum, "tamamlama", KanıtRaporuHatası::KoşumBağıGeçersiz)?
+            != "fresh_rapor_terminali_doğrulandı"
+        || metin_hata(koşum, "profil", KanıtRaporuHatası::KoşumBağıGeçersiz)? != "rapor"
+        || metin_hata(koşum, "araç_zinciri", KanıtRaporuHatası::KoşumBağıGeçersiz)?
+            != "python3-isolated"
+    {
+        return Err(KanıtRaporuHatası::KoşumBağıGeçersiz);
+    }
+    if !dizi(koşum, "feature_kümesi")?.is_empty()
+        || !dizi(koşum, "seçilen_testler")?.is_empty()
+        || !koşum.get("libtest_keşfi").is_some_and(Value::is_null)
+        || !dizi(koşum, "test_birimleri")?.is_empty()
+        || !koşum.get("test_sayaçları").is_some_and(Value::is_null)
+        || !dizi(koşum, "derleme_birimleri")?.is_empty()
+        || !dizi(koşum, "yapısal_birimler")?.is_empty()
+    {
+        return Err(KanıtRaporuHatası::KardinaliteGeçersiz);
+    }
+    for akış in ["stdout", "stderr"] {
+        let özet = nesne(
+            koşum
+                .get(akış)
+                .ok_or(KanıtRaporuHatası::KoşumBağıGeçersiz)?,
+            KanıtRaporuHatası::KoşumBağıGeçersiz,
+        )?;
+        if metin_hata(özet, "tam_sha256", KanıtRaporuHatası::KoşumBağıGeçersiz)? != BOŞ_SHA256
+            || tam_sayı_hata(özet, "gözlenen_bayt", KanıtRaporuHatası::KoşumBağıGeçersiz)? != 0
+        {
+            return Err(KanıtRaporuHatası::KoşumBağıGeçersiz);
+        }
+    }
+
+    let dış = nesne(
+        kaynak_hedefi.ok_or(KanıtRaporuHatası::KaynakBağıGeçersiz)?,
+        KanıtRaporuHatası::KaynakBağıGeçersiz,
+    )?;
+    let hedef = nesne(
+        dış
+            .get("rapor")
+            .ok_or(KanıtRaporuHatası::KaynakBağıGeçersiz)?,
+        KanıtRaporuHatası::KaynakBağıGeçersiz,
+    )?;
+    let rapor_kimliği = metin_hata(hedef, "kimlik", KanıtRaporuHatası::KaynakBağıGeçersiz)?;
+    let çıktı_konumu = metin_hata(hedef, "çıktı_konumu", KanıtRaporuHatası::KaynakBağıGeçersiz)?;
+    let şema_sürümü = tam_sayı_hata(hedef, "şema_sürümü", KanıtRaporuHatası::KaynakBağıGeçersiz)?;
+    if rapor_kimliği != "yon005.uyum-olcut-raporu"
+        || çıktı_konumu != "yon005_uyum_olcut_raporu.json"
+        || şema_sürümü != 2
+    {
+        return Err(KanıtRaporuHatası::KaynakBağıGeçersiz);
+    }
+    let birimler = dizi(koşum, "rapor_birimleri")?;
+    if birimler.len() != 1 {
+        return Err(KanıtRaporuHatası::KardinaliteGeçersiz);
+    }
+    let birim = nesne(&birimler[0], KanıtRaporuHatası::KardinaliteGeçersiz)?;
+    exact_alanlar(
+        birim,
+        &[
+            "rapor_kimliği",
+            "çıktı_konumu",
+            "şema_sürümü",
+            "kök_revizyonu",
+            "içerik_sha256",
+            "hedef",
+            "kanıt_kimliği",
+            "başlatan_yürütülebilir_sha256",
+            "durum",
+        ],
+        KanıtRaporuHatası::KardinaliteGeçersiz,
+    )?;
+    let içerik_sha = metin_hata(
+        birim,
+        "içerik_sha256",
+        KanıtRaporuHatası::KardinaliteGeçersiz,
+    )?;
+    if metin_hata(koşum, "cargo_hedefi", KanıtRaporuHatası::KoşumBağıGeçersiz)? != rapor_kimliği
+        || metin_hata(
+            birim,
+            "rapor_kimliği",
+            KanıtRaporuHatası::KardinaliteGeçersiz,
+        )? != rapor_kimliği
+        || metin_hata(
+            birim,
+            "çıktı_konumu",
+            KanıtRaporuHatası::KardinaliteGeçersiz,
+        )? != çıktı_konumu
+        || tam_sayı_hata(birim, "şema_sürümü", KanıtRaporuHatası::KardinaliteGeçersiz)?
+            != şema_sürümü
+        || metin_hata(
+            birim,
+            "kök_revizyonu",
+            KanıtRaporuHatası::KardinaliteGeçersiz,
+        )? != metin_hata(koşum, "kök_revizyonu", KanıtRaporuHatası::KoşumBağıGeçersiz)?
+        || !küçük_hex(içerik_sha, 64)
+        || içerik_sha
+            != metin_hata(
+                koşum,
+                "makine_sonucu_sha256",
+                KanıtRaporuHatası::KoşumBağıGeçersiz,
+            )?
+        || metin_hata(birim, "hedef", KanıtRaporuHatası::KardinaliteGeçersiz)? != kayıt_hedefi
+        || metin_hata(
+            birim,
+            "kanıt_kimliği",
+            KanıtRaporuHatası::KardinaliteGeçersiz,
+        )? != kayıt_kimliği
+        || !küçük_hex(
+            metin_hata(
+                birim,
+                "başlatan_yürütülebilir_sha256",
+                KanıtRaporuHatası::KardinaliteGeçersiz,
+            )?,
+            64,
+        )
+        || metin_hata(birim, "durum", KanıtRaporuHatası::KardinaliteGeçersiz)? != "doğrulandı"
+    {
+        return Err(KanıtRaporuHatası::KardinaliteGeçersiz);
+    }
+    Ok(())
+}
+
 fn kaynak_hedefini_doğrula(
     değer: Option<&Value>,
     tür: &KanıtTürü,
@@ -668,7 +825,8 @@ fn kaynak_hedefini_doğrula(
         KanıtTürü::Davranış(_) => "davranış",
         KanıtTürü::Derleme => "derleme",
         KanıtTürü::Yapısal => "yapısal",
-        KanıtTürü::Sergi | KanıtTürü::Rapor => {
+        KanıtTürü::Rapor => "rapor",
+        KanıtTürü::Sergi => {
             return Err(KanıtRaporuHatası::SağlayıcıFizikselDeğil);
         }
     };
@@ -689,6 +847,22 @@ fn kaynak_hedefini_doğrula(
             if !kararlı_metin(metin_hata(iç, alan, KanıtRaporuHatası::KaynakBağıGeçersiz)?) {
                 return Err(KanıtRaporuHatası::KaynakBağıGeçersiz);
             }
+        }
+    } else if etiket == "rapor" {
+        exact_alanlar(
+            iç,
+            &["kimlik", "çıktı_konumu", "şema_sürümü"],
+            KanıtRaporuHatası::KaynakBağıGeçersiz,
+        )?;
+        let çıktı = metin_hata(iç, "çıktı_konumu", KanıtRaporuHatası::KaynakBağıGeçersiz)?;
+        if !kararlı_metin(metin_hata(
+            iç,
+            "kimlik",
+            KanıtRaporuHatası::KaynakBağıGeçersiz,
+        )?) || !güvenli_göreli_yol(çıktı)
+            || tam_sayı_hata(iç, "şema_sürümü", KanıtRaporuHatası::KaynakBağıGeçersiz)? <= 0
+        {
+            return Err(KanıtRaporuHatası::KaynakBağıGeçersiz);
         }
     } else {
         exact_alanlar(iç, &["kimlik"], KanıtRaporuHatası::KaynakBağıGeçersiz)?;

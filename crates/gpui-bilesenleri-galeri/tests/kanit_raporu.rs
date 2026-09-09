@@ -5,6 +5,7 @@ use serde_json::{Value, json};
 const H40: &str = "1111111111111111111111111111111111111111";
 const H64: &str = "2222222222222222222222222222222222222222222222222222222222222222";
 const RUN: &str = "33333333333333333333333333333333";
+const EMPTY_SHA: &str = "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855";
 
 fn ortak_koşum(komut: &str, profil: &str, cargo_hedefi: &str) -> Value {
     json!({
@@ -162,6 +163,49 @@ fn derleme_kayıt() -> Value {
     })
 }
 
+fn rapor_kayıt() -> Value {
+    let mut koşum = ortak_koşum(
+        "yon005.rapor.uyum-olcutleri",
+        "rapor",
+        "yon005.uyum-olcut-raporu",
+    );
+    koşum["komut_görünümü"] = json!("python3 -I <registered-report-generator>");
+    koşum["tamamlama"] = json!("fresh_rapor_terminali_doğrulandı");
+    koşum["araç_zinciri"] = json!("python3-isolated");
+    koşum["stdout"] = json!({ "tam_sha256": EMPTY_SHA, "gözlenen_bayt": 0 });
+    koşum["stderr"] = json!({ "tam_sha256": EMPTY_SHA, "gözlenen_bayt": 0 });
+    koşum["rapor_birimleri"] = json!([{
+        "rapor_kimliği": "yon005.uyum-olcut-raporu",
+        "çıktı_konumu": "yon005_uyum_olcut_raporu.json",
+        "şema_sürümü": 2,
+        "kök_revizyonu": H40,
+        "içerik_sha256": H64,
+        "hedef": "YÖN-005.ACC-019",
+        "kanıt_kimliği": "yon005.rapor-provider",
+        "başlatan_yürütülebilir_sha256": H64,
+        "durum": "doğrulandı"
+    }]);
+    json!({
+        "kimlik": "yon005.rapor-provider",
+        "hedef": "YÖN-005.ACC-019",
+        "tür": "rapor",
+        "durum": "doğrulandı",
+        "kaynak": {
+            "konum": "tools/yon005_olcut_raporu.py",
+            "hedef": {
+                "rapor": {
+                    "kimlik": "yon005.uyum-olcut-raporu",
+                    "çıktı_konumu": "yon005_uyum_olcut_raporu.json",
+                    "şema_sürümü": 2
+                }
+            },
+            "kaynak_sha256": H64
+        },
+        "koşum": koşum,
+        "runtime": null
+    })
+}
+
 fn rapor(kayıtlar: Vec<Value>) -> Value {
     json!({
         "şema": "gpui-bilesenleri-kanit-raporu-v2",
@@ -178,22 +222,24 @@ fn ayrıştır(değer: &Value) -> Result<KanıtRaporuÖzeti, KanıtRaporuHatası
 }
 
 #[test]
-fn yon_006_acc_016_fiziksel_uc_rol_ve_getterlar_kayipsizdir() {
+fn yon_006_acc_016_fiziksel_dort_rol_ve_getterlar_kayipsizdir() {
     let özet = ayrıştır(&rapor(vec![
         yapısal_kayıt(),
         davranış_kayıt(),
         derleme_kayıt(),
+        rapor_kayıt(),
     ]))
-    .expect("üç fiziksel rol kabul edilir");
+    .expect("dört fiziksel rol kabul edilir");
     assert_eq!(özet.kök_revizyonu(), H40);
     assert_eq!(özet.parent_yürütülebilir_sha256(), H64);
-    assert_eq!(özet.kayıtlar().len(), 3);
+    assert_eq!(özet.kayıtlar().len(), 4);
     assert!(matches!(özet.kayıtlar()[0].tür(), KanıtTürü::Yapısal));
     assert_eq!(özet.kayıtlar()[1].hedef(), "ORT-002.ACC-002");
     assert_eq!(
         özet.kayıtlar()[2].kaynak_konumu(),
         "tools/yon005_derleme_problari/src/yetkisiz_olumsuz.rs"
     );
+    assert!(matches!(özet.kayıtlar()[3].tür(), KanıtTürü::Rapor));
 }
 
 #[test]
@@ -215,10 +261,10 @@ fn yon_006_acc_016_adas_completion_ve_zaman_sirasi_reddedilir() {
 
 #[test]
 fn yon_006_acc_016_fiziksel_olmayan_rol_duplicate_ve_trailing_reddedilir() {
-    let mut rapor_rolü = yapısal_kayıt();
-    rapor_rolü["tür"] = json!("rapor");
+    let mut sergi_rolü = yapısal_kayıt();
+    sergi_rolü["tür"] = json!("sergi");
     assert_eq!(
-        ayrıştır(&rapor(vec![rapor_rolü])).unwrap_err(),
+        ayrıştır(&rapor(vec![sergi_rolü])).unwrap_err(),
         KanıtRaporuHatası::SağlayıcıFizikselDeğil
     );
 
@@ -238,6 +284,44 @@ fn yon_006_acc_016_fiziksel_olmayan_rol_duplicate_ve_trailing_reddedilir() {
     );
 }
 
+#[test]
+fn yon_006_acc_016_rapor_revision_hash_ve_terminal_tahrifini_reddeder() {
+    let mut yanlış_revizyon = rapor_kayıt();
+    yanlış_revizyon["koşum"]["rapor_birimleri"][0]["kök_revizyonu"] = json!("4".repeat(40));
+    assert_eq!(
+        ayrıştır(&rapor(vec![yanlış_revizyon])).unwrap_err(),
+        KanıtRaporuHatası::KardinaliteGeçersiz
+    );
+
+    let mut tahrif = rapor_kayıt();
+    tahrif["koşum"]["rapor_birimleri"][0]["içerik_sha256"] = json!("5".repeat(64));
+    assert_eq!(
+        ayrıştır(&rapor(vec![tahrif])).unwrap_err(),
+        KanıtRaporuHatası::KardinaliteGeçersiz
+    );
+
+    let mut gürültülü = rapor_kayıt();
+    gürültülü["koşum"]["stderr"]["gözlenen_bayt"] = json!(1);
+    assert_eq!(
+        ayrıştır(&rapor(vec![gürültülü])).unwrap_err(),
+        KanıtRaporuHatası::KoşumBağıGeçersiz
+    );
+
+    let mut yanlış_kaynak = rapor_kayıt();
+    yanlış_kaynak["kaynak"]["konum"] = json!("tools/baska_rapor.py");
+    assert_eq!(
+        ayrıştır(&rapor(vec![yanlış_kaynak])).unwrap_err(),
+        KanıtRaporuHatası::KaynakBağıGeçersiz
+    );
+
+    let mut yanlış_komut = rapor_kayıt();
+    yanlış_komut["koşum"]["komut_kimliği"] = json!("yon005.rapor.baska");
+    assert_eq!(
+        ayrıştır(&rapor(vec![yanlış_komut])).unwrap_err(),
+        KanıtRaporuHatası::KoşumBağıGeçersiz
+    );
+}
+
 /// Gerçek YÖN-005 producer çıktısı bu testte dışarıdan verilir. Normal test
 /// paketi rastgele koşum kimliğine bağlı değildir; kapanış koşumu bunu
 /// `--ignored --exact` ile özellikle çalıştırır.
@@ -248,12 +332,17 @@ fn yon_006_acc_016_canli_yon005_temel_raporunu_tuketir() {
         std::env::var_os("GPUI_KANIT_TEMEL_RAPORU").expect("GPUI_KANIT_TEMEL_RAPORU verilmelidir");
     let baytlar = std::fs::read(yol).expect("canlı temel rapor okunur");
     let özet = KanıtRaporuÖzeti::ayrıştır(&baytlar).expect("canlı temel rapor exact kabul edilir");
-    assert_eq!(özet.kayıtlar().len(), 4);
+    assert_eq!(özet.kayıtlar().len(), 20);
     assert!(özet.kayıtlar().iter().any(|kayıt| {
         kayıt.kimlik() == "grafem_ve_utf16_konumları_zwj_bayrak_ve_birleşimi_bölmez"
             && kayıt.hedef() == "ORT-002.ACC-002"
     }));
     assert!(özet.kayıtlar().iter().any(|kayıt| {
         kayıt.kimlik() == "ort002.konum-haritasi-opakligi" && kayıt.hedef() == "ORT-002.ACC-016"
+    }));
+    assert!(özet.kayıtlar().iter().any(|kayıt| {
+        kayıt.kimlik() == "yon005.rapor-provider"
+            && kayıt.hedef() == "YÖN-005.ACC-019"
+            && matches!(kayıt.tür(), KanıtTürü::Rapor)
     }));
 }
