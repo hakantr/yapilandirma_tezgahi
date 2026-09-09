@@ -169,20 +169,23 @@ fn rapor_kayıt() -> Value {
         "rapor",
         "yon005.uyum-olcut-raporu",
     );
-    koşum["komut_görünümü"] = json!("python3 -I <registered-report-generator>");
+    koşum["komut_görünümü"] = json!("resolved-python3 -I <registered-report-generator>");
     koşum["tamamlama"] = json!("fresh_rapor_terminali_doğrulandı");
-    koşum["araç_zinciri"] = json!("python3-isolated");
+    koşum["araç_zinciri"] = json!("python3-isolated-resolved");
     koşum["stdout"] = json!({ "tam_sha256": EMPTY_SHA, "gözlenen_bayt": 0 });
     koşum["stderr"] = json!({ "tam_sha256": EMPTY_SHA, "gözlenen_bayt": 0 });
     koşum["rapor_birimleri"] = json!([{
         "rapor_kimliği": "yon005.uyum-olcut-raporu",
         "çıktı_konumu": "yon005_uyum_olcut_raporu.json",
-        "şema_sürümü": 2,
+        "şema_sürümü": 3,
         "kök_revizyonu": H40,
         "içerik_sha256": H64,
         "hedef": "YÖN-005.ACC-019",
         "kanıt_kimliği": "yon005.rapor-provider",
         "başlatan_yürütülebilir_sha256": H64,
+        "başlatıcı_yürütülebilir_sha256": H64,
+        "yorumlayıcı_yürütülebilir_sha256": H64,
+        "üretici_bildirimi_yürütülebilir_sha256": H64,
         "durum": "doğrulandı"
     }]);
     json!({
@@ -196,7 +199,7 @@ fn rapor_kayıt() -> Value {
                 "rapor": {
                     "kimlik": "yon005.uyum-olcut-raporu",
                     "çıktı_konumu": "yon005_uyum_olcut_raporu.json",
-                    "şema_sürümü": 2
+                    "şema_sürümü": 3
                 }
             },
             "kaynak_sha256": H64
@@ -208,8 +211,8 @@ fn rapor_kayıt() -> Value {
 
 fn rapor(kayıtlar: Vec<Value>) -> Value {
     json!({
-        "şema": "gpui-bilesenleri-kanit-raporu-v2",
-        "şema_sürümü": 2,
+        "şema": "gpui-bilesenleri-kanit-raporu-v3",
+        "şema_sürümü": 3,
         "kök_revizyonu": H40,
         "parent_yürütülebilir_sha256": H64,
         "üretildi": { "saniye": 10, "nanos": 3 },
@@ -269,7 +272,7 @@ fn yon_006_acc_016_fiziksel_olmayan_rol_duplicate_ve_trailing_reddedilir() {
     );
 
     let yinelenen =
-        r#"{"şema":"gpui-bilesenleri-kanit-raporu-v2","şema":"gpui-bilesenleri-kanit-raporu-v2"}"#
+        r#"{"şema":"gpui-bilesenleri-kanit-raporu-v3","şema":"gpui-bilesenleri-kanit-raporu-v3"}"#
             .as_bytes();
     assert_eq!(
         KanıtRaporuÖzeti::ayrıştır(yinelenen).unwrap_err(),
@@ -320,6 +323,22 @@ fn yon_006_acc_016_rapor_revision_hash_ve_terminal_tahrifini_reddeder() {
         ayrıştır(&rapor(vec![yanlış_komut])).unwrap_err(),
         KanıtRaporuHatası::KoşumBağıGeçersiz
     );
+
+    let mut yanlış_yorumlayıcı = rapor_kayıt();
+    yanlış_yorumlayıcı["koşum"]["rapor_birimleri"][0]["yorumlayıcı_yürütülebilir_sha256"] =
+        json!("6".repeat(64));
+    assert_eq!(
+        ayrıştır(&rapor(vec![yanlış_yorumlayıcı])).unwrap_err(),
+        KanıtRaporuHatası::KardinaliteGeçersiz
+    );
+
+    let mut yanlış_bildirim = rapor_kayıt();
+    yanlış_bildirim["koşum"]["rapor_birimleri"][0]["üretici_bildirimi_yürütülebilir_sha256"] =
+        json!("7".repeat(64));
+    assert_eq!(
+        ayrıştır(&rapor(vec![yanlış_bildirim])).unwrap_err(),
+        KanıtRaporuHatası::KardinaliteGeçersiz
+    );
 }
 
 /// Gerçek YÖN-005 producer çıktısı bu testte dışarıdan verilir. Normal test
@@ -332,7 +351,7 @@ fn yon_006_acc_016_canli_yon005_temel_raporunu_tuketir() {
         std::env::var_os("GPUI_KANIT_TEMEL_RAPORU").expect("GPUI_KANIT_TEMEL_RAPORU verilmelidir");
     let baytlar = std::fs::read(yol).expect("canlı temel rapor okunur");
     let özet = KanıtRaporuÖzeti::ayrıştır(&baytlar).expect("canlı temel rapor exact kabul edilir");
-    assert_eq!(özet.kayıtlar().len(), 20);
+    assert_eq!(özet.kayıtlar().len(), 26);
     assert!(özet.kayıtlar().iter().any(|kayıt| {
         kayıt.kimlik() == "grafem_ve_utf16_konumları_zwj_bayrak_ve_birleşimi_bölmez"
             && kayıt.hedef() == "ORT-002.ACC-002"

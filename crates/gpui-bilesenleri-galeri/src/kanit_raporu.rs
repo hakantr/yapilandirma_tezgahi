@@ -10,7 +10,7 @@ use serde_json::{Map, Value};
 use std::{collections::BTreeSet, fmt, path::Path, sync::Arc};
 
 const RAPOR_BAYT_TAVANI: usize = 4 * 1024 * 1024;
-const RAPOR_MAGIC: &str = "gpui-bilesenleri-kanit-raporu-v2";
+const RAPOR_MAGIC: &str = "gpui-bilesenleri-kanit-raporu-v3";
 const BOŞ_SHA256: &str = "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855";
 
 #[derive(Clone, Debug, Eq, PartialEq)]
@@ -95,7 +95,7 @@ impl KanıtRaporuÖzeti {
             ],
             KanıtRaporuHatası::AlanKümesiGeçersiz,
         )?;
-        if metin(kök, "şema")? != RAPOR_MAGIC || tam_sayı(kök, "şema_sürümü")? != 2 {
+        if metin(kök, "şema")? != RAPOR_MAGIC || tam_sayı(kök, "şema_sürümü")? != 3 {
             return Err(KanıtRaporuHatası::ŞemaDesteklenmiyor);
         }
         let kök_revizyonu = metin(kök, "kök_revizyonu")?;
@@ -690,12 +690,12 @@ fn rapor_koşumunu_doğrula(
             koşum,
             "komut_görünümü",
             KanıtRaporuHatası::KoşumBağıGeçersiz,
-        )? != "python3 -I <registered-report-generator>"
+        )? != "resolved-python3 -I <registered-report-generator>"
         || metin_hata(koşum, "tamamlama", KanıtRaporuHatası::KoşumBağıGeçersiz)?
             != "fresh_rapor_terminali_doğrulandı"
         || metin_hata(koşum, "profil", KanıtRaporuHatası::KoşumBağıGeçersiz)? != "rapor"
         || metin_hata(koşum, "araç_zinciri", KanıtRaporuHatası::KoşumBağıGeçersiz)?
-            != "python3-isolated"
+            != "python3-isolated-resolved"
     {
         return Err(KanıtRaporuHatası::KoşumBağıGeçersiz);
     }
@@ -738,7 +738,7 @@ fn rapor_koşumunu_doğrula(
     let şema_sürümü = tam_sayı_hata(hedef, "şema_sürümü", KanıtRaporuHatası::KaynakBağıGeçersiz)?;
     if rapor_kimliği != "yon005.uyum-olcut-raporu"
         || çıktı_konumu != "yon005_uyum_olcut_raporu.json"
-        || şema_sürümü != 2
+        || şema_sürümü != 3
     {
         return Err(KanıtRaporuHatası::KaynakBağıGeçersiz);
     }
@@ -758,6 +758,9 @@ fn rapor_koşumunu_doğrula(
             "hedef",
             "kanıt_kimliği",
             "başlatan_yürütülebilir_sha256",
+            "başlatıcı_yürütülebilir_sha256",
+            "yorumlayıcı_yürütülebilir_sha256",
+            "üretici_bildirimi_yürütülebilir_sha256",
             "durum",
         ],
         KanıtRaporuHatası::KardinaliteGeçersiz,
@@ -806,6 +809,40 @@ fn rapor_koşumunu_doğrula(
             )?,
             64,
         )
+        || !küçük_hex(
+            metin_hata(
+                birim,
+                "başlatıcı_yürütülebilir_sha256",
+                KanıtRaporuHatası::KardinaliteGeçersiz,
+            )?,
+            64,
+        )
+        || !küçük_hex(
+            metin_hata(
+                birim,
+                "yorumlayıcı_yürütülebilir_sha256",
+                KanıtRaporuHatası::KardinaliteGeçersiz,
+            )?,
+            64,
+        )
+        || metin_hata(
+            birim,
+            "yorumlayıcı_yürütülebilir_sha256",
+            KanıtRaporuHatası::KardinaliteGeçersiz,
+        )? != metin_hata(
+            koşum,
+            "child_yürütülebilir_sha256",
+            KanıtRaporuHatası::KoşumBağıGeçersiz,
+        )?
+        || metin_hata(
+            birim,
+            "üretici_bildirimi_yürütülebilir_sha256",
+            KanıtRaporuHatası::KardinaliteGeçersiz,
+        )? != metin_hata(
+            birim,
+            "yorumlayıcı_yürütülebilir_sha256",
+            KanıtRaporuHatası::KardinaliteGeçersiz,
+        )?
         || metin_hata(birim, "durum", KanıtRaporuHatası::KardinaliteGeçersiz)? != "doğrulandı"
     {
         return Err(KanıtRaporuHatası::KardinaliteGeçersiz);
