@@ -48,6 +48,10 @@ web-sys = { version = "0.3", features = ["Window", "Performance"] }
 # profilinde gerekir; WASM çalışma profiline transitif olarak giremez.
 [dev-dependencies]
 gpui = { workspace = true, features = ["test-support"] }
+# Galeri GPUI'nin doğrudan marked-text enjeksiyonu olmayan test bağlamında
+# kanonik alanın yalnız `test-support` sürücülerini kullanır. Bu özellik
+# normal masaüstü/WASM ürün grafiğine girmez.
+gpui-bilesenleri = { workspace = true, features = ["test-support"] }
 
 # Kare ölçüm koşumu (`tests/kare_olcumu.rs`) gerçek metin sistemiyle koşar:
 # Noop shaping, kare maliyetinin metin payını sıfır gösterirdi. Cosmic saf

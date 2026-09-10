@@ -28,6 +28,10 @@ use crate::{
 pub struct MetinGirişiProfilGirdisi<'a> {
     pub tercih: &'a TezgahTercihleri,
     pub alan: Entity<GirişKutusu>,
+    /// K03 gerçek tüketici kartının yaşayan yetkili/ret/programatik alanları.
+    /// Sergi kuruluşu ayrıca düşmüşse ana tezgâh yaşamaya devam eder ve kart
+    /// çizilmez; yarım alan kümesi üretilmez.
+    pub alanlar: Option<&'a crate::MetinGirişiAlanları>,
     /// Tezgâhın panel entity'leri: alan gözleyen üç panel ve önbellekli
     /// bölüm kolonu.
     ///
@@ -230,6 +234,7 @@ pub fn tezgah_içeriği(
     let MetinGirişiProfilGirdisi {
         tercih,
         alan,
+        alanlar,
         paneller,
         kod,
         sol_kaydırma,
@@ -263,6 +268,7 @@ pub fn tezgah_içeriği(
         önizleme: önizleme_blokları(
             tercih,
             &alan,
+            alanlar,
             en_fazla_yarıçap,
             köşe_izi,
             sayısal,
@@ -287,7 +293,8 @@ pub fn tezgah_içeriği(
 
 /// `§29` kuruluş başarısızlığının içeriği.
 ///
-/// `GirişKutusu::kur` düştüğünde entity, panel ve abonelik yoktur; önizleme
+/// Tip-durumlu kurucunun `kur` adımı düştüğünde entity, panel ve abonelik
+/// yoktur; önizleme
 /// exact typed sonucu çizer. Hata yutulmaz, sahte bir alan da çizilmez.
 pub(crate) fn kuruluş_hatası_içeriği(
     hata: Option<&gpui_bilesenleri::GirişKuruluşHatası>,
@@ -368,6 +375,7 @@ pub(crate) fn kuruluş_hatası_içeriği(
 fn önizleme_blokları(
     tercih: &TezgahTercihleri,
     alan: &Entity<GirişKutusu>,
+    alanlar: Option<&crate::MetinGirişiAlanları>,
     en_fazla_yarıçap: f32,
     köşe_izi: std::rc::Rc<std::cell::Cell<gpui::Bounds<gpui::Pixels>>>,
     sayısal: bool,
@@ -403,6 +411,9 @@ fn önizleme_blokları(
         // görünmüyordu.
         önizleme_kabuğu(alan).into_any_element(),
     ];
+    if let Some(alanlar) = alanlar {
+        bloklar.push(crate::sergiler::k03_tüketici_kanıtı(alanlar, bağlam).into_any_element());
+    }
     // `ORT-021` canlı çözüm yolunun son typed hatası (varsa) burada çizilir.
     // Kök, render girdisini kurmadan önce kanonik anahtarı yoklar
     // (`TezgahİletiÇözücüsü::yokla`): sistemik akıbet yuvaya aynı karede

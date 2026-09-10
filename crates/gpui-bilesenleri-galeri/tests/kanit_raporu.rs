@@ -351,6 +351,12 @@ fn yon_006_acc_016_canli_yon005_temel_raporunu_tuketir() {
         std::env::var_os("GPUI_KANIT_TEMEL_RAPORU").expect("GPUI_KANIT_TEMEL_RAPORU verilmelidir");
     let baytlar = std::fs::read(yol).expect("canlı temel rapor okunur");
     let özet = KanıtRaporuÖzeti::ayrıştır(&baytlar).expect("canlı temel rapor exact kabul edilir");
+    let beklenen_çekirdek = include_str!("../../../raporlar/PAKET_C_CEKIRDEK_REVIZYONU.txt").trim();
+    assert_eq!(
+        özet.kök_revizyonu(),
+        beklenen_çekirdek,
+        "Paket C yalnız bağlandığı exact çekirdek producer raporunu kabul eder"
+    );
     assert_eq!(özet.kayıtlar().len(), 26);
     assert!(özet.kayıtlar().iter().any(|kayıt| {
         kayıt.kimlik() == "grafem_ve_utf16_konumları_zwj_bayrak_ve_birleşimi_bölmez"

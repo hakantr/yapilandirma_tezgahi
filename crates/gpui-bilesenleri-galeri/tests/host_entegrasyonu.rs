@@ -8,14 +8,16 @@
 
 use gpui::TestAppContext;
 use gpui_bilesenleri::{
-    BileşenKimliği, Değer, GirişKuruluşHatası, GirişMaskesi, GirişYapılandırmaHatası,
+    BileşenKimliği, BiçimHizmetHazırlığı, BiçimHizmetKökü, Değer, GirişKuruluşHatası,
+    GirişKutusuKurucusu, GirişKısıtBileşimKöküExt, GirişMaskesi, GirişYapılandırmaHatası,
     GirişYapılandırması, MetinGirişMaskesi, TanımKimliği, UzunlukSınırı, UzunlukSınırıDavranışı,
-    VarsayılanDeğer, VarsayılanDeğerHatası, YerelMetinBağlamı,
+    VarsayılanDeğer, VarsayılanDeğerHatası, YerelMetinBağlamı, ÇözülmüşGirişKısıtları,
 };
 use gpui_bilesenleri_temel::{
-    BağlamSürümü, CanlıBağlamDamgası, GüvenliMetin, MetinDamgası, PaylaşılanMetinDilimi,
-    UnicodeVeYerelMetinHizmetleri, Utf8ParçaAkışı, ÖrnekKimliğiFabrikası,
+    BağlamSürümü, BileşimKökü, CanlıBağlamDamgası, GüvenliMetin, MetinDamgası,
+    PaylaşılanMetinDilimi, UnicodeVeYerelMetinHizmetleri, Utf8ParçaAkışı, ÖrnekKimliğiFabrikası,
 };
+use std::num::{NonZeroU32, NonZeroU64};
 use std::sync::{
     Arc,
     atomic::{AtomicBool, Ordering},
@@ -52,6 +54,14 @@ fn metni_oku(dilim: &PaylaşılanMetinDilimi) -> String {
     metin
 }
 
+fn açık_metni_oku(alan: &gpui_bilesenleri::GirişKutusu) -> String {
+    metni_oku(
+        &alan
+            .açık_metin()
+            .expect("host entegrasyon alanı açık roldedir"),
+    )
+}
+
 fn damga(kök: &UnicodeVeYerelMetinHizmetleri, sürüm: u64) -> MetinDamgası {
     kök.metin_damgası_fabrikası().damga(CanlıBağlamDamgası {
         bağlam: fabrika().sonraki().expect("test bağlam kimliği"),
@@ -71,10 +81,61 @@ fn tema() -> Arc<gpui_bilesenleri::TemaAnlıkGörüntüsü> {
     gpui_bilesenleri_galeri::galeri_teması()
 }
 
+/// Tarihsel host nöbetlerini kanonik K01 kurucusu ve yaşayan ORT-001
+/// bileşim kökü üzerinden çalıştırır. Maskeli alanların cold ORT-008 planı
+/// da gerçek hizmet çiftine bağlanır; test eski serbest kurucuya kaçamaz.
+#[allow(clippy::too_many_arguments)]
+fn giriş_kur(
+    kimlik: BileşenKimliği,
+    unicode_hizmetleri: Arc<UnicodeVeYerelMetinHizmetleri>,
+    ilk_metin_damgası: MetinDamgası,
+    yerel_bağlam: YerelMetinBağlamı,
+    yapılandırma: GirişYapılandırması,
+    başlangıç_metni: impl Into<String>,
+    tema: Arc<gpui_bilesenleri::TemaAnlıkGörüntüsü>,
+    pencere: &mut gpui::Window,
+    bağlam: &mut gpui::App,
+) -> Result<gpui_bilesenleri::GirişKuruluşSonucu, GirişKuruluşHatası> {
+    let yapılandırma = Arc::new(yapılandırma);
+    let mut kök = BileşimKökü::edin(bağlam)
+        .unwrap_or_else(|| BileşimKökü::kur(bağlam).expect("test App bileşim kökü kurulur"));
+    let (_, kuruluş) = kök
+        .giriş_kısıt_alanını_kur(ÇözülmüşGirişKısıtları::bağımsız(
+            yapılandırma.giriş_türü.clone(),
+        ))
+        .expect("test giriş kısıt alanı kurulur");
+    let mut kurucu = GirişKutusuKurucusu::yeni(Arc::clone(&yapılandırma));
+    if let Ok(Some(istek)) = kurucu.biçim_planı_isteği(&yerel_bağlam) {
+        let hazırlık = BiçimHizmetHazırlığı::denetimli(
+            Arc::from([istek]),
+            NonZeroU32::new(1).expect("sabit plan tavanı"),
+            NonZeroU64::new(gpui_bilesenleri_galeri::GALERİ_SAHİPLİ_METİN_UTF8_TAVANI as u64)
+                .expect("sabit canonical bayt tavanı"),
+        )
+        .expect("tek plan hazırlığı geçerlidir");
+        let biçim_kökü = BiçimHizmetKökü::yerleşik(hazırlık)
+            .expect("host testi için gerçek ORT-008 kökü kurulur");
+        kurucu = kurucu.biçim_hizmetleri(biçim_kökü.hizmetleri());
+    }
+    kurucu.kısıtları_çöz(kuruluş).kur(
+        kimlik,
+        unicode_hizmetleri,
+        ilk_metin_damgası,
+        yerel_bağlam,
+        başlangıç_metni,
+        tema,
+        pencere,
+        bağlam,
+    )
+}
+
 /// Bu dosyadaki alanlar açık metindir; `GirişDurumu` kabuğunu özel alana
 /// uzanmadan, kanonik varyant ve erişiciler üzerinden açar.
 fn açık_durum(alan: &gpui_bilesenleri::GirişKutusu) -> &gpui_bilesenleri::GirişÇekirdeği {
-    match alan.durum() {
+    match alan
+        .açık_durum()
+        .expect("host entegrasyon alanı açık roldedir")
+    {
         gpui_bilesenleri::GirişDurumu::Açık(durum) => durum,
         gpui_bilesenleri::GirişDurumu::Gizli(_) => {
             panic!("açık alan testi gizli durum kabuğu üretmemeli")
@@ -124,7 +185,7 @@ fn kurulus_yapisal_ve_teknik_hatalari_ayirir(bağlam: &mut TestAppContext) {
         sabitleri_göster: true,
     }));
     let akıbet = görsel.update(|pencere, bağlam| {
-        gpui_bilesenleri::GirişKutusu::kur(
+        giriş_kur(
             bileşen("yapısal"),
             kök.clone(),
             damga(&kök, u64::MAX),
@@ -156,7 +217,7 @@ fn kurulus_yapisal_ve_teknik_hatalari_ayirir(bağlam: &mut TestAppContext) {
         sabitleri_göster: true,
     }));
     let akıbet = görsel.update(|pencere, bağlam| {
-        gpui_bilesenleri::GirişKutusu::kur(
+        giriş_kur(
             bileşen("teknik"),
             kök.clone(),
             damga(&kök, u64::MAX),
@@ -198,7 +259,7 @@ fn varsayilan_saglayici_hatasi_entityyi_oldurmez(bağlam: &mut TestAppContext) {
         );
     let sonuç = görsel
         .update(|pencere, bağlam| {
-            gpui_bilesenleri::GirişKutusu::kur(
+            giriş_kur(
                 bileşen("sağlayıcı-hata"),
                 kök.clone(),
                 damga(&kök, 0),
@@ -216,7 +277,7 @@ fn varsayilan_saglayici_hatasi_entityyi_oldurmez(bağlam: &mut TestAppContext) {
         Some(VarsayılanDeğerHatası::SağlayıcıBaşarısız)
     );
     görsel.update(|_, bağlam| {
-        assert_eq!(metni_oku(&sonuç.bileşen.read(bağlam).metin()), "");
+        assert_eq!(açık_metni_oku(sonuç.bileşen.read(bağlam)), "");
     });
 }
 
@@ -246,7 +307,7 @@ fn acik_baslangic_metni_saglayiciyi_cagirmaz(bağlam: &mut TestAppContext) {
     y.varsayılan_değer = sağlayıcı.clone();
     let sonuç = görsel
         .update(|pencere, bağlam| {
-            gpui_bilesenleri::GirişKutusu::kur(
+            giriş_kur(
                 bileşen("açık-metin"),
                 kök.clone(),
                 damga(&kök, 0),
@@ -265,10 +326,7 @@ fn acik_baslangic_metni_saglayiciyi_cagirmaz(bağlam: &mut TestAppContext) {
     );
     assert!(sonuç.varsayılan_değer_hatası.is_none());
     görsel.update(|_, bağlam| {
-        assert_eq!(
-            metni_oku(&sonuç.bileşen.read(bağlam).metin()),
-            "elle-girilmiş"
-        );
+        assert_eq!(açık_metni_oku(sonuç.bileşen.read(bağlam)), "elle-girilmiş");
     });
 
     // Boş açılış: sağlayıcı çağrılır ve değeri uygulanır.
@@ -276,7 +334,7 @@ fn acik_baslangic_metni_saglayiciyi_cagirmaz(bağlam: &mut TestAppContext) {
     y.varsayılan_değer = sağlayıcı;
     let sonuç = görsel
         .update(|pencere, bağlam| {
-            gpui_bilesenleri::GirişKutusu::kur(
+            giriş_kur(
                 bileşen("boş-açılış"),
                 kök.clone(),
                 damga(&kök, 0),
@@ -295,10 +353,7 @@ fn acik_baslangic_metni_saglayiciyi_cagirmaz(bağlam: &mut TestAppContext) {
     );
     assert!(sonuç.varsayılan_değer_hatası.is_none());
     görsel.update(|_, bağlam| {
-        assert_eq!(
-            metni_oku(&sonuç.bileşen.read(bağlam).metin()),
-            "sağlayıcıdan"
-        );
+        assert_eq!(açık_metni_oku(sonuç.bileşen.read(bağlam)), "sağlayıcıdan");
     });
 }
 
@@ -340,7 +395,7 @@ fn maskeli_kur(
 ) -> gpui::Entity<gpui_bilesenleri::GirişKutusu> {
     görsel
         .update(|pencere, bağlam| {
-            gpui_bilesenleri::GirişKutusu::kur(
+            giriş_kur(
                 bileşen(ad),
                 kök.clone(),
                 damga(kök, 0),
@@ -369,8 +424,8 @@ fn kurulus_enjekte_yerel_baglami_gercekten_kullanir(bağlam: &mut TestAppContext
     görsel.update(|_, bağlam| {
         assert_eq!(en_alan.read(bağlam).yerel_bağlam().dil().bcp47(), "en");
         assert_eq!(el_alan.read(bağlam).yerel_bağlam().dil().bcp47(), "el");
-        let en_metin = metni_oku(&en_alan.read(bağlam).metin());
-        let el_metin = metni_oku(&el_alan.read(bağlam).metin());
+        let en_metin = açık_metni_oku(en_alan.read(bağlam));
+        let el_metin = açık_metni_oku(el_alan.read(bağlam));
         assert!(
             en_metin.contains('Ά'),
             "en büyütmesi tonos korur: {en_metin:?}"
@@ -407,7 +462,7 @@ fn ayni_yerel_baglama_gecis_gercek_noop(bağlam: &mut TestAppContext) {
         let a = alan.read(bağlam);
         let durum = açık_durum(a);
         (
-            metni_oku(&a.metin()),
+            açık_metni_oku(a),
             metni_oku(durum.ham_giriş_metni()),
             *durum.seçim(),
             durum.değer_sürümü(),
@@ -423,7 +478,7 @@ fn ayni_yerel_baglama_gecis_gercek_noop(bağlam: &mut TestAppContext) {
     görsel.update(|_, bağlam| {
         let a = alan.read(bağlam);
         let durum = açık_durum(a);
-        assert_eq!(metni_oku(&a.metin()), önce.0);
+        assert_eq!(açık_metni_oku(a), önce.0);
         assert_eq!(metni_oku(durum.ham_giriş_metni()), önce.1);
         assert_eq!(*durum.seçim(), önce.2);
         assert_eq!(durum.değer_sürümü(), önce.3);
@@ -459,7 +514,7 @@ fn kompozisyonsuz_farkli_yerel_gecisi_basarili(bağlam: &mut TestAppContext) {
         let a = alan.read(bağlam);
         assert_eq!(a.yerel_bağlam().dil().bcp47(), "el");
         assert!(
-            metni_oku(&a.metin()).contains('Α'),
+            açık_metni_oku(a).contains('Α'),
             "yeni yerelin planı uygulanır"
         );
         assert_eq!(açık_durum(a).değer_sürümü(), sürüm_önce + 1);
@@ -484,9 +539,7 @@ fn etkin_kompozisyonda_ret_kurtarma_ve_asili_eksen_yoklugu(bağlam: &mut TestApp
 
     görsel.update(|pencere, bağlam| {
         alan.update(bağlam, |alan, bağlam| {
-            gpui::EntityInputHandler::replace_and_mark_text_in_range(
-                alan, None, "ん", None, pencere, bağlam,
-            );
+            alan.test_ime_birleşimini_değiştir(None, "ん", None, pencere, bağlam);
         });
     });
     görsel.run_until_parked();
@@ -501,9 +554,12 @@ fn etkin_kompozisyonda_ret_kurtarma_ve_asili_eksen_yoklugu(bağlam: &mut TestApp
     let önce = görsel.update(|_, bağlam| {
         let a = alan.read(bağlam);
         let durum = açık_durum(a);
-        let ime = a.etkin_ime().expect("kompozisyon gerçekten etkin");
+        let ime = a
+            .açık_etkin_ime()
+            .expect("IME host alanı açık roldedir")
+            .expect("kompozisyon gerçekten etkin");
         (
-            metni_oku(&a.metin()),
+            açık_metni_oku(a),
             metni_oku(durum.ham_giriş_metni()),
             *durum.seçim(),
             ime.metin.clone(),
@@ -526,8 +582,11 @@ fn etkin_kompozisyonda_ret_kurtarma_ve_asili_eksen_yoklugu(bağlam: &mut TestApp
     görsel.update(|_, bağlam| {
         let a = alan.read(bağlam);
         let durum = açık_durum(a);
-        let ime = a.etkin_ime().expect("ret IME birleşimini korur");
-        assert_eq!(metni_oku(&a.metin()), önce.0, "metin korunur");
+        let ime = a
+            .açık_etkin_ime()
+            .expect("IME host alanı açık roldedir")
+            .expect("ret IME birleşimini korur");
+        assert_eq!(açık_metni_oku(a), önce.0, "metin korunur");
         assert_eq!(
             metni_oku(durum.ham_giriş_metni()),
             önce.1,
@@ -549,14 +608,16 @@ fn etkin_kompozisyonda_ret_kurtarma_ve_asili_eksen_yoklugu(bağlam: &mut TestApp
     // kalmaz; yeniden deneme başarıyla sonuçlanır.
     görsel.update(|pencere, bağlam| {
         alan.update(bağlam, |alan, bağlam| {
-            gpui::EntityInputHandler::replace_text_in_range(alan, None, "ん", pencere, bağlam);
+            alan.test_ime_metnini_değiştir(None, "ん", pencere, bağlam);
         });
     });
     görsel.run_until_parked();
     görsel.update(|_, bağlam| {
         alan.update(bağlam, |alan, bağlam| {
             assert!(
-                alan.etkin_ime().is_none(),
+                alan.açık_etkin_ime()
+                    .expect("IME host alanı açık roldedir")
+                    .is_none(),
                 "`insertText`-commit kompozisyonu düşürür; sahte/asılı kompozisyon kalmaz"
             );
             alan.yerel_bağlamı_değiştir(yerel_dil(&kök, "el"), bağlam)
@@ -592,7 +653,7 @@ fn acik_maskeli_baslangic_tabani_ve_escape(bağlam: &mut TestAppContext) {
     let yerel_bağlam = yerel_dil(&kök, "tr");
     let kök_kopya = kök.clone();
     let (konak, görsel) = bağlam.add_window_view(move |pencere, bağlam| {
-        let alan = gpui_bilesenleri::GirişKutusu::kur(
+        let alan = giriş_kur(
             bileşen("maskeli-taban"),
             kök_kopya.clone(),
             damga(&kök_kopya, 0),
@@ -615,7 +676,7 @@ fn acik_maskeli_baslangic_tabani_ve_escape(bağlam: &mut TestAppContext) {
         let a = alan.read(bağlam);
         let durum = açık_durum(a);
         assert_eq!(
-            metni_oku(&a.metin()),
+            açık_metni_oku(a),
             "AB_",
             "kuruluş maskeyi ve büyütmeyi uygular"
         );
@@ -640,13 +701,13 @@ fn acik_maskeli_baslangic_tabani_ve_escape(bağlam: &mut TestAppContext) {
     görsel.run_until_parked();
     görsel.update(|pencere, bağlam| {
         alan.update(bağlam, |alan, bağlam| {
-            gpui::EntityInputHandler::replace_text_in_range(alan, None, "c", pencere, bağlam);
+            alan.test_ime_metnini_değiştir(None, "c", pencere, bağlam);
         });
     });
     görsel.run_until_parked();
     görsel.update(|_, bağlam| {
         assert_ne!(
-            metni_oku(&alan.read(bağlam).metin()),
+            açık_metni_oku(alan.read(bağlam)),
             "AB_",
             "düzenleme gözlenir"
         );
@@ -658,7 +719,7 @@ fn acik_maskeli_baslangic_tabani_ve_escape(bağlam: &mut TestAppContext) {
         let a = alan.read(bağlam);
         let durum = açık_durum(a);
         assert_eq!(
-            metni_oku(&a.metin()),
+            açık_metni_oku(a),
             "AB_",
             "`Escape` şablonlu `\"AB_\"` tabanına döner"
         );
@@ -667,7 +728,12 @@ fn acik_maskeli_baslangic_tabani_ve_escape(bağlam: &mut TestAppContext) {
             "AB",
             "ham değer de tabana döner"
         );
-        assert!(a.etkin_ime().is_none(), "IME ekseni temiz");
+        assert!(
+            a.açık_etkin_ime()
+                .expect("IME host alanı açık roldedir")
+                .is_none(),
+            "IME ekseni temiz"
+        );
     });
 }
 

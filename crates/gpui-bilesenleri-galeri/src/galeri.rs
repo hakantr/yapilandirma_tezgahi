@@ -348,7 +348,7 @@ fn aile_kaydı(sözleşme: &str, sıra: u16) -> (SergiTanımı, GaleriKatalogKay
 
 fn aile_kabul_aralığı(sözleşme: &str) -> &'static str {
     match sözleşme {
-        "BİL-010" => "^28.0",
+        "BİL-010" => "^31.0",
         "BİL-040" => "^5.0",
         "BİL-120" => "^9.0",
         "BİL-140" => "^2.0",

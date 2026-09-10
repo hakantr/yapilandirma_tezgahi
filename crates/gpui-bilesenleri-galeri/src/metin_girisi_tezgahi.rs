@@ -721,9 +721,36 @@ pub fn olay_özeti(olay: &gpui_bilesenleri::GirişOlayı) -> TezgahOlayı {
             format!("{tür:?} · sürüm {değer_sürümü}"),
         ),
         GirişOlayı::DeğerKabulEdildi { neden, .. } => ("DeğerKabulEdildi", format!("{neden:?}")),
-        GirişOlayı::GizliDeğerKabulEdildi { neden, .. } => (
-            "GizliDeğerKabulEdildi",
-            format!("{neden:?} · tek kullanımlık teslim"),
+        GirişOlayı::GizliKabulSonuçlandı { neden, akıbet, .. } => (
+            "GizliKabulSonuçlandı",
+            format!("{neden:?} · {akıbet:?} · içerik taşımayan terminal"),
+        ),
+        GirişOlayı::GizliMetinDeğişti { değer_sürümü } => (
+            "GizliMetinDeğişti",
+            format!("sürüm {değer_sürümü} · içerik/uzunluk kapalı"),
+        ),
+        GirişOlayı::GizliYapıştırmaSüzüldü { değer_sürümü } => (
+            "GizliYapıştırmaSüzüldü",
+            format!("sürüm {değer_sürümü} · içerik/uzunluk kapalı"),
+        ),
+        GirişOlayı::GizliUzunlukSınırıUygulandı { değer_sürümü } => (
+            "GizliUzunlukSınırıUygulandı",
+            format!("sürüm {değer_sürümü} · uzunluk kapalı"),
+        ),
+        GirişOlayı::GizliAramaİstendi {
+            kaynak,
+            değer_sürümü,
+        } => (
+            "GizliAramaİstendi",
+            format!("{kaynak:?} · sürüm {değer_sürümü} · içerik kapalı"),
+        ),
+        GirişOlayı::GizliKabulReddedildi { değer_sürümü } => (
+            "GizliKabulReddedildi",
+            format!("sürüm {değer_sürümü} · sorun ayrıntısı kapalı"),
+        ),
+        GirişOlayı::GizliOdakGeçişiReddedildi { değer_sürümü } => (
+            "GizliOdakGeçişiReddedildi",
+            format!("sürüm {değer_sürümü} · sorun ayrıntısı kapalı"),
         ),
         GirişOlayı::KabulReddedildi { sorunlar } => {
             ("KabulReddedildi", format!("{} sorun", sorunlar.len()))
@@ -741,6 +768,15 @@ pub fn olay_özeti(olay: &gpui_bilesenleri::GirişOlayı) -> TezgahOlayı {
         GirişOlayı::YapılandırmaReddedildi { hatalar } => {
             ("YapılandırmaReddedildi", format!("{} hata", hatalar.len()))
         }
+        GirişOlayı::KısıtlarYenidenTabanlandı {
+            yeni_yapılandırma_sürümü,
+            yeni_kısıt_yayın_nesli,
+        } => (
+            "KısıtlarYenidenTabanlandı",
+            format!(
+                "yapılandırma sürümü {yeni_yapılandırma_sürümü} · yayın nesli {yeni_kısıt_yayın_nesli}"
+            ),
+        ),
         GirişOlayı::VarsayılanDeğerReddedildi(hata) => {
             ("VarsayılanDeğerReddedildi", format!("{hata:?}"))
         }
@@ -807,6 +843,11 @@ pub fn çelişki_metni(hata: &GirişYapılandırmaHatası) -> &'static str {
         H::YinelenenUzakİşSınıfı => "Uzak doğrulama iş sınıfı yineleniyor",
         H::UzakPortEksik => "Uzak doğrulama kuralı için sağlayıcı portu eksik",
         H::GizliAlandaUzakKural => "Gizli alanda uzak doğrulama kuralı kullanılamaz",
+        H::GizliAlanKurucusuGerekli => "Gizli alan üç eksenli gizli kurucuyu gerektiriyor",
+        H::GizliRevealPolitikasıDeğiştirilemez => {
+            "Gizli alanın reveal politikası yaşayan alanda değiştirilemez"
+        }
+        H::RolParmakİziDeğişti => "Açık/gizli rol yaşayan alanda değiştirilemez",
     }
 }
 

@@ -1071,7 +1071,7 @@ mod testler {
                 // sağlayıcı akıbeti galeri durumunda durur.
                 assert!(uygulama.tezgah_kuruluş_raporu.is_some());
                 assert!(uygulama.tezgah_varsayılan_değer_hatası.is_none());
-                assert_eq!(alanlar.kuruluş_notları.len(), 10);
+                assert_eq!(alanlar.kuruluş_notları.len(), 12);
             });
         });
     }
@@ -1145,9 +1145,7 @@ mod testler {
         // Birleşim kanonik giriş yolundan başlar.
         görsel.update(|pencere, bağlam| {
             desen_kutusu.update(bağlam, |kutu, bağlam| {
-                gpui::EntityInputHandler::replace_and_mark_text_in_range(
-                    kutu, None, "か", None, pencere, bağlam,
-                );
+                kutu.test_ime_birleşimini_değiştir(None, "か", None, pencere, bağlam);
             });
         });
         görsel.run_until_parked();
@@ -1168,7 +1166,10 @@ mod testler {
                 assert_eq!(uygulama.tezgah.desen, hedef);
                 assert!(
                     !crate::paylaşılan_metin_dizeye_eşit_mi(
-                        &desen_kutusu.read(bağlam).metin(),
+                        &desen_kutusu
+                            .read(bağlam)
+                            .açık_metin()
+                            .expect("desen tercih alanı açık roldedir"),
                         hedef.as_str(),
                     ),
                     "birleşim dış yazımla bozulmamalı"
@@ -1178,9 +1179,7 @@ mod testler {
         // Birleşim sürerken gelen metin olayı tercihi geri ezmez.
         görsel.update(|pencere, bağlam| {
             desen_kutusu.update(bağlam, |kutu, bağlam| {
-                gpui::EntityInputHandler::replace_and_mark_text_in_range(
-                    kutu, None, "かん", None, pencere, bağlam,
-                );
+                kutu.test_ime_birleşimini_değiştir(None, "かん", None, pencere, bağlam);
             });
         });
         görsel.run_until_parked();
@@ -1197,7 +1196,7 @@ mod testler {
         // sürer); ileri eşitleme şimdi uygulanır.
         görsel.update(|pencere, bağlam| {
             desen_kutusu.update(bağlam, |kutu, bağlam| {
-                gpui::EntityInputHandler::unmark_text(kutu, pencere, bağlam);
+                kutu.test_ime_birleşimini_bitir(pencere, bağlam);
             });
         });
         görsel.run_until_parked();
@@ -1209,7 +1208,10 @@ mod testler {
                 );
                 assert!(
                     crate::paylaşılan_metin_dizeye_eşit_mi(
-                        &desen_kutusu.read(bağlam).metin(),
+                        &desen_kutusu
+                            .read(bağlam)
+                            .açık_metin()
+                            .expect("desen tercih alanı açık roldedir"),
                         hedef.as_str(),
                     ),
                     "kutu bekleyen hedefe eşitlenmeli"
@@ -1255,9 +1257,7 @@ mod testler {
         // düşer (küme gerçekten dolu).
         görsel.update(|pencere, bağlam| {
             desen_kutusu.update(bağlam, |kutu, bağlam| {
-                gpui::EntityInputHandler::replace_and_mark_text_in_range(
-                    kutu, None, "か", None, pencere, bağlam,
-                );
+                kutu.test_ime_birleşimini_değiştir(None, "か", None, pencere, bağlam);
             });
         });
         görsel.run_until_parked();
@@ -1278,27 +1278,28 @@ mod testler {
         // aralığı da kompozisyon değeri de aynı commit'te düşer.
         görsel.update(|pencere, bağlam| {
             desen_kutusu.update(bağlam, |kutu, bağlam| {
-                gpui::EntityInputHandler::replace_text_in_range(
-                    kutu,
-                    None,
-                    "かんじ",
-                    pencere,
-                    bağlam,
-                );
+                kutu.test_ime_metnini_değiştir(None, "かんじ", pencere, bağlam);
             });
         });
         görsel.run_until_parked();
         görsel.update(|_, bağlam| {
             uygulama.update(bağlam, |uygulama, bağlam| {
                 assert!(
-                    desen_kutusu.read(bağlam).etkin_ime().is_none(),
+                    desen_kutusu
+                        .read(bağlam)
+                        .açık_etkin_ime()
+                        .expect("desen tercih alanı açık roldedir")
+                        .is_none(),
                     "`insertText`-commit kompozisyon değerini düşürmeli; asılı eksen kalmamalı"
                 );
                 // Commit'in metin olayı bekleyen ileri eşitlemeyi yeniden
                 // denedi ve eksen kapandığı için hedef **uygulandı**.
                 assert!(
                     crate::paylaşılan_metin_dizeye_eşit_mi(
-                        &desen_kutusu.read(bağlam).metin(),
+                        &desen_kutusu
+                            .read(bağlam)
+                            .açık_metin()
+                            .expect("desen tercih alanı açık roldedir"),
                         hedef.as_str(),
                     ),
                     "bekleyen hedef commit sonrasında uygulanmalı; seçilen tercih kazanır"
@@ -1326,7 +1327,10 @@ mod testler {
                 uygulama.tezgahı_değiştir(move |t| t.desen = seçim, bağlam);
                 assert!(
                     crate::paylaşılan_metin_dizeye_eşit_mi(
-                        &desen_kutusu.read(bağlam).metin(),
+                        &desen_kutusu
+                            .read(bağlam)
+                            .açık_metin()
+                            .expect("desen tercih alanı açık roldedir"),
                         hedef2.as_str(),
                     ),
                     "kapalı eksende ileri eşitleme doğrudan uygulanır"
@@ -1374,20 +1378,22 @@ mod testler {
     fn kalici_esitleme_reti_typed_sunum_kaydinda_korunur() {
         let kayıt = crate::TercihEşitlemeKaydı {
             kutu: 1_u64.into(),
-            hata: Arc::new(gpui_bilesenleri::GirişHatası::SürümTükendi(
-                gpui_bilesenleri::GirişSürümEkseni::MetinVeIme,
+            hata: Arc::new(crate::TercihEşitlemeHatası::Gözlem(
+                gpui_bilesenleri::GirişHatası::SürümTükendi(
+                    gpui_bilesenleri::GirişSürümEkseni::MetinVeIme,
+                ),
             )),
         };
 
         assert!(matches!(
             kayıt.hata.as_ref(),
-            gpui_bilesenleri::GirişHatası::SürümTükendi(
+            crate::TercihEşitlemeHatası::Gözlem(gpui_bilesenleri::GirişHatası::SürümTükendi(
                 gpui_bilesenleri::GirişSürümEkseni::MetinVeIme
-            )
+            ))
         ));
         assert_eq!(
             crate::tercih_eşitleme_hatası_metni(&kayıt),
-            "Tercih kutusu eşitlemesi kalıcı retle düştü: ‹SürümTükendi(MetinVeIme)›"
+            "Tercih kutusu eşitlemesi kalıcı retle düştü: ‹Gözlem(SürümTükendi(MetinVeIme))›"
         );
     }
 

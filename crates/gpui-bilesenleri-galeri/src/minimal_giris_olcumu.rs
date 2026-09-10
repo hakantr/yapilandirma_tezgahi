@@ -7,6 +7,7 @@
 
 use gpui::{Context, Entity, IntoElement, Render, Window, div, prelude::*, px, rgb};
 use gpui_bilesenleri::GirişKutusu;
+use std::sync::Arc;
 
 use crate::{
     TezgahTercihleri, YardımcıKimlikleri, galeri_bileşen_kimliği, galeri_simge_çizim_bağlamı,
@@ -41,18 +42,19 @@ impl MinimalGirişÖlçümü {
         // Ölçüm bilinen-geçerli varsayılan tercihle koşar; kuruluş burada
         // düşerse ölçüm ortamı arızasıdır ve exact typed sonuç mesajla
         // taşınır.
-        let sonuç = GirişKutusu::kur(
-            bileşen,
-            hizmetler.unicode(),
-            hizmetler.alan_damgası(&kimlik_fabrikası),
-            (*hizmetler.yerel_kök()).clone(),
-            yapılandırma,
-            örnek,
-            tema,
-            pencere,
-            bağlam,
-        )
-        .unwrap_or_else(|hata| panic!("minimal ölçüm alanı kurulamadı: {hata:?}"));
+        let yerel = hizmetler.yerel_kök();
+        let sonuç = crate::açık_giriş_kurucusu(Arc::new(yapılandırma), &yerel, bağlam)
+            .kur(
+                bileşen,
+                hizmetler.unicode(),
+                hizmetler.alan_damgası(&kimlik_fabrikası),
+                (*yerel).clone(),
+                örnek,
+                tema,
+                pencere,
+                bağlam,
+            )
+            .unwrap_or_else(|hata| panic!("minimal ölçüm alanı kurulamadı: {hata:?}"));
         let alan = sonuç.bileşen;
         alan.update(bağlam, |alan, bağlam| {
             alan.simge_çizim_bağlamını_değiştir(Some(simge_çizimi), bağlam);
@@ -63,7 +65,7 @@ impl MinimalGirişÖlçümü {
         }
     }
 
-    /// Tam tezgâhla aynı `EntityInputHandler` düzenleme yolunu koşturur.
+    /// Tam tezgâhla aynı yetkili dış-düzenleme mutasyon yolunu koşturur.
     pub fn ölçüm_alanına_yaz(
         &mut self,
         metin: &str,

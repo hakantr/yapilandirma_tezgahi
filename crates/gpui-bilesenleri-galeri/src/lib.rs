@@ -10,12 +10,19 @@ use gpui::{
     Context, Entity, IntoElement, Render, ScrollHandle, Window, div, point, prelude::*, px, rgb,
 };
 use gpui_bilesenleri::{
-    BileşenKimliği, EksikGirişPolitikası, GirişKutusu, GirişMaskesi, GirişYapılandırması,
-    MetinGirişMaskesi, RakamKümesi, Sabitİçerik, SayaçYapılandırması, SayımBirimi, TanımKimliği,
-    TarihGirişMaskesi, UzunlukSınırı, UzunlukSınırıDavranışı, YardımcıEylemTürü,
-    YardımcıEylemYuvası, medya_fallback_planı, ÖrnekKimliğiFabrikası, İçerikGörünürlüğü,
+    AlanAmacı, BileşenKimliği, BiçimHizmetHazırlığı, BiçimHizmetKökü, EksikGirişPolitikası,
+    GirişKaynakBütçesi, GirişKutusu, GirişKutusuKurucusu, GirişKısıtBileşimKöküExt, GirişMaskesi,
+    GirişYapılandırması, GizliGirişKurucusu, GizliTeslimPolitikası, MetinGirişMaskesi, RakamKümesi,
+    Sabitİçerik, SayaçYapılandırması, SayımBirimi, TanımKimliği, TarihGirişMaskesi, UzunlukSınırı,
+    UzunlukSınırıDavranışı, YardımcıEylemTürü, YardımcıEylemYuvası, medya_fallback_planı,
+    ÇözülmüşGirişKısıtları, ÖrnekKimliğiFabrikası, İçerikGörünürlüğü,
 };
-use std::{cell::Cell, rc::Rc, sync::Arc};
+use std::{
+    cell::Cell,
+    num::{NonZeroU32, NonZeroU64},
+    rc::Rc,
+    sync::Arc,
+};
 
 mod cjk_dugme_kaniti;
 mod galeri;
@@ -150,6 +157,73 @@ pub(crate) fn paylaşılan_metin_dizeye_eşit_mi(
 /// tanımlamaz; yalnız kanonik bileşenin kaydını iletir.
 pub fn bileşen_tuş_bağlarını_kur(bağlam: &mut gpui::App) {
     gpui_bilesenleri::tuş_bağlarını_kur(bağlam);
+    if gpui_bilesenleri_temel::BileşimKökü::edin(bağlam).is_none() {
+        gpui_bilesenleri_temel::BileşimKökü::kur(bağlam)
+            .expect("galeri App bileşim kökü kurulmalı");
+    }
+}
+
+/// Her giriş alanına aynı yaşayan `App` bileşim kökünden ayrı, opak bir
+/// kısıt kuruluşu verir. Kök yeniden üretilmez; `edin` aynı provenance
+/// kimliğini non-Clone bir yetki tutamacıyla ödünçler.
+fn giriş_kısıt_kuruluşu(
+    yapılandırma: &GirişYapılandırması,
+    bağlam: &mut gpui::App,
+) -> gpui_bilesenleri::GirişKısıtKuruluşu {
+    let mut kök = gpui_bilesenleri_temel::BileşimKökü::edin(bağlam).unwrap_or_else(|| {
+        gpui_bilesenleri_temel::BileşimKökü::kur(bağlam).expect("galeri App bileşim kökü kurulmalı")
+    });
+    let (_, kuruluş) = kök
+        .giriş_kısıt_alanını_kur(ÇözülmüşGirişKısıtları::bağımsız(
+            yapılandırma.giriş_türü.clone(),
+        ))
+        .expect("galeri giriş kısıt alanı kurulmalı");
+    kuruluş
+}
+
+/// Açık alan kurucusunu gerçek ORT-001 kısıt kaynağına ve, gerekiyorsa,
+/// cold hazırlanmış gerçek ORT-008 hizmet çiftine bağlar. Plan listesi her
+/// alan için sonludur (0/1); canonical hazırlık baytı galeri tüketicisinin
+/// 64 KiB sahipli metin tavanını aşamaz.
+fn açık_giriş_kurucusu(
+    yapılandırma: Arc<GirişYapılandırması>,
+    yerel: &gpui_bilesenleri::YerelMetinBağlamı,
+    bağlam: &mut gpui::App,
+) -> gpui_bilesenleri::GirişKutusuKurucusu<gpui_bilesenleri::KaynakÇözüldü> {
+    let kuruluş = giriş_kısıt_kuruluşu(&yapılandırma, bağlam);
+    let mut kurucu = GirişKutusuKurucusu::yeni(Arc::clone(&yapılandırma));
+    if let Ok(Some(istek)) = kurucu.biçim_planı_isteği(yerel) {
+        let hazırlık = BiçimHizmetHazırlığı::denetimli(
+            Arc::from([istek]),
+            NonZeroU32::new(1).expect("sabit plan tavanı"),
+            NonZeroU64::new(GALERİ_SAHİPLİ_METİN_UTF8_TAVANI as u64)
+                .expect("sabit canonical bayt tavanı"),
+        )
+        .expect("galerinin sonlu 0/1 biçim planı hazırlığı geçerli olmalı");
+        let kök = BiçimHizmetKökü::yerleşik(hazırlık)
+            .expect("galerinin denetlenmiş biçim hazırlığı köke dönüşmeli");
+        kurucu = kurucu.biçim_hizmetleri(kök.hizmetleri());
+    }
+    kurucu.kısıtları_çöz(kuruluş)
+}
+
+/// Gizli alanın üç kuruluş eksenini (kaynak, tek teslim politikası ve
+/// çizim kararı) birlikte çözer. Saklamayan GPUI şekillendirme adapterı
+/// henüz bulunmadığı için reveal isteği fail-closed maskede kalır.
+fn gizli_giriş_kurucusu(
+    yapılandırma: Arc<GirişYapılandırması>,
+    teslim: GizliTeslimPolitikası,
+    bağlam: &mut gpui::App,
+) -> gpui_bilesenleri::GizliGirişKurucusu<
+    gpui_bilesenleri::KaynakÇözüldü,
+    gpui_bilesenleri::TeslimPolitikasıÇözüldü,
+    gpui_bilesenleri::GizliÇizimKararıÇözüldü,
+> {
+    let kuruluş = giriş_kısıt_kuruluşu(&yapılandırma, bağlam);
+    GizliGirişKurucusu::yeni(yapılandırma, GirişKaynakBütçesi::default())
+        .amacı_çöz(AlanAmacı::GeçerliParola, kuruluş)
+        .teslim_politikası(teslim)
+        .geçici_gösterimsiz()
 }
 
 fn galeri_bileşen_kimliği(
@@ -320,10 +394,16 @@ impl GösterimDoğrulamaPortu {
 /// exact typed hatayı ve hangi tercih kutusunda üretildiğini taşır;
 /// önizleme tanı satırı çizer, aynı kutunun sonraki başarılı eşitlemesi
 /// kaydı düşürür.
+#[derive(Debug, Eq, PartialEq)]
+pub(crate) enum TercihEşitlemeHatası {
+    Mutasyon(gpui_bilesenleri::GirişMutasyonReddi),
+    Gözlem(gpui_bilesenleri::GirişHatası),
+}
+
 #[derive(Clone, Debug, Eq, PartialEq)]
 pub(crate) struct TercihEşitlemeKaydı {
     pub(crate) kutu: gpui::EntityId,
-    pub(crate) hata: Arc<gpui_bilesenleri::GirişHatası>,
+    pub(crate) hata: Arc<TercihEşitlemeHatası>,
 }
 
 /// `§30` kalıcı eşitleme retinin exact sunum satırı; varyant adı korunur.
@@ -908,12 +988,8 @@ impl GaleriUygulaması {
     /// (`GirişKutusu::yerel_bağlamı_değiştir`) inilir: yerel-türevli
     /// planlar (maske) bileşenin kendi atomunda yeniden kurulur ve metin
     /// damgası sabit kalır (`ACC-158`) — eksen-ayrılığı hükmü artık
-    /// bileşenin kendi sözleşmesidir. Bağlamlar fabrika üretimidir, elle
-    /// kurulmaz. Not: bu yüzey
-    /// `authorize_bil010_injected_locale_context_and_atomic_runtime_locale_update_surface`
-    /// karar atomunun ürünüdür ve şimdilik kardeşin **commitsiz çalışma
-    /// ağacından** tüketilir; kardeş yüzeyi mühürleyene kadar bu dikiş
-    /// yeniden oynayabilir.
+    /// kanonik `BİL-010 ^31` fiziksel yüzeyidir. Bağlamlar fabrika
+    /// üretimidir, elle kurulmaz.
     /// Eşitlemenin dayandığı çözülmüş dilimi döndürür: dilimi okuyan her
     /// sunum yolu bu dönüşü kullanmalı ki ekrandaki dilim ile `ORT-021`
     /// kökü hiçbir karede ayrışmasın (masaüstü portu bildirimi tazelik
@@ -1155,30 +1231,60 @@ impl GaleriUygulaması {
         ];
         for (kutu, hedef) in hedefler {
             let sonuç = kutu.update(bağlam, |kutu, bağlam| {
-                if crate::paylaşılan_metin_dizeye_eşit_mi(&kutu.metin(), &hedef) {
-                    return Ok(());
+                let metin = match kutu.açık_metin() {
+                    Ok(metin) => metin,
+                    Err(red) => {
+                        return Some(gpui_bilesenleri::GirişSonucu::Reddedildi(
+                            gpui_bilesenleri::GirişMutasyonReddi::Erişim(red),
+                        ));
+                    }
+                };
+                if crate::paylaşılan_metin_dizeye_eşit_mi(&metin, &hedef) {
+                    return None;
                 }
                 // Tampon doğrudan yazılmaz: `§30` dış değişiklik portu
-                // sürümlü uygular. Ret olağan bir typed akıbettir ve panic'e
-                // çevrilmez (birleşim sırasındaki bir tercih tıklaması
-                // uygulamayı düşürmemeli). Anlık görüntü aynı kirada
-                // alındığı için `EskiSürüm` bu yolda üretilemez.
-                let anlık = gpui_bilesenleri::MetinDüzenlemePortu::anlık_görüntü(kutu);
-                let sonuç = gpui_bilesenleri::MetinDüzenlemePortu::dış_değişikliği_uygula(
-                    kutu,
-                    gpui_bilesenleri::MetinDeğişikliği {
-                        utf8_aralığı: 0..anlık.metin.utf8_bayt_uzunluğu(),
-                        yeni_metin: hedef.clone(),
-                    },
-                    anlık.değer_sürümü,
-                );
-                if sonuç.is_ok() {
-                    bağlam.notify();
-                }
-                sonuç.map(|_| ())
+                // sürümlü ve tek-kullanımlık yetkiyle uygular. Ret olağan
+                // typed akıbettir; iki beklenti ekseni aynı snapshot'tan
+                // taşınır, kökeni çağıran seçemez.
+                let yetki = match kutu.dış_düzenleme_yetkisi() {
+                    Ok(yetki) => yetki,
+                    Err(red) => {
+                        return Some(gpui_bilesenleri::GirişSonucu::Reddedildi(
+                            gpui_bilesenleri::GirişMutasyonReddi::Erişim(red),
+                        ));
+                    }
+                };
+                let anlık =
+                    match gpui_bilesenleri::MetinDüzenlemePortu::anlık_görüntü(kutu, &yetki) {
+                        Ok(anlık) => anlık,
+                        Err(red) => {
+                            return Some(gpui_bilesenleri::GirişSonucu::Reddedildi(
+                                gpui_bilesenleri::GirişMutasyonReddi::Erişim(red),
+                            ));
+                        }
+                    };
+                Some(
+                    gpui_bilesenleri::MetinDüzenlemePortu::dış_değişikliği_uygula(
+                        kutu,
+                        yetki,
+                        gpui_bilesenleri::DışMetinDeğişikliğiİsteği {
+                            değişiklik: gpui_bilesenleri::MetinDeğişikliği {
+                                utf8_aralığı: 0..anlık.metin.utf8_bayt_uzunluğu(),
+                                yeni_metin: hedef.clone(),
+                            },
+                            beklenen_değer_sürümü: anlık.değer_sürümü,
+                            beklenen_yapılandırma_sürümü: anlık.yapılandırma_sürümü,
+                        },
+                        bağlam,
+                    ),
+                )
             });
             match sonuç {
-                Ok(()) => {
+                None
+                | Some(
+                    gpui_bilesenleri::GirişSonucu::Uygulandı { .. }
+                    | gpui_bilesenleri::GirişSonucu::DeğişiklikYok { .. },
+                ) => {
                     self.bekleyen_tercih_eşitlemeleri.remove(&kutu.entity_id());
                     // Kutu ve tercih yeniden uyumlu: bu kutuya ait kalıcı
                     // ret kaydı (varsa) geçmiştir, satır söner.
@@ -1200,7 +1306,9 @@ impl GaleriUygulaması {
                 // olayında ileri eşitlemeyi yeniden denetir ve o olayın kutu
                 // metnini tercihe geri yazmasını bastırır; birleşim biterken
                 // seçilen tercih birleşim metnine ezilmez.
-                Err(gpui_bilesenleri::GirişHatası::CompositionEtkin) => {
+                Some(gpui_bilesenleri::GirişSonucu::Reddedildi(
+                    gpui_bilesenleri::GirişMutasyonReddi::CompositionEtkin,
+                )) => {
                     self.bekleyen_tercih_eşitlemeleri.insert(kutu.entity_id());
                 }
                 // Diğer her ret **kalıcıdır**: örn. `SürümTükendi`
@@ -1208,11 +1316,11 @@ impl GaleriUygulaması {
                 // ret bekleyen kayda dönüşmez — dönüşseydi kutunun metin
                 // olayları süresiz bastırılırdı; exact typed akıbet burada
                 // gözlenir ve önizleme tanı satırında çizilir.
-                Err(hata) => {
+                Some(gpui_bilesenleri::GirişSonucu::Reddedildi(hata)) => {
                     self.bekleyen_tercih_eşitlemeleri.remove(&kutu.entity_id());
                     let kayıt = TercihEşitlemeKaydı {
                         kutu: kutu.entity_id(),
-                        hata: Arc::new(hata),
+                        hata: Arc::new(TercihEşitlemeHatası::Mutasyon(hata)),
                     };
                     if self.tercih_eşitleme_hatası.as_ref() != Some(&kayıt) {
                         self.tercih_eşitleme_hatası = Some(kayıt);
@@ -1374,20 +1482,41 @@ impl GaleriUygulaması {
             galeri_bileşen_kimliği(&self.kimlik_fabrikası, "galeri.metin_girisi", "tezgah");
         // `BİL-010 §29` fallible kuruluş: `ORT-002` kökü ve başlangıç
         // damgası uygulama kökünden verilir; kutu kök kurmaz.
-        let sonuç = GirişKutusu::kur(
-            bileşen,
-            self.metin_hizmetleri.unicode(),
-            self.metin_hizmetleri.alan_damgası(&self.kimlik_fabrikası),
-            // Yerel bağlam kuruluşta enjekte edilir: `kur` hazırlığı
-            // (maske şablonu, varsayılan) host kökünün bağlamıyla koşar,
-            // kutu bağlam üretmez.
-            (*self.metin_hizmetleri.yerel_kök()).clone(),
-            yapılandırma,
-            örnek,
-            tema,
-            pencere,
-            bağlam,
-        );
+        let yerel = self.metin_hizmetleri.yerel_kök();
+        let yapılandırma = Arc::new(yapılandırma);
+        let gizli = !matches!(yapılandırma.içerik_görünürlüğü, İçerikGörünürlüğü::Açık);
+        let sonuç = if gizli {
+            // Gizli rol başlangıç metnini genel kurucudan alamaz. Tezgâh
+            // keyfi bir ürün alıcısı varsaymaz; görünür K01 kanıt alanları
+            // yetkili ve reddeden politikaları ayrıca bağlar.
+            gizli_giriş_kurucusu(
+                Arc::clone(&yapılandırma),
+                GizliTeslimPolitikası::teslimsiz(),
+                bağlam,
+            )
+            .kur(
+                bileşen,
+                self.metin_hizmetleri.unicode(),
+                self.metin_hizmetleri.alan_damgası(&self.kimlik_fabrikası),
+                (*yerel).clone(),
+                tema,
+                pencere,
+                bağlam,
+            )
+        } else {
+            açık_giriş_kurucusu(Arc::clone(&yapılandırma), &yerel, bağlam).kur(
+                bileşen,
+                self.metin_hizmetleri.unicode(),
+                self.metin_hizmetleri.alan_damgası(&self.kimlik_fabrikası),
+                // Yerel bağlam kuruluşta enjekte edilir: maske ve biçim
+                // planı host kökünün aynı snapshot'ıyla hazırlanır.
+                (*yerel).clone(),
+                örnek,
+                tema,
+                pencere,
+                bağlam,
+            )
+        };
         let gpui_bilesenleri::GirişKuruluşSonucu {
             bileşen: alan,
             rapor,
@@ -1602,12 +1731,14 @@ impl GaleriUygulaması {
         // değil, bölüm panelinin girdisidir (`tezgah_bölümleri`).
         let kod = self.tezgah_kodu();
         let en_fazla_yarıçap = self.en_fazla_yarıçap();
+        let sergi_alanları = self.sergi_girişlerini_al(pencere, bağlam);
 
         // Tercih yalnız okunur: klonlanmaz, doğrudan ödünç verilir.
         metin_girisi_profili::tezgah_içeriği(
             metin_girisi_profili::MetinGirişiProfilGirdisi {
                 tercih: &self.tezgah,
                 alan,
+                alanlar: sergi_alanları.as_ref(),
                 paneller: &paneller,
                 kod,
                 sol_kaydırma: self.tezgah_sol_kaydırma.clone(),
@@ -1711,6 +1842,107 @@ impl GaleriUygulaması {
                 None
             }
         }
+    }
+
+    /// K03 görünür kanıt alanlarını gerçek kuruluş yolundan edinir.
+    pub fn k03_kanıt_alanları(
+        &mut self,
+        pencere: &mut Window,
+        bağlam: &mut Context<Self>,
+    ) -> Option<MetinGirişiAlanları> {
+        self.sergi_girişlerini_al(pencere, bağlam)
+    }
+
+    /// Yetkili ya da reddeden gizli alanı odaklar ve gerçek Enter kabul
+    /// eylemini GPUI odak zincirinden dağıtır.
+    pub fn k03_gizli_kabulü_çalıştır(
+        &mut self,
+        reddedilen: bool,
+        pencere: &mut Window,
+        bağlam: &mut Context<Self>,
+    ) -> bool {
+        let Some(alanlar) = self.sergi_girişlerini_al(pencere, bağlam) else {
+            return false;
+        };
+        let alan = if reddedilen {
+            alanlar.parola_reddi
+        } else {
+            alanlar.parola
+        };
+        let odak = alan.read(bağlam).odak().clone();
+        pencere.focus(&odak, bağlam);
+        pencere.dispatch_action(Box::new(gpui_bilesenleri::DegeriKabulEt), bağlam);
+        true
+    }
+
+    /// Mevcut dış sağlayıcı sınırında reveal isteğini gerçek yardımcı eylem
+    /// yüzeyinden geçirir. Kuruluş `geçici_gösterimsiz` olduğundan istek
+    /// maskede fail-closed kalır; runtime kapanışı iddia edilmez.
+    pub fn k03_reveal_isteğini_çalıştır(
+        &mut self,
+        pencere: &mut Window,
+        bağlam: &mut Context<Self>,
+    ) -> Result<(), gpui_bilesenleri::GirişHatası> {
+        let Some(alanlar) = self.sergi_girişlerini_al(pencere, bağlam) else {
+            return Ok(());
+        };
+        let sonuç = alanlar.parola.update(bağlam, |alan, bağlam| {
+            alan.yardımcı_eylemi_çalıştır(
+                &gpui_bilesenleri::YardımcıEylemTürü::ParolayıGöster,
+                pencere,
+                bağlam,
+            )
+        });
+        bağlam.notify();
+        sonuç
+    }
+
+    /// Açık sergi alanında bir programatik taslak ataması yapar, ardından
+    /// aynı çift sürüm beklentisini yeniden kullanarak exact eski-beklenti
+    /// reddini üretir. Her tur benzersiz, gizli olmayan demo metni kullanır.
+    pub fn k03_programatik_senaryoyu_çalıştır(
+        &mut self,
+        pencere: &mut Window,
+        bağlam: &mut Context<Self>,
+    ) -> Option<(gpui_bilesenleri::AtamaSonucu, gpui_bilesenleri::AtamaSonucu)> {
+        let alanlar = self.sergi_girişlerini_al(pencere, bağlam)?;
+        let tur = alanlar.k03_kanıt.programatik_tur.get().saturating_add(1);
+        alanlar.k03_kanıt.programatik_tur.set(tur);
+        let sonuçlar = alanlar.programatik.update(bağlam, |alan, bağlam| {
+            let beklenen_değer_sürümü = değer_sürümü(alan);
+            let beklenen_yapılandırma_sürümü = alan.yapılandırma().yapılandırma_sürümü();
+            let ilk = alan.değeri_ata(
+                gpui_bilesenleri::AçıkGirişDeğeriGirdisi::Metin(format!(
+                    "Galeri programatik taslağı {tur}"
+                )),
+                gpui_bilesenleri::AtamaNiyeti::DüzenlemeTaslağıOlarakAta,
+                beklenen_değer_sürümü,
+                beklenen_yapılandırma_sürümü,
+                bağlam,
+            );
+            let eski = alan.değeri_ata(
+                gpui_bilesenleri::AçıkGirişDeğeriGirdisi::Metin(format!(
+                    "Eski beklenti denemesi {tur}"
+                )),
+                gpui_bilesenleri::AtamaNiyeti::DüzenlemeTaslağıOlarakAta,
+                beklenen_değer_sürümü,
+                beklenen_yapılandırma_sürümü,
+                bağlam,
+            );
+            (ilk, eski)
+        });
+        let başarılı = matches!(sonuçlar.0, gpui_bilesenleri::AtamaSonucu::Uygulandı { .. })
+            && matches!(
+                sonuçlar.1,
+                gpui_bilesenleri::AtamaSonucu::EskiBeklenti { .. }
+            );
+        alanlar.k03_kanıt.programatik.set(if başarılı {
+            K03ProgramatikKanıtGözlemi::UygulandıVeEskiBeklentiReddedildi
+        } else {
+            K03ProgramatikKanıtGözlemi::BeklenmeyenAkıbet
+        });
+        bağlam.notify();
+        Some(sonuçlar)
     }
 
     /// Sağ kolonun bölüm listesi; profilin `§9` tür süzgecinden geçmiş.
@@ -2483,6 +2715,99 @@ impl GaleriUygulaması {
 ///
 /// Her alan sözleşmenin ayrı bir yetenek ekseninde nasıl davrandığını
 /// gösterir; hepsi aynı kanonik `GirişKutusu` bileşenidir.
+#[derive(Clone, Copy, Debug, Eq, PartialEq)]
+pub enum K03ProgramatikKanıtGözlemi {
+    Başlamadı,
+    UygulandıVeEskiBeklentiReddedildi,
+    BeklenmeyenAkıbet,
+}
+
+/// Görünür K03 tüketici kartının gizli payload taşımayan anlık durumu.
+///
+/// Gizli gözlemler yalnız kanonik yaşam metadata'sıdır. Teslim sayaçları
+/// payload uzunluğuna, içeriğine veya türetilmiş bir özete bağlı değildir.
+#[derive(Clone, Copy, Debug, Eq, PartialEq)]
+pub struct K03GaleriKanıtGözlemi {
+    pub yetkili_hazırlık_sayısı: u32,
+    pub yetkili_teslim_sayısı: u32,
+    pub yetkili_terminal: Option<gpui_bilesenleri::GizliKabulGözlemi>,
+    pub yetkili_gözlem: Option<gpui_bilesenleri::GizliGirişGözlemi>,
+    pub reddedilen_hazırlık_sayısı: u32,
+    pub reddedilen_terminal: Option<gpui_bilesenleri::GizliKabulGözlemi>,
+    pub reddedilen_gözlem: Option<gpui_bilesenleri::GizliGirişGözlemi>,
+    pub programatik: K03ProgramatikKanıtGözlemi,
+}
+
+#[derive(Clone)]
+struct K03GaleriKanıtDurumu {
+    yetkili_hazırlık: Rc<Cell<u32>>,
+    yetkili_teslim: Rc<Cell<u32>>,
+    yetkili_terminal: Rc<Cell<Option<gpui_bilesenleri::GizliKabulGözlemi>>>,
+    reddedilen_hazırlık: Rc<Cell<u32>>,
+    reddedilen_terminal: Rc<Cell<Option<gpui_bilesenleri::GizliKabulGözlemi>>>,
+    programatik: Rc<Cell<K03ProgramatikKanıtGözlemi>>,
+    programatik_tur: Rc<Cell<u64>>,
+}
+
+impl K03GaleriKanıtDurumu {
+    fn yeni() -> Self {
+        Self {
+            yetkili_hazırlık: Rc::new(Cell::new(0)),
+            yetkili_teslim: Rc::new(Cell::new(0)),
+            yetkili_terminal: Rc::new(Cell::new(None)),
+            reddedilen_hazırlık: Rc::new(Cell::new(0)),
+            reddedilen_terminal: Rc::new(Cell::new(None)),
+            programatik: Rc::new(Cell::new(K03ProgramatikKanıtGözlemi::Başlamadı)),
+            programatik_tur: Rc::new(Cell::new(0)),
+        }
+    }
+}
+
+/// Yetkili gizli kabul alıcısı payloadı yalnız callback kiradayken görür.
+/// Bayt, uzunluk, hash veya başka bir türev kalıcı galeri durumuna yazılmaz.
+struct GaleriSaklamayanGizliAlıcı {
+    hazırlık: Rc<Cell<u32>>,
+    teslim: Rc<Cell<u32>>,
+}
+
+impl gpui_bilesenleri::GizliKabulAlıcısı for GaleriSaklamayanGizliAlıcı {
+    fn teslimi_hazırla(
+        &mut self,
+        _: &gpui_bilesenleri::GizliTeslimBağlamı,
+        hazırlayıcı: gpui_bilesenleri::GizliTeslimYuvaHazırlayıcısı<'_>,
+        _: &mut gpui::App,
+    ) -> Result<gpui_bilesenleri::GizliTeslimYuvası, gpui_bilesenleri::GizliAlıcıHazırlıkReddi>
+    {
+        self.hazırlık.set(self.hazırlık.get().saturating_add(1));
+        let teslim = Rc::clone(&self.teslim);
+        Ok(hazırlayıcı.yuva(move |değer, _| {
+            değer.baytlarla(|baytlar| {
+                // Alıcının gerçekten teslim zarfını tükettiğini korur;
+                // sonuç galeri durumuna veya genel olay izine yazılmaz.
+                std::hint::black_box(baytlar);
+            });
+            teslim.set(teslim.get().saturating_add(1));
+        }))
+    }
+}
+
+struct GaleriReddedenGizliAlıcı {
+    hazırlık: Rc<Cell<u32>>,
+}
+
+impl gpui_bilesenleri::GizliKabulAlıcısı for GaleriReddedenGizliAlıcı {
+    fn teslimi_hazırla(
+        &mut self,
+        _: &gpui_bilesenleri::GizliTeslimBağlamı,
+        _: gpui_bilesenleri::GizliTeslimYuvaHazırlayıcısı<'_>,
+        _: &mut gpui::App,
+    ) -> Result<gpui_bilesenleri::GizliTeslimYuvası, gpui_bilesenleri::GizliAlıcıHazırlıkReddi>
+    {
+        self.hazırlık.set(self.hazırlık.get().saturating_add(1));
+        Err(gpui_bilesenleri::GizliAlıcıHazırlıkReddi::ÜrünPolitikasıReddetti)
+    }
+}
+
 #[derive(Clone)]
 pub struct MetinGirişiAlanları {
     /// Yalın alan: yer tutucu, temizleme yuvası, sayaç ve uzunluk sınırı.
@@ -2491,6 +2816,10 @@ pub struct MetinGirişiAlanları {
     pub arama: Entity<GirişKutusu>,
     /// Parola alanı: gizli içerik ve göster/gizle yuvası.
     pub parola: Entity<GirişKutusu>,
+    /// K03 ret nöbeti: teslim hazırlığında ürün politikası exact reddeder.
+    pub parola_reddi: Entity<GirişKutusu>,
+    /// K04 programatik atama ve eski beklenti nöbetinin açık alanı.
+    pub programatik: Entity<GirişKutusu>,
     /// Access kod kümeli metin maskesi: `\0(000) 000 00 00`.
     pub maskeli: Entity<GirişKutusu>,
     /// Tarih maskesi ve seçici yuvası.
@@ -2515,6 +2844,7 @@ pub struct MetinGirişiAlanları {
     /// metniyle kurulduğu için sağlayıcı ekseni beklenen durumda `None`dır;
     /// eksen yine de taşınır, sessizce düşürülmez.
     pub kuruluş_notları: Arc<[SergiKuruluşNotu]>,
+    k03_kanıt: K03GaleriKanıtDurumu,
 }
 
 /// Bir sergi alanının `GirişKuruluşSonucu` eksenleri (bileşen dışı).
@@ -2576,11 +2906,13 @@ impl MetinGirişiAlanları {
     }
 
     /// Bütün yaşayan sergi kutuları; toplu tema/yerel güncellemeleri gezer.
-    fn kutular(&self) -> [&Entity<GirişKutusu>; 10] {
+    fn kutular(&self) -> [&Entity<GirişKutusu>; 12] {
         [
             &self.yalın,
             &self.arama,
             &self.parola,
+            &self.parola_reddi,
+            &self.programatik,
             &self.maskeli,
             &self.tarih,
             &self.tutar,
@@ -2589,6 +2921,24 @@ impl MetinGirişiAlanları {
             &self.ön_ek_metni,
             &self.son_ek_metni,
         ]
+    }
+
+    /// Görünür kanıt kartının bytesiz, kopyalanabilir anlık görüntüsü.
+    pub fn k03_kanıt_gözlemi(&self, bağlam: &gpui::App) -> K03GaleriKanıtGözlemi {
+        let gizli_gözlem = |alan: &Entity<GirişKutusu>| match alan.read(bağlam).metin_gözlemi() {
+            gpui_bilesenleri::GirişMetniGözlemi::Gizli(gözlem) => Some(gözlem),
+            gpui_bilesenleri::GirişMetniGözlemi::Açık(_) => None,
+        };
+        K03GaleriKanıtGözlemi {
+            yetkili_hazırlık_sayısı: self.k03_kanıt.yetkili_hazırlık.get(),
+            yetkili_teslim_sayısı: self.k03_kanıt.yetkili_teslim.get(),
+            yetkili_terminal: self.k03_kanıt.yetkili_terminal.get(),
+            yetkili_gözlem: gizli_gözlem(&self.parola),
+            reddedilen_hazırlık_sayısı: self.k03_kanıt.reddedilen_hazırlık.get(),
+            reddedilen_terminal: self.k03_kanıt.reddedilen_terminal.get(),
+            reddedilen_gözlem: gizli_gözlem(&self.parola_reddi),
+            programatik: self.k03_kanıt.programatik.get(),
+        }
     }
 
     /// Host yerel kökü değişince **bütün** kutulara yeni bağlamı indirir.
@@ -2634,6 +2984,7 @@ impl MetinGirişiAlanları {
         let tema = galeri_teması();
         let simge_çizimi = galeri_simge_çizim_bağlamı();
         let yerel_kök = hizmetler.yerel_kök();
+        let k03_kanıt = K03GaleriKanıtDurumu::yeni();
         // `§29` kuruluş eksenleri kayıpsız toplanır (rapor + varsayılan
         // sağlayıcı akıbeti); `RefCell` yalnız iki kurucu kapanışın aynı
         // listeye yazabilmesi içindir.
@@ -2657,14 +3008,14 @@ impl MetinGirişiAlanları {
                 .rsplit_once('.')
                 .expect("galeri giriş tanımı ad alanı ve yerel ad taşır");
             let bileşen = galeri_bileşen_kimliği(kimlik_fabrikası, ad_alanı, yerel_ad);
-            let sonuç = GirişKutusu::kur(
+            let yapılandırma = Arc::new(yapılandırma);
+            let sonuç = açık_giriş_kurucusu(Arc::clone(&yapılandırma), &yerel_kök, bağlam).kur(
                 bileşen,
                 hizmetler.unicode(),
                 hizmetler.alan_damgası(kimlik_fabrikası),
                 // Yaşayan yerel bağlam kuruluşta host kökünden enjekte
                 // edilir; kutu kendi kökünü kurmaz.
                 (*yerel_kök).clone(),
-                yapılandırma,
                 metin,
                 tema,
                 pencere,
@@ -2725,6 +3076,7 @@ impl MetinGirişiAlanları {
             let mut y = GirişYapılandırması::tek_satırlı_metin();
             let yardımcı_kimlikleri = YardımcıKimlikleri::yeni(kimlik_fabrikası);
             y.yer_tutucu = Some(hazır_ileti("Parola"));
+            y.erişilebilir_ad = Some(hazır_ileti("Yetkili gizli kabul alanı"));
             y.içerik_görünürlüğü = İçerikGörünürlüğü::Gizli {
                 maske_grafemi: "•".into(),
             };
@@ -2741,10 +3093,87 @@ impl MetinGirişiAlanları {
                 ]
                 .as_slice(),
             ));
+            let kimlik = "galeri.metin_girisi.parola";
+            let (ad_alanı, yerel_ad) = kimlik
+                .rsplit_once('.')
+                .expect("galeri giriş tanımı ad alanı ve yerel ad taşır");
+            let sonuç = gizli_giriş_kurucusu(
+                Arc::new(y),
+                GizliTeslimPolitikası::tek_alıcı(Box::new(GaleriSaklamayanGizliAlıcı {
+                    hazırlık: Rc::clone(&k03_kanıt.yetkili_hazırlık),
+                    teslim: Rc::clone(&k03_kanıt.yetkili_teslim),
+                })),
+                bağlam,
+            )
+            .kur(
+                galeri_bileşen_kimliği(kimlik_fabrikası, ad_alanı, yerel_ad),
+                hizmetler.unicode(),
+                hizmetler.alan_damgası(kimlik_fabrikası),
+                (*yerel_kök).clone(),
+                tema.clone(),
+                pencere,
+                bağlam,
+            )?;
+            notlar.borrow_mut().push(SergiKuruluşNotu {
+                alan: kimlik,
+                rapor: sonuç.rapor,
+                varsayılan_değer_hatası: sonuç.varsayılan_değer_hatası,
+            });
+            let alan = sonuç.bileşen;
+            let simge_çizimi = simge_çizimi.clone();
+            alan.update(bağlam, |alan, bağlam| {
+                alan.simge_çizim_bağlamını_değiştir(Some(simge_çizimi), bağlam);
+            });
+            alan
+        };
+
+        let parola_reddi = {
+            let mut y = GirişYapılandırması::tek_satırlı_metin();
+            y.yer_tutucu = Some(hazır_ileti("Teslimi reddedilen parola"));
+            y.erişilebilir_ad = Some(hazır_ileti("Reddedilen gizli teslim alanı"));
+            y.içerik_görünürlüğü = İçerikGörünürlüğü::Gizli {
+                maske_grafemi: "•".into(),
+            };
+            let kimlik = "galeri.metin_girisi.parola-reddi";
+            let (ad_alanı, yerel_ad) = kimlik
+                .rsplit_once('.')
+                .expect("galeri giriş tanımı ad alanı ve yerel ad taşır");
+            let sonuç = gizli_giriş_kurucusu(
+                Arc::new(y),
+                GizliTeslimPolitikası::tek_alıcı(Box::new(GaleriReddedenGizliAlıcı {
+                    hazırlık: Rc::clone(&k03_kanıt.reddedilen_hazırlık),
+                })),
+                bağlam,
+            )
+            .kur(
+                galeri_bileşen_kimliği(kimlik_fabrikası, ad_alanı, yerel_ad),
+                hizmetler.unicode(),
+                hizmetler.alan_damgası(kimlik_fabrikası),
+                (*yerel_kök).clone(),
+                tema.clone(),
+                pencere,
+                bağlam,
+            )?;
+            notlar.borrow_mut().push(SergiKuruluşNotu {
+                alan: kimlik,
+                rapor: sonuç.rapor,
+                varsayılan_değer_hatası: sonuç.varsayılan_değer_hatası,
+            });
+            let alan = sonuç.bileşen;
+            let simge_çizimi = simge_çizimi.clone();
+            alan.update(bağlam, |alan, bağlam| {
+                alan.simge_çizim_bağlamını_değiştir(Some(simge_çizimi), bağlam);
+            });
+            alan
+        };
+
+        let programatik = {
+            let mut y = GirişYapılandırması::tek_satırlı_metin();
+            y.yer_tutucu = Some(hazır_ileti("Programatik atama alanı"));
             alan(
-                "galeri.metin_girisi.parola",
+                "galeri.metin_girisi.programatik",
                 y,
-                "gizli-değer",
+                "Başlangıç",
                 pencere,
                 bağlam,
             )?
@@ -2856,12 +3285,26 @@ impl MetinGirişiAlanları {
                         bu.tercih_alanlarını_eşitle(bağlam);
                         return;
                     }
-                    let görünüm = hedef.read(bağlam).gösterim_görünümü(true);
+                    let görünüm = match hedef.read(bağlam).açık_gösterim_metni(true) {
+                        Ok(görünüm) => görünüm,
+                        Err(red) => {
+                            bu.tercih_eşitleme_hatası = Some(TercihEşitlemeKaydı {
+                                kutu: hedef.entity_id(),
+                                hata: Arc::new(TercihEşitlemeHatası::Mutasyon(
+                                    gpui_bilesenleri::GirişMutasyonReddi::Erişim(red),
+                                )),
+                            });
+                            bağlam.notify();
+                            return;
+                        }
+                    };
                     if görünüm.utf8_bayt_uzunluğu() > GALERİ_SAHİPLİ_METİN_UTF8_TAVANI {
                         bu.tercih_eşitleme_hatası = Some(TercihEşitlemeKaydı {
                             kutu: hedef.entity_id(),
-                            hata: Arc::new(gpui_bilesenleri::GirişHatası::KalıcıDönüşüm(
-                                gpui_bilesenleri_temel::KalıcıMetinDönüşümHatası::ÇıktıBütçesiAşıldı,
+                            hata: Arc::new(TercihEşitlemeHatası::Gözlem(
+                                gpui_bilesenleri::GirişHatası::KalıcıDönüşüm(
+                                    gpui_bilesenleri_temel::KalıcıMetinDönüşümHatası::ÇıktıBütçesiAşıldı,
+                                ),
                             )),
                         });
                         bağlam.notify();
@@ -2874,7 +3317,7 @@ impl MetinGirişiAlanları {
                         Err(hata) => {
                             bu.tercih_eşitleme_hatası = Some(TercihEşitlemeKaydı {
                                 kutu: hedef.entity_id(),
-                                hata: Arc::new(hata),
+                                hata: Arc::new(TercihEşitlemeHatası::Gözlem(hata)),
                             });
                             bağlam.notify();
                             return;
@@ -2884,11 +3327,25 @@ impl MetinGirişiAlanları {
                 }
             })
         };
-        let abonelikler = vec![
+        let mut abonelikler = vec![
             abone(&desen, |t, m| t.desen = m, bağlam),
             abone(&ön_ek_metni, |t, m| t.ön_ek_metni = m, bağlam),
             abone(&son_ek_metni, |t, m| t.son_ek_metni = m, bağlam),
         ];
+        let yetkili_terminal = Rc::clone(&k03_kanıt.yetkili_terminal);
+        abonelikler.push(bağlam.subscribe(&parola, move |_, _, olay, bağlam| {
+            if let gpui_bilesenleri::GirişOlayı::GizliKabulSonuçlandı { akıbet, .. } = olay {
+                yetkili_terminal.set(Some(*akıbet));
+                bağlam.notify();
+            }
+        }));
+        let reddedilen_terminal = Rc::clone(&k03_kanıt.reddedilen_terminal);
+        abonelikler.push(bağlam.subscribe(&parola_reddi, move |_, _, olay, bağlam| {
+            if let gpui_bilesenleri::GirişOlayı::GizliKabulSonuçlandı { akıbet, .. } = olay {
+                reddedilen_terminal.set(Some(*akıbet));
+                bağlam.notify();
+            }
+        }));
 
         let salt_okunur = {
             let mut y = GirişYapılandırması::tek_satırlı_metin();
@@ -2906,6 +3363,8 @@ impl MetinGirişiAlanları {
             yalın,
             arama,
             parola,
+            parola_reddi,
+            programatik,
             maskeli,
             tarih,
             tutar,
@@ -2915,6 +3374,7 @@ impl MetinGirişiAlanları {
             son_ek_metni,
             _abonelikler: abonelikler.into(),
             kuruluş_notları: notlar.into_inner().into(),
+            k03_kanıt,
         })
     }
 }
@@ -2926,18 +3386,49 @@ const ÖLÇÜM_TASLAĞI: &str = "5386977935";
 fn bütün_metni_değiştir(
     alan: &mut GirişKutusu,
     metin: &str,
-    pencere: &mut Window,
+    _pencere: &mut Window,
     bağlam: &mut Context<GirişKutusu>,
-) {
-    let uzunluk =
-        gpui::EntityInputHandler::text_length_utf16(alan, pencere, bağlam).unwrap_or_default();
-    gpui::EntityInputHandler::replace_text_in_range(alan, Some(0..uzunluk), metin, pencere, bağlam);
+) -> gpui_bilesenleri::GirişSonucu {
+    let yetki = match alan.dış_düzenleme_yetkisi() {
+        Ok(yetki) => yetki,
+        Err(red) => {
+            return gpui_bilesenleri::GirişSonucu::Reddedildi(
+                gpui_bilesenleri::GirişMutasyonReddi::Erişim(red),
+            );
+        }
+    };
+    let anlık = match gpui_bilesenleri::MetinDüzenlemePortu::anlık_görüntü(alan, &yetki) {
+        Ok(anlık) => anlık,
+        Err(red) => {
+            return gpui_bilesenleri::GirişSonucu::Reddedildi(
+                gpui_bilesenleri::GirişMutasyonReddi::Erişim(red),
+            );
+        }
+    };
+    gpui_bilesenleri::MetinDüzenlemePortu::dış_değişikliği_uygula(
+        alan,
+        yetki,
+        gpui_bilesenleri::DışMetinDeğişikliğiİsteği {
+            değişiklik: gpui_bilesenleri::MetinDeğişikliği {
+                utf8_aralığı: 0..anlık.metin.utf8_bayt_uzunluğu(),
+                yeni_metin: metin.to_owned(),
+            },
+            beklenen_değer_sürümü: anlık.değer_sürümü,
+            beklenen_yapılandırma_sürümü: anlık.yapılandırma_sürümü,
+        },
+        bağlam,
+    )
 }
 
 fn değer_sürümü(alan: &GirişKutusu) -> u64 {
-    match alan.durum() {
-        gpui_bilesenleri::GirişDurumu::Açık(açık) => açık.değer_sürümü(),
-        gpui_bilesenleri::GirişDurumu::Gizli(gizli) => gizli.değer_sürümü(),
+    match alan.durum_gözlemi() {
+        gpui_bilesenleri::GirişDurumuGözlemi::Açık(gpui_bilesenleri::GirişDurumu::Açık(
+            açık,
+        )) => açık.değer_sürümü(),
+        gpui_bilesenleri::GirişDurumuGözlemi::Açık(gpui_bilesenleri::GirişDurumu::Gizli(_)) => {
+            unreachable!("açık gözlem gizli çekirdek taşıyamaz")
+        }
+        gpui_bilesenleri::GirişDurumuGözlemi::Gizli(gizli) => gizli.değer_sürümü,
     }
 }
 

@@ -26,7 +26,7 @@ fn yon_006_acc_002_olcutsuz_sergi_yok_ve_kanitsiz_raporu_uretilir() {
 
 #[test]
 fn yon_006_acc_017_sergi_tanimi_getterlari_ve_kapali_hatalari_exacttir() {
-    let atıf = SözleşmeAtfı::yeni("BİL-010", "^28.0", "§1").expect("atıf");
+    let atıf = SözleşmeAtfı::yeni("BİL-010", "^31.0", "§1").expect("atıf");
     let ölçüt = KabulÖlçütüAtfı::yeni(atıf.clone(), "BİL-010.ACC-001").expect("ölçüt");
     let başlık = YerelleştirmeAnahtarı::yeni("galeri.sergi.bil010").expect("başlık");
     let eksenler = EksenDestekMatrisi {
@@ -362,9 +362,18 @@ fn yon_006_metin_girisi_kanonik_bilesenden_tuketilir() {
         );
     }
 
-    // Yaşayan alanlar kanonik bileşenden kurulur ve tipli yapılandırma alır.
+    assert!(
+        !galeri.contains("GirişKutusu::kur("),
+        "eski serbest kuruluş yolu galeride açık kalmamalı"
+    );
+
+    // Yaşayan alanlar kanonik tip-durumlu kuruculardan kurulur ve tipli
+    // yapılandırma alır.
     for kanonik in [
-        "GirişKutusu::kur",
+        "GirişKutusuKurucusu::yeni",
+        "GizliGirişKurucusu::yeni",
+        "GizliTeslimPolitikası::tek_alıcı",
+        ".kısıtları_çöz(",
         "GirişYapılandırması::tek_satırlı_metin",
         "GirişMaskesi::Metin",
         "GirişMaskesi::Tarih",

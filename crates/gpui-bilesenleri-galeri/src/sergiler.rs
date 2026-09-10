@@ -198,6 +198,149 @@ fn metin_girişi_özeti(alanlar: crate::MetinGirişiAlanları) -> Stateful<Div> 
     )
 }
 
+/// K01/K02/K04'ün gerçek galeri tüketicisi.
+///
+/// İki gizli alanın görünür metni hiçbir zaman okunmaz. Kart yalnız kanonik
+/// maskeli gözlemi, bytesiz terminal akıbetini ve payloaddan bağımsız çağrı
+/// sayaçlarını gösterir. Reveal sağlayıcı ekseni dış GPUI değişikliği
+/// beklediği için açık kalır ve mevcut istek fail-closed maskede sınanır.
+pub(crate) fn k03_tüketici_kanıtı(
+    alanlar: &crate::MetinGirişiAlanları,
+    bağlam: &mut Context<GaleriUygulaması>,
+) -> Stateful<Div> {
+    let g = crate::görünüm();
+    let t = crate::TezgahTokenları::paletten(crate::palet());
+    let gözlem = alanlar.k03_kanıt_gözlemi(bağlam);
+    let gizli_özeti = |gözlem: Option<gpui_bilesenleri::GizliGirişGözlemi>| match gözlem {
+        Some(gözlem) => format!(
+            "maskeli · durum={:?} · taslak_kirli={} · kayıt_kirli={} · reveal={}",
+            gözlem.durum, gözlem.düzenleme_kirli, gözlem.kayıt_kirli, gözlem.geçici_gösterim_etkin
+        ),
+        None => "ROL HATASI: açık gözlem döndü".to_owned(),
+    };
+
+    let yetkili_düğme = crate::hap(
+        "k03-yetkili-kabul",
+        &g,
+        &t,
+        "Enter kabulünü çalıştır",
+        false,
+    )
+    .on_click(bağlam.listener(|bu, _, pencere, bağlam| {
+        bu.k03_gizli_kabulü_çalıştır(false, pencere, bağlam);
+    }));
+    let ret_düğmesi = crate::hap(
+        "k03-reddedilen-teslim",
+        &g,
+        &t,
+        "Reddedilen teslimi çalıştır",
+        false,
+    )
+    .on_click(bağlam.listener(|bu, _, pencere, bağlam| {
+        bu.k03_gizli_kabulü_çalıştır(true, pencere, bağlam);
+    }));
+    let reveal_düğmesi = crate::hap("k03-reveal-dene", &g, &t, "Reveal isteğini dene", false)
+        .on_click(bağlam.listener(|bu, _, pencere, bağlam| {
+            let _ = bu.k03_reveal_isteğini_çalıştır(pencere, bağlam);
+        }));
+    let programatik_düğme = crate::hap(
+        "k03-programatik-atama",
+        &g,
+        &t,
+        "Atama + eski beklenti",
+        false,
+    )
+    .on_click(bağlam.listener(|bu, _, pencere, bağlam| {
+        let _ = bu.k03_programatik_senaryoyu_çalıştır(pencere, bağlam);
+    }));
+
+    crate::kart(&g, &t)
+        .id("k03-gercek-tuketici-kaniti")
+        .debug_selector(|| "k03-gercek-tuketici-kaniti".into())
+        .child(crate::bölüm_başlığı(
+            &g,
+            &t,
+            "K03 · gerçek kurucu, teslim ve atama tüketicisi",
+        ))
+        .child(
+            crate::stili_uygula(div().mt_1(), &g.eksen_etiketi)
+                .text_color(t.soluk)
+                .child(
+                    "Gizli alanlara bir değer yazın; kabul düğmeleri gerçek GPUI Enter yolunu kullanır.",
+                ),
+        )
+        .child(
+            div()
+                .id("k03-yetkili-gizli-alan")
+                .mt_3()
+                .child(etiketli_alan("Yetkili gizli kabul", alanlar.parola.clone()))
+                .child(div().mt_2().child(yetkili_düğme))
+                .child(
+                    crate::stili_uygula(div().mt_1(), &g.eksen_etiketi)
+                        .debug_selector(|| "k03-yetkili-terminal".into())
+                        .text_color(t.ikincil_metin)
+                        .child(format!(
+                            "hazırlık={} · teslim={} · terminal={:?}",
+                            gözlem.yetkili_hazırlık_sayısı,
+                            gözlem.yetkili_teslim_sayısı,
+                            gözlem.yetkili_terminal
+                        )),
+                )
+                .child(
+                    crate::stili_uygula(div().mt_1(), &g.eksen_etiketi)
+                        .debug_selector(|| "k03-maskeli-gozlem".into())
+                        .text_color(t.ikincil_metin)
+                        .child(gizli_özeti(gözlem.yetkili_gözlem)),
+                )
+                .child(div().mt_2().child(reveal_düğmesi)),
+        )
+        .child(
+            div()
+                .id("k03-reddedilen-gizli-alan")
+                .mt_4()
+                .child(etiketli_alan(
+                    "Reddedilen gizli teslim",
+                    alanlar.parola_reddi.clone(),
+                ))
+                .child(div().mt_2().child(ret_düğmesi))
+                .child(
+                    crate::stili_uygula(div().mt_1(), &g.eksen_etiketi)
+                        .debug_selector(|| "k03-reddedilen-terminal".into())
+                        .text_color(t.ikincil_metin)
+                        .child(format!(
+                            "hazırlık={} · terminal={:?} · {}",
+                            gözlem.reddedilen_hazırlık_sayısı,
+                            gözlem.reddedilen_terminal,
+                            gizli_özeti(gözlem.reddedilen_gözlem)
+                        )),
+                ),
+        )
+        .child(
+            div()
+                .id("k03-programatik-alan")
+                .mt_4()
+                .child(etiketli_alan(
+                    "Programatik taslak",
+                    alanlar.programatik.clone(),
+                ))
+                .child(div().mt_2().child(programatik_düğme))
+                .child(
+                    crate::stili_uygula(div().mt_1(), &g.eksen_etiketi)
+                        .debug_selector(|| "k03-programatik-terminal".into())
+                        .text_color(t.ikincil_metin)
+                        .child(format!("akıbet={:?}", gözlem.programatik)),
+                ),
+        )
+        .child(
+            crate::stili_uygula(div().mt_4(), &g.eksen_etiketi)
+                .debug_selector(|| "k03-reveal-acik-ekseni".into())
+                .text_color(t.vurgu)
+                .child(
+                    "Reveal runtime ekseni AÇIK: saklamayan GPUI şekillendirme adapterı yok; istek fail-closed maskede kalır. Gizli payload genel olay veya demo log’una yazılmaz.",
+                ),
+        )
+}
+
 pub(crate) fn aile_sergisi(
     sözleşme: &str,
     mut durum: SergiDurumu,
@@ -1877,7 +2020,12 @@ pub(crate) fn yuva_görünürlük_notu(
 ) -> Option<Div> {
     use gpui_bilesenleri::YardımcıEylemGörünürlüğü as G;
 
-    let değer_var = alan.read(bağlam).metin().utf8_bayt_uzunluğu() != 0;
+    let değer_var = match alan.read(bağlam).metin_gözlemi() {
+        gpui_bilesenleri::GirişMetniGözlemi::Açık(metin) => metin.utf8_bayt_uzunluğu() != 0,
+        // Gizli gözlem uzunluk taşımaz; değere bağlı yuvanın görünürlüğünü
+        // dışarıdan tahmin etmeyiz.
+        gpui_bilesenleri::GirişMetniGözlemi::Gizli(_) => false,
+    };
     let değere_bağlı = matches!(yuva_görünürlüğü, G::DeğerVarken | G::DeğerVarkenKademeli);
     let mut satırlar: Vec<&'static str> = Vec::new();
     if !değer_var && değere_bağlı && açık_yuva_sayısı > 0 {
@@ -1919,9 +2067,14 @@ pub(crate) fn değer_durumu(
     let g = crate::görünüm();
     let t = crate::TezgahTokenları::paletten(crate::palet());
     let kutu = alan.read(bağlam);
-    let açık = match kutu.durum() {
-        gpui_bilesenleri::GirişDurumu::Açık(açık) => Some(açık),
-        gpui_bilesenleri::GirişDurumu::Gizli(_) => None,
+    let açık = match kutu.durum_gözlemi() {
+        gpui_bilesenleri::GirişDurumuGözlemi::Açık(gpui_bilesenleri::GirişDurumu::Açık(
+            açık,
+        )) => Some(açık),
+        gpui_bilesenleri::GirişDurumuGözlemi::Açık(gpui_bilesenleri::GirişDurumu::Gizli(_)) => {
+            unreachable!("açık gözlem gizli çekirdek taşıyamaz")
+        }
+        gpui_bilesenleri::GirişDurumuGözlemi::Gizli(_) => None,
     };
 
     let boş = |metin: &gpui_bilesenleri_temel::PaylaşılanMetinDilimi| {
@@ -1958,8 +2111,8 @@ pub(crate) fn değer_durumu(
             |açık| boş(açık.düzenleme_başlangıcı().düzenleme_metni()),
         )
     };
-    let kabul = değer(açık.and_then(gpui_bilesenleri::GirişÇekirdeği::kabul_edilmiş_değer));
-    let kirli = açık.is_some_and(gpui_bilesenleri::GirişÇekirdeği::düzenleme_kirli);
+    let kabul = değer(açık.and_then(|çekirdek| çekirdek.kabul_edilmiş_değer()));
+    let kirli = açık.is_some_and(|çekirdek| çekirdek.düzenleme_kirli());
 
     let satır = |etiket: &'static str, içerik: String| {
         şerit_satırı()
@@ -3328,16 +3481,39 @@ pub(crate) fn turetilmis_durum_satırı(
         yürürlükteki_durum,
         yürürlükteki_önem,
         yürürlükteki_erişim,
-    ) = alan.read_with(bağlam, |alan, _| {
-        let durum = alan.durum_göstergesi_durumu();
-        (
-            durum.yerleşim(),
-            durum.birincil_sorun().is_some(),
-            alan.sorunlar().len(),
-            alan.görsel_durum(),
-            alan.önem(),
-            alan.erişim(),
-        )
+        gizli_gözlem,
+    ) = alan.read_with(bağlam, |alan, _| match alan.durum_gözlemi() {
+        gpui_bilesenleri::GirişDurumuGözlemi::Açık(gpui_bilesenleri::GirişDurumu::Açık(_)) =>
+        {
+            let durum = alan
+                .açık_durum_göstergesi_durumu()
+                .expect("açık durum gözlemi açık erişicilerle uyumludur");
+            (
+                Some(durum.yerleşim()),
+                Some(durum.birincil_sorun().is_some()),
+                Some(
+                    alan.açık_sorunlar()
+                        .expect("açık durum gözlemi açık erişicilerle uyumludur")
+                        .len(),
+                ),
+                Some(
+                    alan.açık_görsel_durum()
+                        .expect("açık durum gözlemi açık erişicilerle uyumludur"),
+                ),
+                Some(
+                    alan.açık_önem()
+                        .expect("açık durum gözlemi açık erişicilerle uyumludur"),
+                ),
+                alan.erişim(),
+                None,
+            )
+        }
+        gpui_bilesenleri::GirişDurumuGözlemi::Açık(gpui_bilesenleri::GirişDurumu::Gizli(_)) => {
+            unreachable!("açık gözlem gizli çekirdek taşıyamaz")
+        }
+        gpui_bilesenleri::GirişDurumuGözlemi::Gizli(gözlem) => {
+            (None, None, None, None, None, alan.erişim(), Some(gözlem))
+        }
     });
 
     let özel_durumlar = [
@@ -3364,20 +3540,33 @@ pub(crate) fn turetilmis_durum_satırı(
             .child(türetilmiş_rozet(değer))
     };
     let yerleşim_adı = match yerleşim {
-        gpui_bilesenleri::DurumGöstergesiYerleşimi::Yok => "Yok",
-        gpui_bilesenleri::DurumGöstergesiYerleşimi::SatırSonu => "Satır sonu",
-        gpui_bilesenleri::DurumGöstergesiYerleşimi::ÜstKöşe => "Üst köşe",
+        Some(gpui_bilesenleri::DurumGöstergesiYerleşimi::Yok) => "Yok",
+        Some(gpui_bilesenleri::DurumGöstergesiYerleşimi::SatırSonu) => "Satır sonu",
+        Some(gpui_bilesenleri::DurumGöstergesiYerleşimi::ÜstKöşe) => "Üst köşe",
+        None => "İçerik kapalı",
     };
 
-    let durum_adı = özel_durumlar
-        .iter()
-        .find(|(_, durum)| *durum == yürürlükteki_durum)
-        .map_or("—", |(ad, _)| *ad);
+    let durum_adı = yürürlükteki_durum.map_or_else(
+        || {
+            gizli_gözlem.map_or_else(
+                || SharedString::new_static("—"),
+                |gözlem| SharedString::new(format!("Gizli · {:?}", gözlem.durum)),
+            )
+        },
+        |yürürlükteki_durum| {
+            SharedString::new_static(
+                özel_durumlar
+                    .iter()
+                    .find(|(_, durum)| *durum == yürürlükteki_durum)
+                    .map_or("—", |(ad, _)| *ad),
+            )
+        },
+    );
     let erişim_adı = erişimler
         .iter()
         .find(|(_, erişim)| *erişim == yürürlükteki_erişim)
         .map_or("—", |(ad, _)| *ad);
-    let önem_adı = {
+    let önem_adı = yürürlükteki_önem.map_or("İçerik kapalı", |yürürlükteki_önem| {
         use gpui_bilesenleri::SemantikÖnem as Ö;
         match yürürlükteki_önem {
             Ö::Hata => "Hata",
@@ -3386,13 +3575,13 @@ pub(crate) fn turetilmis_durum_satırı(
             Ö::Başarı => "Başarı",
             Ö::Olağan => "Olağan",
         }
-    };
+    });
 
     div()
         // `§28` durum okunur, seçilmez: kaynağı sorun kümesidir. Doğrulama
         // kartından bir kural kurup kutuyu ihlal ettirin, buradaki değer
         // değişsin.
-        .child(satır("Özel durum", durum_adı.into()))
+        .child(satır("Özel durum", durum_adı))
         .child(
             div()
                 .mt(px(ölçü::ARALIK))
@@ -3455,13 +3644,20 @@ pub(crate) fn turetilmis_durum_satırı(
             div()
                 .mt(px(ölçü::ARALIK))
                 .child(satır("Gösterge yerleşimi", yerleşim_adı.into()))
-                .child(div().mt_1().child(satır(
-                    "gösterge sorunu",
-                    if gösterge_sorunu { "var" } else { "yok" }.into(),
-                )))
+                .child(
+                    div().mt_1().child(satır(
+                        "gösterge sorunu",
+                        gösterge_sorunu
+                            .map_or("içerik kapalı", |var| if var { "var" } else { "yok" })
+                            .into(),
+                    )),
+                )
                 .child(div().mt_1().child(satır(
                     "geçerlilik sorunu",
-                    SharedString::new(sorun_sayısı.to_string()),
+                    sorun_sayısı.map_or_else(
+                        || SharedString::new_static("içerik kapalı"),
+                        |sayı| SharedString::new(sayı.to_string()),
+                    ),
                 ))),
         )
 }
