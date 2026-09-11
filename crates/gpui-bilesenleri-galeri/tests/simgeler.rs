@@ -1,81 +1,79 @@
-//! Galerinin gerçek `ORT-016` snapshot ve GPUI bağdaştırıcı tüketicisi.
+//! Galerinin root-yetkili ORT-016/K09 hizmet tüketicisi.
 
 #![allow(non_ascii_idents)]
 
-use std::sync::Arc;
-
-use gpui::AssetSource as _;
+use gpui::{AssetSource as _, TestAppContext};
 use gpui_bilesenleri::{
-    SimgeBoyutTercihi, SimgeGerekliliği, SimgeGörselBiçimi, SimgeÇizimBağlamı, SimgeÇizimPlanı,
-    SimgeÇözümAkıbeti, Simgeİsteği, TemaKipi, ÇözülmüşSimge, ÇözülmüşYazıYönü,
+    SimgeBoyutTercihi, SimgeGerekliliği, SimgeGörselBiçimi, SimgeÇözümAkıbeti, Simgeİsteği,
+    TemaKipi, ÇözülmüşYazıYönü,
 };
 use gpui_bilesenleri_galeri::{
-    GaleriVarlıkKaynağı, galeri_simge_kimliği, galeri_simge_çizim_bağlamı,
+    GaleriVarlıkKaynağı, bileşen_tuş_bağlarını_kur, galeri_simge_cache_gözlemi,
+    galeri_simge_hizmeti, galeri_simge_kimliği,
 };
 use gpui_bilesenleri_temel::SimgeRolü;
 
-fn istek(kimlik: &str) -> Simgeİsteği {
+fn istek(kimlik: gpui_bilesenleri::SimgeKimliği) -> Simgeİsteği {
     Simgeİsteği::yeni(
-        galeri_simge_kimliği(kimlik).expect("galeri input kimliği geçerlidir"),
+        kimlik,
         SimgeGörselBiçimi::Çizgisel,
         SimgeBoyutTercihi::default(),
         SimgeRolü::Olağan,
         None,
         ÇözülmüşYazıYönü::SoldanSağa,
-        SimgeGerekliliği::İsteğeBağlı,
+        SimgeGerekliliği::Zorunlu,
         TemaKipi::Açık,
     )
 }
 
-fn çöz(bağlam: &SimgeÇizimBağlamı, kimlik: &str) -> Arc<ÇözülmüşSimge> {
-    match bağlam.snapshot.çöz(&istek(kimlik)) {
-        SimgeÇözümAkıbeti::TamÇözüldü(simge) => simge,
-        SimgeÇözümAkıbeti::YedekleÇözüldü { makbuz, .. } => {
-            panic!("{kimlik} yedeğe düşmemeli: {makbuz:?}")
+#[test]
+fn yardimci_eylem_simgeleri_yasayan_hizmette_tam_cozulur() {
+    let bağlam = TestAppContext::single();
+    bağlam.update(|bağlam| {
+        bileşen_tuş_bağlarını_kur(bağlam);
+        let hizmet = galeri_simge_hizmeti(bağlam);
+        for ad in [
+            "input.clear",
+            "input.search",
+            "input.reveal",
+            "input.reveal-off",
+            "input.picker",
+            "input.product-action",
+            "input.missing",
+        ] {
+            let kimlik = galeri_simge_kimliği(ad, bağlam)
+                .unwrap_or_else(|| panic!("{ad} yaşayan snapshotta kayıtlı olmalı"));
+            assert!(matches!(
+                hizmet.çöz(&istek(kimlik)),
+                Ok(SimgeÇözümAkıbeti::TamÇözüldü(_))
+            ));
         }
-        SimgeÇözümAkıbeti::ÇizimYok => panic!("{kimlik} çizimsiz kalmamalı"),
-    }
-}
-
-fn varlık_yolu(bağlam: &SimgeÇizimBağlamı, kimlik: &str) -> gpui::SharedString {
-    let simge = çöz(bağlam, kimlik);
-    let başvuru = match simge.çizim() {
-        SimgeÇizimPlanı::TekTonlu(tek) => &tek.varlık,
-        SimgeÇizimPlanı::İkiTonlu(iki) => &iki.birincil.varlık,
-    };
-    bağlam
-        .bağdaştırıcı
-        .svg_yolu(başvuru)
-        .unwrap_or_else(|| panic!("{kimlik} için GPUI varlık yolu bulunmalı"))
+    });
 }
 
 #[test]
-fn yardimci_eylem_simgeleri_snapshotta_tam_cozulur() {
-    let bağlam = galeri_simge_çizim_bağlamı();
-    for kimlik in [
-        "input.clear",
-        "input.search",
-        "input.reveal",
-        "input.reveal-off",
-        "input.picker",
-    ] {
-        let _ = çöz(&bağlam, kimlik);
-    }
-}
+fn kayitsiz_tanim_kimlik_uydurmaz_ve_varlik_listesi_exacttir() {
+    let bağlam = TestAppContext::single();
+    bağlam.update(|bağlam| {
+        bileşen_tuş_bağlarını_kur(bağlam);
+        assert!(galeri_simge_kimliği("input.kayıtsız", bağlam).is_none());
+        assert!(galeri_simge_kimliği("başka.clear", bağlam).is_none());
+    });
 
-#[test]
-fn cozulen_varlik_gpui_bagdastiricisindan_ve_kaynagindan_yuklenir() {
-    let bağlam = galeri_simge_çizim_bağlamı();
     let kaynak = GaleriVarlıkKaynağı;
-    for kimlik in [
-        "input.clear",
-        "input.search",
-        "input.reveal",
-        "input.picker",
+    assert!(kaynak.load("yok.svg").unwrap().is_none());
+    // Beş yerleşik yardımcı eylem + ürün + nötr fallback + üç durum glifi.
+    assert_eq!(kaynak.list("").unwrap().len(), 10);
+    for yol in [
+        "close-circle.svg",
+        "product.svg",
+        "question-circle.svg",
+        "exclamation-circle.svg",
+        "warning.svg",
+        "info-circle.svg",
     ] {
-        let yol = varlık_yolu(&bağlam, kimlik);
         let baytlar = kaynak
-            .load(yol.as_ref())
+            .load(yol)
             .unwrap_or_else(|hata| panic!("{yol} yüklenemedi: {hata:?}"))
             .unwrap_or_else(|| panic!("{yol} varlık kaynağında yok"));
         let svg = String::from_utf8_lossy(&baytlar);
@@ -85,32 +83,39 @@ fn cozulen_varlik_gpui_bagdastiricisindan_ve_kaynagindan_yuklenir() {
 }
 
 #[test]
-fn varlik_kaynagi_bilinmeyen_yolu_bulamaz() {
-    assert!(GaleriVarlıkKaynağı.load("yok.svg").unwrap().is_none());
-    // Beş yardımcı eylem yuvası + üç `§16.2` gösterge glifi.
-    assert_eq!(GaleriVarlıkKaynağı.list("").unwrap().len(), 8);
-    assert!(galeri_simge_kimliği("başka.clear").is_err());
+fn k09_ayni_mantiksal_istek_once_kacirma_sonra_vurus_uretir() {
+    let bağlam = TestAppContext::single();
+    bağlam.update(|bağlam| {
+        bileşen_tuş_bağlarını_kur(bağlam);
+        let hizmet = galeri_simge_hizmeti(bağlam);
+        let kimlik =
+            galeri_simge_kimliği("input.product-action", bağlam).expect("ürün simgesi kayıtlıdır");
+        let istek = istek(kimlik);
+        let önce = galeri_simge_cache_gözlemi(bağlam);
+        assert!(matches!(
+            hizmet.çöz(&istek),
+            Ok(SimgeÇözümAkıbeti::TamÇözüldü(_))
+        ));
+        assert!(matches!(
+            hizmet.çöz(&istek),
+            Ok(SimgeÇözümAkıbeti::TamÇözüldü(_))
+        ));
+        let sonra = galeri_simge_cache_gözlemi(bağlam);
+        assert_eq!(sonra.mantıksal_kaçırma, önce.mantıksal_kaçırma + 1);
+        assert_eq!(sonra.mantıksal_vuruş, önce.mantıksal_vuruş + 1);
+        assert!(sonra.mantıksal_girdi >= 1);
+        assert!(sonra.mantıksal_payload_baytı > 0);
+    });
 }
 
-/// `§16.2.3` üç gösterge glifini aynı doğrulanmış snapshot ve bağdaştırıcı
-/// üzerinden çözer; renk dışında ayrı varlık kimliği de korunur.
 #[test]
-fn gosterge_glifleri_snapshotta_cozulur_ve_ayridir() {
-    let bağlam = galeri_simge_çizim_bağlamı();
-    let hata = varlık_yolu(&bağlam, "input.status-error");
-    let uyarı = varlık_yolu(&bağlam, "input.status-warning");
-    let bilgi = varlık_yolu(&bağlam, "input.status-info");
-
-    assert_ne!(hata, uyarı);
-    assert_ne!(uyarı, bilgi);
-    assert_ne!(hata, bilgi);
-    assert_ne!(hata, varlık_yolu(&bağlam, "input.clear"));
-
+fn gosterge_glifleri_fiziksel_varliklarda_ayridir() {
     let kaynak = GaleriVarlıkKaynağı;
-    for ad in [&hata, &uyarı, &bilgi] {
-        assert!(
-            kaynak.load(ad.as_ref()).unwrap().is_some(),
-            "varlık kaynağı {ad} baytlarını sunmalı"
-        );
-    }
+    let yükle = |yol: &str| kaynak.load(yol).unwrap().expect("kayıtlı varlık");
+    let hata = yükle("exclamation-circle.svg");
+    let uyarı = yükle("warning.svg");
+    let bilgi = yükle("info-circle.svg");
+    assert_ne!(hata.as_ref(), uyarı.as_ref());
+    assert_ne!(uyarı.as_ref(), bilgi.as_ref());
+    assert_ne!(hata.as_ref(), bilgi.as_ref());
 }

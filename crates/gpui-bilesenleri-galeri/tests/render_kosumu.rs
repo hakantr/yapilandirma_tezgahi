@@ -11,16 +11,17 @@ use gpui::TestAppContext;
 use gpui_bilesenleri::{
     AtamaSonucu, DegeriKabulEt, GizliAlıcıHazırlıkReddi, GizliDeğerGörünümü, GizliKabulGözlemi,
     GizliTeslimRetNedeni, HarfDönüşümü, KırpmaPolitikası, MetinDeğişikliği, MetinDüzenlemePortu,
+    YardımcıEylemGörünürlüğü, YardımcıEylemTürü,
 };
 use gpui_bilesenleri_galeri::{
     BİL_AİLELERİ, GALERİ_SAHİPLİ_METİN_UTF8_TAVANI, GaleriHedefi, GaleriUygulaması, KAB_AİLELERİ,
-    ORT_AİLELERİ, bileşen_tuş_bağlarını_kur,
+    ORT_AİLELERİ, bileşen_tuş_bağlarını_kur, galeri_simge_cache_gözlemi, galeri_simge_kimliği,
 };
 use gpui_bilesenleri_galeri::{K03ProgramatikKanıtGözlemi, TezgahDeğerKipi, olay_özeti};
 use std::{cell::RefCell, rc::Rc};
 
 fn galeri_çiz(bağlam: &mut TestAppContext, hedef: GaleriHedefi, aile: Option<&str>) {
-    bağlam.update(|bağlam| bileşen_tuş_bağlarını_kur(bağlam));
+    bağlam.update(bileşen_tuş_bağlarını_kur);
     let (uygulama, görsel) = bağlam.add_window_view(move |_, _| GaleriUygulaması::hedef(hedef));
     if let Some(aile) = aile {
         let aile = aile.to_owned();
@@ -36,6 +37,104 @@ fn galeri_çiz(bağlam: &mut TestAppContext, hedef: GaleriHedefi, aile: Option<&
     // Bekleyen etkileri (notify → yeniden çizim) boşaltır; çizim yolundaki
     // panik burada yüzeye çıkar.
     görsel.run_until_parked();
+}
+
+fn çizimi_akıt(görsel: &mut gpui::VisualTestContext) {
+    görsel.update(|pencere, bağlam| {
+        pencere.activate_window();
+        pencere.draw(bağlam).clear(bağlam);
+    });
+    görsel.run_until_parked();
+}
+
+#[gpui::test]
+fn k07_urun_yuvasi_root_yetkili_simgeyi_kurulusta_ve_renderda_tasir(bağlam: &mut TestAppContext) {
+    bağlam.update(bileşen_tuş_bağlarını_kur);
+    let (uygulama, görsel) =
+        bağlam.add_window_view(|_, _| GaleriUygulaması::hedef(GaleriHedefi::Masaüstü));
+    görsel.update(|_, bağlam| {
+        uygulama.update(bağlam, |uygulama, bağlam| {
+            assert!(uygulama.model.aileyi_aç("BİL-010"));
+            uygulama.tezgahı_değiştir(
+                |tezgah| {
+                    tezgah.ürün_eylemi = true;
+                    tezgah.yuva_görünürlüğü = YardımcıEylemGörünürlüğü::HerZaman;
+                },
+                bağlam,
+            );
+        });
+    });
+    çizimi_akıt(görsel);
+
+    görsel.update(|_, bağlam| {
+        let beklenen = galeri_simge_kimliği("input.product-action", bağlam)
+            .expect("ürün simgesi yaşayan snapshotta kayıtlıdır");
+        let alan = uygulama
+            .read(bağlam)
+            .yaşayan_tezgah_alanı()
+            .expect("tezgâh alanı kurulmuştur");
+        let alan = alan.read(bağlam);
+        let yuvalar = alan
+            .yapılandırma()
+            .bildirim()
+            .yardımcı_eylemler
+            .as_deref()
+            .expect("ürün yuvası kurulmuştur");
+        let ürün = yuvalar
+            .iter()
+            .find(|yuva| matches!(yuva.tür, YardımcıEylemTürü::Ürün(_)))
+            .expect("ürün yuvası exact türle bulunur");
+        assert_eq!(ürün.simge.as_ref(), Some(&beklenen));
+    });
+}
+
+#[gpui::test]
+fn k08_k09_gercek_plan_gecisi_ve_sicak_soguk_gpui_cizimi(bağlam: &mut TestAppContext) {
+    bağlam.update(bileşen_tuş_bağlarını_kur);
+    let (uygulama, görsel) =
+        bağlam.add_window_view(|_, _| GaleriUygulaması::hedef(GaleriHedefi::Masaüstü));
+    görsel.update(|_, bağlam| {
+        uygulama.update(bağlam, |uygulama, bağlam| {
+            assert!(uygulama.model.aileyi_aç("BİL-140"));
+            bağlam.notify();
+        });
+    });
+    çizimi_akıt(görsel);
+
+    görsel.update(|_, bağlam| {
+        let uygulama = uygulama.read(bağlam);
+        assert_eq!(
+            uygulama.k08_plan_nesli(),
+            Some(1),
+            "K08 kuruluş tanısı: {:?}",
+            uygulama.k08_plan_hatası()
+        );
+        assert_eq!(uygulama.k08_plan_hatası(), None);
+        let cache = galeri_simge_cache_gözlemi(bağlam);
+        assert!(cache.mantıksal_kaçırma >= 1, "ilk çözüm soğuk olmalı");
+        assert!(cache.mantıksal_vuruş >= 1, "ikinci çözüm sıcak olmalı");
+        assert!(cache.geometri_kaçırma >= 1, "ilk paint soğuk olmalı");
+        assert!(cache.geometri_vuruş >= 1, "ikinci paint sıcak olmalı");
+        assert!(cache.mantıksal_payload_baytı > 0);
+        assert!(cache.geometri_payload_baytı > 0);
+    });
+
+    görsel.update(|_, bağlam| {
+        uygulama.update(bağlam, |uygulama, bağlam| {
+            uygulama.k08_planını_ilerlet(bağlam);
+        });
+    });
+    çizimi_akıt(görsel);
+    görsel.update(|_, bağlam| {
+        let uygulama = uygulama.read(bağlam);
+        assert_eq!(
+            uygulama.k08_plan_nesli(),
+            Some(2),
+            "K08 geçiş tanısı: {:?}",
+            uygulama.k08_plan_hatası()
+        );
+        assert_eq!(uygulama.k08_plan_hatası(), None);
+    });
 }
 
 #[gpui::test]
@@ -60,7 +159,7 @@ fn metin_girisi_ailesi_cizilir(bağlam: &mut TestAppContext) {
 /// yalnız galerinin kesin tüketici bütçesiyle okunur.
 #[gpui::test]
 fn k03_gercek_tezgah_tuketicisi_donusturur_kirpar_ve_cizer(bağlam: &mut TestAppContext) {
-    bağlam.update(|bağlam| bileşen_tuş_bağlarını_kur(bağlam));
+    bağlam.update(bileşen_tuş_bağlarını_kur);
     let (uygulama, görsel) =
         bağlam.add_window_view(move |_, _| GaleriUygulaması::hedef(GaleriHedefi::Masaüstü));
 
@@ -145,7 +244,7 @@ fn k03_gercek_tezgah_tuketicisi_donusturur_kirpar_ve_cizer(bağlam: &mut TestApp
 fn k03_gizli_teslim_ve_programatik_atama_kapanir_reveal_acik_kalir(bağlam: &mut TestAppContext) {
     const GİZLİ: &str = "yalnız-test-gizlisi🙂";
 
-    bağlam.update(|bağlam| bileşen_tuş_bağlarını_kur(bağlam));
+    bağlam.update(bileşen_tuş_bağlarını_kur);
     let (uygulama, görsel) =
         bağlam.add_window_view(move |_, _| GaleriUygulaması::hedef(GaleriHedefi::Masaüstü));
     let alanlar = görsel.update(|pencere, bağlam| {
@@ -338,7 +437,7 @@ fn butun_ortak_ve_kabuk_aileleri_cizilir(bağlam: &mut TestAppContext) {
 fn tezgah_her_deger_turunde_cizilir(bağlam: &mut TestAppContext) {
     // Tür süzgeci render yolunda da çalışmalı: bölüm listesi türe göre
     // değişiyor ve çizim sırasında hiçbir türde panik üretmemeli.
-    bağlam.update(|bağlam| bileşen_tuş_bağlarını_kur(bağlam));
+    bağlam.update(bileşen_tuş_bağlarını_kur);
     let (uygulama, görsel) =
         bağlam.add_window_view(move |_, _| GaleriUygulaması::hedef(GaleriHedefi::Masaüstü));
     görsel.update(|_, bağlam| {
@@ -365,7 +464,7 @@ fn tezgah_her_deger_turunde_cizilir(bağlam: &mut TestAppContext) {
 fn tezgah_erisilebilir_metin_olceginde_cizilir(bağlam: &mut TestAppContext) {
     // `%200` metin ölçeğinde iki kolon eşiği aşılır ve gövde tek kolona
     // iner; kırpma yerine erişilebilir yerleşim kipine geçilmeli.
-    bağlam.update(|bağlam| bileşen_tuş_bağlarını_kur(bağlam));
+    bağlam.update(bileşen_tuş_bağlarını_kur);
     let (uygulama, görsel) =
         bağlam.add_window_view(move |_, _| GaleriUygulaması::hedef(GaleriHedefi::Masaüstü));
     görsel.update(|_, bağlam| {

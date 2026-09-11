@@ -24,8 +24,8 @@ use gpui_bilesenleri::{
     KırpmaPolitikası, MetinYapıştırmaDönüşümü, MetinİçerikTürü, OdakSeçimi, OndalıkDeğer,
     OndalıkDuyarlılık, ParaBirimiGösterimi, ParaBiçimi, RakamKümesi, SaatDilimiGösterimi,
     SaatDilimiTercihi, SaatDöngüsü, Sabitİçerik, SabitİçerikSunumRolü, SayaçYapılandırması,
-    SayıBiçimi, SayımBirimi, SeçiciGörünürlüğü, SeçiciUyarlaması, SüreBirimi, SüreBiçimi,
-    TarihParçasıGösterimi, TemaKipi, UzunlukSınırı, UzunlukSınırıDavranışı,
+    SayıBiçimi, SayımBirimi, SeçiciGörünürlüğü, SeçiciUyarlaması, SimgeKimliği, SüreBirimi,
+    SüreBiçimi, TarihParçasıGösterimi, TemaKipi, UzunlukSınırı, UzunlukSınırıDavranışı,
     YardımcıEylemGörünürlüğü, YardımcıEylemTürü, YardımcıEylemYuvası, YardımcıEylemÇalışması,
     YüzdeBiçimi, ÇalışırkenEnterPolitikası, İçerikGörünürlüğü, İşaretKonumu,
 };
@@ -133,8 +133,8 @@ pub struct TezgahTercihleri {
     ///
     /// Yerleşik dört tür dışında ürün kendi eylemini yuvaya koyabilir.
     /// Simgesini **ürün sağlar**: `BİL-010` eylem kimliğinden ikinci bir
-    /// simge kimliği türetmez, bu yüzden yuva tezgâhta simgesiz ama adlı
-    /// ve tıklanabilir görünür — sözleşmenin dürüst karşılığı budur.
+    /// simge kimliği türetmez. Yaşayan galeri yolu root-yetkili fiziksel
+    /// `input.product-action` kaydını açıkça bu yuvaya taşır.
     pub ürün_eylemi: bool,
     /// `ORT-009` alanın erişilebilir adı kurulsun mu?
     ///
@@ -847,6 +847,7 @@ pub fn çelişki_metni(hata: &GirişYapılandırmaHatası) -> &'static str {
         H::GizliRevealPolitikasıDeğiştirilemez => {
             "Gizli alanın reveal politikası yaşayan alanda değiştirilemez"
         }
+        H::SimgeÇizimHizmetiEksik => "Yapılandırılmış simge için çizim hizmeti eksik",
         H::RolParmakİziDeğişti => "Açık/gizli rol yaşayan alanda değiştirilemez",
     }
 }
@@ -2152,13 +2153,17 @@ impl TezgahTercihleri {
         motor: &gpui_bilesenleri_temel::UnicodeMetinMotoru,
     ) -> GirişYapılandırması {
         let yardımcı_kimlikleri = crate::YardımcıKimlikleri::yeni(fabrika);
-        self.yapılandırma_kimliklerle(&yardımcı_kimlikleri, motor)
+        // Bu saf model yolu App/root yetkisi uydurmaz. Ürün eylemi açıksa
+        // sonuç kanonik doğrulamada fail-closed olur; yaşayan galeri yolu
+        // root-kayıtlı opak simgeyi `yapılandırma_kimliklerle`ye verir.
+        self.yapılandırma_kimliklerle(&yardımcı_kimlikleri, motor, None)
     }
 
     pub(crate) fn yapılandırma_kimliklerle(
         &self,
         yardımcı_kimlikleri: &crate::YardımcıKimlikleri,
         motor: &gpui_bilesenleri_temel::UnicodeMetinMotoru,
+        ürün_simgesi: Option<&SimgeKimliği>,
     ) -> GirişYapılandırması {
         let mut y = GirişYapılandırması::tek_satırlı_metin();
         // `§6` kip kanonik aileye iner: para/yüzde `Ondalık` türdür ve
@@ -2335,6 +2340,11 @@ impl TezgahTercihleri {
                 // temizleme ya da parola yuvası gönderim üretmez.
                 if tür == YardımcıEylemTürü::AramayıBaşlat && self.arama_gönderime_bağlı {
                     yuva.çalışma = YardımcıEylemÇalışması::AlanınGönderimineBağlı;
+                }
+                if matches!(tür, YardımcıEylemTürü::Ürün(_))
+                    && let Some(simge) = ürün_simgesi
+                {
+                    yuva = yuva.simgeyle(simge.clone());
                 }
                 yuva
             })
@@ -2803,7 +2813,10 @@ impl TezgahTercihleri {
                         let sapma = self.yuva_görünürlüğü != taban.yuva_görünürlüğü
                             || !self.yuvalar_etkin
                             || (*y == YardımcıEylemTürü::AramayıBaşlat
-                                && self.arama_gönderime_bağlı);
+                                && self.arama_gönderime_bağlı)
+                            // Ürün yuvası root-yetkili opak simgeyi açıkça
+                            // taşımalıdır; kısa kurucu bu zorunlu bağı saklayamaz.
+                            || matches!(y, YardımcıEylemTürü::Ürün(_));
                         if !sapma {
                             return if self.yuva_adları {
                                 format!(
@@ -2837,6 +2850,11 @@ impl TezgahTercihleri {
                             satır.push_str(
                                 "\n        yuva.çalışma = \
                                  YardımcıEylemÇalışması::AlanınGönderimineBağlı;",
+                            );
+                        }
+                        if matches!(y, YardımcıEylemTürü::Ürün(_)) {
+                            satır.push_str(
+                                "\n        yuva = yuva.simgeyle(ürün_simge_kimliği.clone());",
                             );
                         }
                         if self.yuva_adları {

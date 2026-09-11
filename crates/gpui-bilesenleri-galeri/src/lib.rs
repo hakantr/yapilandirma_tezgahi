@@ -26,6 +26,8 @@ use std::{
 
 mod cjk_dugme_kaniti;
 mod galeri;
+#[path = "durum_plani.rs"]
+mod k08_durum_plani;
 mod kanit_raporu;
 mod metin_girisi_profili;
 mod metin_girisi_tezgahi;
@@ -161,6 +163,9 @@ pub fn bileşen_tuş_bağlarını_kur(bağlam: &mut gpui::App) {
         gpui_bilesenleri_temel::BileşimKökü::kur(bağlam)
             .expect("galeri App bileşim kökü kurulmalı");
     }
+    // K07/K09 hizmeti de App kökünde bir kez kurulur. Giriş kurucuları ve
+    // görünür galeri tuvalleri aynı snapshot+cache çiftini paylaşır.
+    let _ = galeri_simge_hizmeti(bağlam);
 }
 
 /// Her giriş alanına aynı yaşayan `App` bileşim kökünden ayrı, opak bir
@@ -191,7 +196,9 @@ fn açık_giriş_kurucusu(
     bağlam: &mut gpui::App,
 ) -> gpui_bilesenleri::GirişKutusuKurucusu<gpui_bilesenleri::KaynakÇözüldü> {
     let kuruluş = giriş_kısıt_kuruluşu(&yapılandırma, bağlam);
-    let mut kurucu = GirişKutusuKurucusu::yeni(Arc::clone(&yapılandırma));
+    let simge_hizmeti = galeri_simge_hizmeti(bağlam);
+    let mut kurucu =
+        GirişKutusuKurucusu::yeni(Arc::clone(&yapılandırma)).simge_çizim_hizmeti(simge_hizmeti);
     if let Ok(Some(istek)) = kurucu.biçim_planı_isteği(yerel) {
         let hazırlık = BiçimHizmetHazırlığı::denetimli(
             Arc::from([istek]),
@@ -220,10 +227,12 @@ fn gizli_giriş_kurucusu(
     gpui_bilesenleri::GizliÇizimKararıÇözüldü,
 > {
     let kuruluş = giriş_kısıt_kuruluşu(&yapılandırma, bağlam);
+    let simge_hizmeti = galeri_simge_hizmeti(bağlam);
     GizliGirişKurucusu::yeni(yapılandırma, GirişKaynakBütçesi::default())
         .amacı_çöz(AlanAmacı::GeçerliParola, kuruluş)
         .teslim_politikası(teslim)
         .geçici_gösterimsiz()
+        .simge_çizim_hizmeti(simge_hizmeti)
 }
 
 fn galeri_bileşen_kimliği(
@@ -518,6 +527,11 @@ pub struct GaleriUygulaması {
     /// Galeri gösterim beslemesinin tek ORT-007 bileşim kökü; ilk açık
     /// istekte gerçek `App` yürütücüsünden tembel kurulur.
     doğrulama_görev_kökü: Option<gpui_bilesenleri_temel::GpuiGörevBaşlatıcısıKökü>,
+    /// Bu pencere için görünür BİL-010 tezgâhında bir kez kurulan gerçek K08
+    /// depo+plan+görünüm sahipliği. Hata exact tanı olarak ayrı tutulur;
+    /// eski statik ilerleme kartı başarı kanıtı yerine kullanılmaz.
+    durum_plan_kökü: Option<k08_durum_plani::GaleriDurumPlanKökü>,
+    durum_plan_hatası: Option<String>,
     /// Pencerenin tamamına uygulanan tema ve kip.
     ///
     /// `ORT-004` renk değerinin sahibi temadır; galeri kendi kabuğunu da
@@ -646,6 +660,8 @@ impl GaleriUygulaması {
             imleç_portu: None,
             otomatik_doldurma_portu: None,
             doğrulama_görev_kökü: None,
+            durum_plan_kökü: None,
+            durum_plan_hatası: None,
             // İki hedef iki farklı temayla açılır: aynı çekirdeğin farklı
             // temalarla nasıl göründüğü tek bakışta karşılaştırılabilsin.
             tezgah_ekranı: true,
@@ -696,6 +712,37 @@ impl GaleriUygulaması {
 }
 
 impl GaleriUygulaması {
+    fn k08_kökünü_kur(&mut self, pencere: &mut Window, bağlam: &mut Context<Self>) {
+        if self.durum_plan_kökü.is_some() || self.durum_plan_hatası.is_some() {
+            return;
+        }
+        let fabrika = self.kimlik_fabrikası.clone();
+        match k08_durum_plani::GaleriDurumPlanKökü::kur(&fabrika, pencere, bağlam) {
+            Ok(kök) => self.durum_plan_kökü = Some(kök),
+            Err(hata) => self.durum_plan_hatası = Some(hata),
+        }
+    }
+
+    /// Aynı yaşayan K08 görünüm entitysini önceden doğrulanmış öteki plana geçirir.
+    pub fn k08_planını_ilerlet(&mut self, bağlam: &mut Context<Self>) {
+        let Some(kök) = self.durum_plan_kökü.as_mut() else {
+            return;
+        };
+        if let Err(hata) = kök.ilerlet(bağlam) {
+            self.durum_plan_hatası = Some(hata);
+        }
+        bağlam.notify();
+    }
+
+    /// Görünür K08 tüketicisinin o anda çizdiği exact plan nesli.
+    pub fn k08_plan_nesli(&self) -> Option<u64> {
+        self.durum_plan_kökü.as_ref().map(|kök| kök.plan_nesli())
+    }
+
+    pub fn k08_plan_hatası(&self) -> Option<&str> {
+        self.durum_plan_hatası.as_deref()
+    }
+
     /// Tezgâh ekranını çizer.
     ///
     /// Galeri kabuğundan tümüyle ayrıdır: ne ağaç menü, ne kategori
@@ -705,9 +752,25 @@ impl GaleriUygulaması {
         pencere: &mut Window,
         bağlam: &mut Context<Self>,
     ) -> gpui::Div {
+        // K08/K09 kanıt tüketicisi erişilemeyen eski katalog dalında değil,
+        // ürünün gerçekten açtığı BİL-010 tezgâhında yaşar. Kataloğu yeniden
+        // açmak ayrı YÖN-006 bilgi mimarisi kararıdır.
+        self.k08_kökünü_kur(pencere, bağlam);
         // Gövde içeriği test erişim noktasıyla **aynı** yoldan üretilir;
         // iki kopya bir süre yan yana yaşadı ve sessizce ayrışıyordu.
-        let içerik = self.tezgah_profil_içeriği(pencere, bağlam);
+        let mut içerik = self.tezgah_profil_içeriği(pencere, bağlam);
+        let k08_görünümü = self.durum_plan_kökü.as_ref().map(|kök| kök.görünüm());
+        let k08_nesli = self.durum_plan_kökü.as_ref().map(|kök| kök.plan_nesli());
+        içerik.sol_ek.push(
+            sergiler::ilerleme_sergisi(
+                self.sergi_ilerleme,
+                k08_görünümü,
+                k08_nesli,
+                self.durum_plan_hatası.clone(),
+                bağlam,
+            )
+            .into_any_element(),
+        );
         let kabuk = sergiler::TezgahKabukDurumu {
             tema: self.galeri_teması,
             kip: self.galeri_kipi,
@@ -927,8 +990,14 @@ impl GaleriUygulaması {
         let kök = self.doğrulama_görev_kökü.get_or_insert_with(|| {
             gpui_bilesenleri_temel::GpuiGörevBaşlatıcısıKökü::kur(
                 bağlam,
-                gpui_bilesenleri_temel::EşzamansızAyrıİşSınırı::denetimli(1)
-                    .expect("galeri görev sınırı pozitiftir"),
+                gpui_bilesenleri_temel::GpuiGörevBaşlatıcısıKökSınırları::yeni(
+                    gpui_bilesenleri_temel::EşzamansızMantıksalKuyrukSınırı::denetimli(32)
+                        .expect("galeri mantıksal görev sınırı pozitiftir"),
+                    gpui_bilesenleri_temel::EşzamansızFizikselGörevSınırları::denetimli(8, 8)
+                        .expect("galeri fiziksel görev sınırları pozitiftir"),
+                    gpui_bilesenleri_temel::EşzamansızAyrıİşSınırı::denetimli(1, 0)
+                        .expect("galeri ayrı iş sınırı pozitiftir"),
+                ),
             )
         });
         let port: Arc<dyn gpui_bilesenleri::EşzamansızDoğrulamaPortu> =
@@ -1187,9 +1256,12 @@ impl GaleriUygulaması {
                 .tezgah_yardımcı_kimlikleri
                 .as_ref()
                 .expect("yaşayan tezgâh alanının yardımcı kimlikleri vardır");
-            let yapılandırma = self
-                .tezgah
-                .yapılandırma_kimliklerle(kimlikler, &self.metin_hizmetleri.motor());
+            let ürün_simgesi = galeri_simge_kimliği("input.product-action", bağlam);
+            let yapılandırma = self.tezgah.yapılandırma_kimliklerle(
+                kimlikler,
+                &self.metin_hizmetleri.motor(),
+                ürün_simgesi.as_ref(),
+            );
             let tema = tezgah_teması(&self.tezgah.kutu_teması());
             let önem_zemini = self.tezgah.önem_zemini;
             alan.update(bağlam, |alan, bağlam| {
@@ -1466,9 +1538,12 @@ impl GaleriUygulaması {
             return None;
         }
         let yardımcı_kimlikleri = YardımcıKimlikleri::yeni(&self.kimlik_fabrikası);
-        let yapılandırma = self
-            .tezgah
-            .yapılandırma_kimliklerle(&yardımcı_kimlikleri, &self.metin_hizmetleri.motor());
+        let ürün_simgesi = galeri_simge_kimliği("input.product-action", bağlam);
+        let yapılandırma = self.tezgah.yapılandırma_kimliklerle(
+            &yardımcı_kimlikleri,
+            &self.metin_hizmetleri.motor(),
+            ürün_simgesi.as_ref(),
+        );
         // Önizleme seçili tercihi açılışta göstersin: boş kutu hizalamayı,
         // ayracı, gizlemeyi ve temizleme simgesini görünür kılmaz.
         let örnek = self.tezgah.örnek_değer();
@@ -1477,7 +1552,6 @@ impl GaleriUygulaması {
         let tema = tezgah_teması(&self.tezgah.kutu_teması());
         let imleç_portu = self.imleç_portu.clone();
         let doldurma_portu = self.otomatik_doldurma_portu.clone();
-        let simge_çizimi = galeri_simge_çizim_bağlamı();
         let bileşen =
             galeri_bileşen_kimliği(&self.kimlik_fabrikası, "galeri.metin_girisi", "tezgah");
         // `BİL-010 §29` fallible kuruluş: `ORT-002` kökü ve başlangıç
@@ -1540,11 +1614,11 @@ impl GaleriUygulaması {
         // saklanır; sağlayıcı hatası entity'yi öldürmez.
         self.tezgah_kuruluş_raporu = Some(rapor);
         self.tezgah_varsayılan_değer_hatası = varsayılan_değer_hatası;
-        // Portlar, simge kataloğu ve yaşayan yerel kök hosttan verilir;
+        // Portlar ve yaşayan yerel kök hosttan verilir; simge hizmeti
+        // kuruluş tohumunda taşınmıştır, sonradan değiştirilemez.
         // yerel bağlam fabrika üretimidir, alan üzerinde elle kurulmaz.
         //
         alan.update(bağlam, |alan, bağlam| {
-            alan.simge_çizim_bağlamını_değiştir(Some(simge_çizimi), bağlam);
             alan.platform_imleç_portunu_değiştir(imleç_portu, bağlam);
             alan.otomatik_doldurma_portunu_değiştir(doldurma_portu, bağlam);
         });
@@ -1656,15 +1730,24 @@ impl GaleriUygulaması {
     /// Rapor yalnız tercihten türer. Her çizimde yeniden kurmak hem
     /// doğrulamayı hem kimlik fabrikasını kare hızında çalıştırıyordu;
     /// şimdi yalnız tercih değişince kurulur.
-    fn tezgah_raporu(&mut self) -> Rc<gpui_bilesenleri::GirişYapılandırmaRaporu> {
+    fn tezgah_raporu(
+        &mut self,
+        bağlam: &mut gpui::App,
+    ) -> Rc<gpui_bilesenleri::GirişYapılandırmaRaporu> {
         if let Some((sürüm, rapor)) = &self.rapor_önbelleği
             && *sürüm == self.tercih_sürümü
         {
             return Rc::clone(rapor);
         }
+        let yardımcı_kimlikleri = YardımcıKimlikleri::yeni(&self.kimlik_fabrikası);
+        let ürün_simgesi = galeri_simge_kimliği("input.product-action", bağlam);
         let rapor = Rc::new(
             self.tezgah
-                .yapılandırma(&self.kimlik_fabrikası, &self.metin_hizmetleri.motor())
+                .yapılandırma_kimliklerle(
+                    &yardımcı_kimlikleri,
+                    &self.metin_hizmetleri.motor(),
+                    ürün_simgesi.as_ref(),
+                )
                 .doğrula(),
         );
         self.rapor_önbelleği = Some((self.tercih_sürümü, Rc::clone(&rapor)));
@@ -1971,7 +2054,7 @@ impl GaleriUygulaması {
         let doldurma_var = self.otomatik_doldurma_kullanılabilir(bağlam);
         let portlar = self.port_durumu(bağlam);
         // `§29` raporu tercih sürümüne bağlıdır: kart sonucu okur.
-        let rapor = self.tezgah_raporu();
+        let rapor = self.tezgah_raporu(bağlam);
         // Tercih yalnız okunur: klonlanmaz, doğrudan ödünç verilir.
         metin_girisi_profili::bölümler(
             metin_girisi_profili::BölümGirdisi {
@@ -2307,6 +2390,11 @@ impl GaleriUygulaması {
                 None
             };
             let tezgah_çözücüsü = tezgah_içeriği.is_some().then(|| self.tezgah_çözücüsü());
+            if seçili.as_ref() == "BİL-140" {
+                self.k08_kökünü_kur(pencere, bağlam);
+            }
+            let k08_görünümü = self.durum_plan_kökü.as_ref().map(|kök| kök.görünüm());
+            let durum_planı_nesli = self.durum_plan_kökü.as_ref().map(|kök| kök.plan_nesli());
             let canlı_sergi = sergiler::aile_sergisi(
                 seçili.as_ref(),
                 sergiler::SergiDurumu {
@@ -2314,6 +2402,9 @@ impl GaleriUygulaması {
                     tezgah: tezgah_tercihi,
                     tezgah_içeriği,
                     tezgah_çözücüsü,
+                    durum_planı: k08_görünümü,
+                    durum_planı_nesli,
+                    durum_planı_hatası: self.durum_plan_hatası.clone(),
                     düğme_sayacı: self.sergi_düğme_sayacı,
                     seçili: self.sergi_seçimi,
                     onaylı: self.sergi_onaylı,
@@ -2472,6 +2563,9 @@ impl GaleriUygulaması {
                     // Genel bakış tezgâh gövdesini çizmez.
                     tezgah_içeriği: None,
                     tezgah_çözücüsü: None,
+                    durum_planı: None,
+                    durum_planı_nesli: None,
+                    durum_planı_hatası: None,
                     düğme_sayacı: self.sergi_düğme_sayacı,
                     seçili: self.sergi_seçimi,
                     onaylı: self.sergi_onaylı,
@@ -2982,7 +3076,8 @@ impl MetinGirişiAlanları {
         bağlam: &mut Context<GaleriUygulaması>,
     ) -> Result<Self, gpui_bilesenleri::GirişKuruluşHatası> {
         let tema = galeri_teması();
-        let simge_çizimi = galeri_simge_çizim_bağlamı();
+        let ürün_simgesi = galeri_simge_kimliği("input.product-action", bağlam)
+            .expect("galeri ürün simgesi yaşayan snapshotta kayıtlıdır");
         let yerel_kök = hizmetler.yerel_kök();
         let k03_kanıt = K03GaleriKanıtDurumu::yeni();
         // `§29` kuruluş eksenleri kayıpsız toplanır (rapor + varsayılan
@@ -3002,7 +3097,6 @@ impl MetinGirişiAlanları {
                 yapılandırma.erişilebilir_ad = Some(hazır_ileti("Sergi giriş alanı"));
             }
             let tema = tema.clone();
-            let simge_çizimi = simge_çizimi.clone();
             let yerel_kök = Arc::clone(&yerel_kök);
             let (ad_alanı, yerel_ad) = kimlik
                 .rsplit_once('.')
@@ -3026,20 +3120,28 @@ impl MetinGirişiAlanları {
                 rapor: sonuç.rapor,
                 varsayılan_değer_hatası: sonuç.varsayılan_değer_hatası,
             });
-            let alan = sonuç.bileşen;
-            alan.update(bağlam, |alan, bağlam| {
-                alan.simge_çizim_bağlamını_değiştir(Some(simge_çizimi), bağlam);
-            });
-            Ok(alan)
+            Ok(sonuç.bileşen)
         };
 
         let yalın = {
             let mut y = GirişYapılandırması::tek_satırlı_metin();
             let yardımcı_kimlikleri = YardımcıKimlikleri::yeni(kimlik_fabrikası);
             y.yer_tutucu = Some(hazır_ileti("Bir bileşen adı yazın…"));
-            y.yardımcı_eylem = Some(YardımcıEylemYuvası::kademeli(
-                yardımcı_kimlikleri.al(&YardımcıEylemTürü::Temizle),
-                YardımcıEylemTürü::Temizle,
+            let ürün_türü = YardımcıEylemTürü::Ürün(ürün_eylem_kimliği());
+            y.yardımcı_eylemler = Some(Arc::from(
+                [
+                    YardımcıEylemYuvası::kademeli(
+                        yardımcı_kimlikleri.al(&YardımcıEylemTürü::Temizle),
+                        YardımcıEylemTürü::Temizle,
+                    ),
+                    YardımcıEylemYuvası::her_zaman(
+                        yardımcı_kimlikleri.al(&ürün_türü),
+                        ürün_türü,
+                    )
+                    .simgeyle(ürün_simgesi.clone())
+                    .adla(hazır_ileti("Ürün eylemini çalıştır")),
+                ]
+                .as_slice(),
             ));
             y.uzunluk_sınırı = Some(UzunlukSınırı {
                 en_fazla_grafem: 24,
@@ -3119,12 +3221,7 @@ impl MetinGirişiAlanları {
                 rapor: sonuç.rapor,
                 varsayılan_değer_hatası: sonuç.varsayılan_değer_hatası,
             });
-            let alan = sonuç.bileşen;
-            let simge_çizimi = simge_çizimi.clone();
-            alan.update(bağlam, |alan, bağlam| {
-                alan.simge_çizim_bağlamını_değiştir(Some(simge_çizimi), bağlam);
-            });
-            alan
+            sonuç.bileşen
         };
 
         let parola_reddi = {
@@ -3159,12 +3256,7 @@ impl MetinGirişiAlanları {
                 rapor: sonuç.rapor,
                 varsayılan_değer_hatası: sonuç.varsayılan_değer_hatası,
             });
-            let alan = sonuç.bileşen;
-            let simge_çizimi = simge_çizimi.clone();
-            alan.update(bağlam, |alan, bağlam| {
-                alan.simge_çizim_bağlamını_değiştir(Some(simge_çizimi), bağlam);
-            });
-            alan
+            sonuç.bileşen
         };
 
         let programatik = {

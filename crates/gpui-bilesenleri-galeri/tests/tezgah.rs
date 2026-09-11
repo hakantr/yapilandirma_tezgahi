@@ -1661,7 +1661,7 @@ fn yuva_kipi_etkinlik_ve_gonderim_bagi_gecer() {
     assert!(!kod.contains(".çalışmayla("));
 }
 
-/// `§23.1` ürün kendi yardımcı eylemini yuvaya koyabilir.
+/// `§23.1` ürün kendi yardımcı eylemini yalnız root-yetkili simge bağıyla koyabilir.
 ///
 /// Galeri `YardımcıEylemTürü::Ürün` dalında `unreachable!()` çağırıyordu:
 /// yerleşik dört tür dışına çıkmak tezgâhta hiç denenemiyordu.
@@ -1677,9 +1677,15 @@ fn urun_eylemi_yuvaya_kurulabilir() {
         .iter()
         .find(|yuva| matches!(yuva.tür, YardımcıEylemTürü::Ürün(_)))
         .expect("ürün yuvası kuruldu");
-    // `ORT-009` adsız düğme erişilebilir ağaca girmez.
+    // Saf model yolu App/root yetkisi uydurmaz. Yaşayan galeri exact simgeyi
+    // ayrı render testinde verir; burada eksik bağ fail-closed kalmalıdır.
     assert!(ürün.erişilebilir_ad.is_some());
-    assert!(y.doğrula().hatalar.is_empty());
+    assert!(ürün.simge.is_none());
+    assert!(
+        y.doğrula()
+            .hatalar
+            .contains(&gpui_bilesenleri::GirişYapılandırmaHatası::GeçersizYardımcıEylem)
+    );
 
     // Ürün eylemi de `§23` üç yuva sınırına girer.
     assert_eq!(t.açık_yuva_sayısı(), 2, "temizle + ürün");
@@ -1687,6 +1693,7 @@ fn urun_eylemi_yuvaya_kurulabilir() {
     // Üretilen kod kopyalanabilmeli: ham `EylemKimliği` basılmamalı.
     let kod = t.kod();
     assert!(kod.contains("YardımcıEylemTürü::Ürün(ürün_eylem_kimliği)"));
+    assert!(kod.contains("yuva.simgeyle(ürün_simge_kimliği.clone())"));
     assert!(!kod.contains("TanımKimliği {"));
 }
 

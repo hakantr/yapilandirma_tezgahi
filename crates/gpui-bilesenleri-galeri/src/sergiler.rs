@@ -20,6 +20,7 @@ use gpui_bilesenleri::{
     oynatma_niyetini_teslim_et, sözdizimi_çöz, tuşu_yakala, yönetilen_ayar_sunumu, çakışmayı_çöz,
     İlerlemeDeğeri,
 };
+use std::sync::Arc;
 
 /// Tezgâhın ölçü sistemi.
 ///
@@ -105,6 +106,10 @@ pub(crate) struct SergiDurumu {
     /// `ORT-021` kök-kapsamlı ileti çözücüsü; tezgâh içeriğiyle birlikte
     /// verilir. Genel bakış tezgâh gövdesi çizmediği için `None` kalabilir.
     pub tezgah_çözücüsü: Option<crate::TezgahİletiÇözücüsü>,
+    /// K08'in gerçek plan deposuna bağlı tek yaşayan GPUI görünümü.
+    pub durum_planı: Option<gpui_bilesenleri::DurumPlanGörünümTutamacı>,
+    pub durum_planı_nesli: Option<u64>,
+    pub durum_planı_hatası: Option<String>,
     pub düğme_sayacı: u32,
     pub seçili: u8,
     pub onaylı: bool,
@@ -385,7 +390,14 @@ pub(crate) fn aile_sergisi(
         "BİL-110" => bildirim_sergisi(durum.bildirim_açık, bağlam).into_any_element(),
         "BİL-120" => form_sergisi(durum.form_gönderildi, bağlam).into_any_element(),
         "BİL-130" => sürekli_değer_sergisi(durum.sürekli_değer, bağlam).into_any_element(),
-        "BİL-140" => ilerleme_sergisi(durum.ilerleme, bağlam).into_any_element(),
+        "BİL-140" => ilerleme_sergisi(
+            durum.ilerleme,
+            durum.durum_planı,
+            durum.durum_planı_nesli,
+            durum.durum_planı_hatası,
+            bağlam,
+        )
+        .into_any_element(),
         "BİL-150" => takvim_sergisi(durum.takvim_günü, bağlam).into_any_element(),
         "BİL-160" => disclosure_sergisi(durum.disclosure_açık, bağlam).into_any_element(),
         "BİL-170" => renk_sergisi(durum.renk_seçimi, bağlam).into_any_element(),
@@ -6171,7 +6183,13 @@ fn sürekli_değer_sergisi(değer: u8, bağlam: &mut Context<GaleriUygulaması>)
     )
 }
 
-fn ilerleme_sergisi(ilerleme: u8, bağlam: &mut Context<GaleriUygulaması>) -> Stateful<Div> {
+pub(crate) fn ilerleme_sergisi(
+    ilerleme: u8,
+    durum_planı: Option<gpui_bilesenleri::DurumPlanGörünümTutamacı>,
+    durum_planı_nesli: Option<u64>,
+    durum_planı_hatası: Option<String>,
+    bağlam: &mut Context<GaleriUygulaması>,
+) -> Stateful<Div> {
     // Kanonik kesir tipli kurulur; yüzde tabanı sabittir ve sergi değeri
     // 0..=100 aralığında üretilir.
     let kesir = gpui_bilesenleri::İlerlemeKesri::yeni(
@@ -6184,10 +6202,13 @@ fn ilerleme_sergisi(ilerleme: u8, bağlam: &mut Context<GaleriUygulaması>) -> S
         İlerlemeDeğeri::Belirli(kesir) => kesir.pay() as f64 / kesir.payda().get() as f64,
         İlerlemeDeğeri::Belirsiz => 0.,
     };
-    sergi_kartı(
+    let simge_hizmeti = crate::galeri_simge_hizmeti(bağlam);
+    let ürün_simgesi = crate::galeri_simge_kimliği("input.product-action", bağlam);
+    let simge_gözlemi = crate::galeri_simge_cache_gözlemi(bağlam);
+    let mut kart = sergi_kartı(
         "bil-140-canlı-sergi",
         "Durum ve İlerleme",
-        "Banner, belirli ilerleme ve tamamlanma",
+        "K08 yaşayan planı, K09 sıcak/soğuk simge çizimi ve tamamlanma",
     )
     .child(
         div()
@@ -6241,6 +6262,9 @@ fn ilerleme_sergisi(ilerleme: u8, bağlam: &mut Context<GaleriUygulaması>) -> S
                 "İlerlet"
             })
             .on_click(bağlam.listener(|bu, _, _, bağlam| {
+                // Aynı K08 görünüm entitysi önce öteki doğrulanmış plana
+                // geçirilir; statik yüzde değişimi plan geçişi sayılmaz.
+                bu.k08_planını_ilerlet(bağlam);
                 bu.sergi_ilerleme = if bu.sergi_ilerleme >= 100 {
                     0
                 } else {
@@ -6255,7 +6279,96 @@ fn ilerleme_sergisi(ilerleme: u8, bağlam: &mut Context<GaleriUygulaması>) -> S
             .text_xs()
             .text_color(rgb(ikincil_metin()))
             .child(format!("Belirli ilerleme: %{ilerleme}")),
-    )
+    );
+
+    kart = if let Some(görünüm) = durum_planı {
+        kart.child(
+            div()
+                .id("bil-140-k08-gercek-plan")
+                .mt_4()
+                .rounded_md()
+                .border_1()
+                .border_color(rgb(kenarlık()))
+                .p_3()
+                .child(gpui_bilesenleri::durum_planı_elementi(&görünüm))
+                .child(
+                    div()
+                        .mt_2()
+                        .text_xs()
+                        .text_color(rgb(ikincil_metin()))
+                        .child(format!(
+                            "K08 · aynı entity · plan nesli {}",
+                            durum_planı_nesli.unwrap_or_default()
+                        )),
+                ),
+        )
+    } else {
+        kart.child(
+            div()
+                .id("bil-140-k08-kurulus-hatasi")
+                .mt_4()
+                .text_xs()
+                .text_color(rgb(0xb91c1c))
+                .child(format!(
+                    "K08 plan görünümü kurulamadı: {}",
+                    durum_planı_hatası.as_deref().unwrap_or("kayıt yok")
+                )),
+        )
+    };
+
+    if let Some(kimlik) = ürün_simgesi {
+        let tema = crate::galeri_teması();
+        kart = kart
+            .child(
+                div()
+                    .id("bil-140-k09-sicak-soguk")
+                    .mt_4()
+                    .flex()
+                    .items_center()
+                    .gap_3()
+                    // İlk tuval yeni anahtarda soğuk, ikincisi aynı snapshot,
+                    // istek ve geometri anahtarında sıcak yoldur.
+                    .child(crate::galeri_simge_öğesi(
+                        kimlik.clone(),
+                        Arc::clone(&simge_hizmeti),
+                        Arc::clone(&tema),
+                        px(24.),
+                    ))
+                    .child(crate::galeri_simge_öğesi(
+                        kimlik,
+                        simge_hizmeti,
+                        tema,
+                        px(24.),
+                    ))
+                    .child(
+                        div()
+                            .text_xs()
+                            .text_color(rgb(ikincil_metin()))
+                            .child("K09 · aynı ürün simgesi: soğuk → sıcak"),
+                    ),
+            )
+            .child(
+                div()
+                    .id("bil-140-k09-cache-gozlemi")
+                    .mt_2()
+                    .text_xs()
+                    .text_color(rgb(ikincil_metin()))
+                    .child(format!(
+                        "mantıksal h/m/e={}/{}/{} · geometri h/m/e={}/{}/{} · payload={}/{} B · dış Arc={} B · geçici={} B",
+                        simge_gözlemi.mantıksal_vuruş,
+                        simge_gözlemi.mantıksal_kaçırma,
+                        simge_gözlemi.mantıksal_atım,
+                        simge_gözlemi.geometri_vuruş,
+                        simge_gözlemi.geometri_kaçırma,
+                        simge_gözlemi.geometri_atım,
+                        simge_gözlemi.mantıksal_payload_baytı,
+                        simge_gözlemi.geometri_payload_baytı,
+                        simge_gözlemi.dış_arc_payload_baytı,
+                        simge_gözlemi.geçici_payload_baytı,
+                    )),
+            );
+    }
+    kart
 }
 
 fn takvim_sergisi(gün: u8, bağlam: &mut Context<GaleriUygulaması>) -> Stateful<Div> {

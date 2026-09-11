@@ -2233,6 +2233,7 @@ dependencies = [
 name = "gpui-bilesenleri-temel"
 version = "0.1.0"
 dependencies = [
+ "aligned-vec",
  "gpui",
  "icu_casemap",
  "icu_collator",

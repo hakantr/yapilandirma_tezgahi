@@ -104,7 +104,8 @@ fn giriş_kur(
             yapılandırma.giriş_türü.clone(),
         ))
         .expect("test giriş kısıt alanı kurulur");
-    let mut kurucu = GirişKutusuKurucusu::yeni(Arc::clone(&yapılandırma));
+    let mut kurucu = GirişKutusuKurucusu::yeni(Arc::clone(&yapılandırma))
+        .simge_çizim_hizmeti(gpui_bilesenleri_galeri::galeri_simge_hizmeti(bağlam));
     if let Ok(Some(istek)) = kurucu.biçim_planı_isteği(&yerel_bağlam) {
         let hazırlık = BiçimHizmetHazırlığı::denetimli(
             Arc::from([istek]),

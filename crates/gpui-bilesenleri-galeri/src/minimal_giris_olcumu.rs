@@ -10,8 +10,8 @@ use gpui_bilesenleri::GirişKutusu;
 use std::sync::Arc;
 
 use crate::{
-    TezgahTercihleri, YardımcıKimlikleri, galeri_bileşen_kimliği, galeri_simge_çizim_bağlamı,
-    tezgah_teması, ÖrnekKimliğiFabrikası,
+    TezgahTercihleri, YardımcıKimlikleri, galeri_bileşen_kimliği, tezgah_teması,
+    ÖrnekKimliğiFabrikası,
 };
 
 /// Yalnız bir yaşayan metin alanı taşıyan ölçüm penceresi kökü.
@@ -35,10 +35,9 @@ impl MinimalGirişÖlçümü {
         let tezgah = TezgahTercihleri::default();
         let yardımcı_kimlikleri = YardımcıKimlikleri::yeni(&kimlik_fabrikası);
         let yapılandırma =
-            tezgah.yapılandırma_kimliklerle(&yardımcı_kimlikleri, &hizmetler.motor());
+            tezgah.yapılandırma_kimliklerle(&yardımcı_kimlikleri, &hizmetler.motor(), None);
         let örnek = tezgah.örnek_değer();
         let tema = tezgah_teması(&tezgah.kutu_teması());
-        let simge_çizimi = galeri_simge_çizim_bağlamı();
         // Ölçüm bilinen-geçerli varsayılan tercihle koşar; kuruluş burada
         // düşerse ölçüm ortamı arızasıdır ve exact typed sonuç mesajla
         // taşınır.
@@ -56,9 +55,6 @@ impl MinimalGirişÖlçümü {
             )
             .unwrap_or_else(|hata| panic!("minimal ölçüm alanı kurulamadı: {hata:?}"));
         let alan = sonuç.bileşen;
-        alan.update(bağlam, |alan, bağlam| {
-            alan.simge_çizim_bağlamını_değiştir(Some(simge_çizimi), bağlam);
-        });
         Self {
             alan,
             _hizmetler: hizmetler,
