@@ -7,11 +7,12 @@
 
 #![allow(non_ascii_idents)]
 
-use gpui::TestAppContext;
+use gpui::{IntoElement, Render, TestAppContext, Window, WindowAppearance};
 use gpui_bilesenleri::{
-    AtamaSonucu, DegeriKabulEt, GizliAlıcıHazırlıkReddi, GizliDeğerGörünümü, GizliKabulGözlemi,
-    GizliTeslimRetNedeni, HarfDönüşümü, KırpmaPolitikası, MetinDeğişikliği, MetinDüzenlemePortu,
-    YardımcıEylemGörünürlüğü, YardımcıEylemTürü,
+    AtamaSonucu, DegeriKabulEt, DurumPlanGörünümTutamacı, GizliAlıcıHazırlıkReddi,
+    GizliDeğerGörünümü, GizliKabulGözlemi, GizliTeslimRetNedeni, HarfDönüşümü, KırpmaPolitikası,
+    MetinDeğişikliği, MetinDüzenlemePortu, YardımcıEylemGörünürlüğü, YardımcıEylemTürü,
+    durum_planı_elementi,
 };
 use gpui_bilesenleri_galeri::{
     BİL_AİLELERİ, GALERİ_SAHİPLİ_METİN_UTF8_TAVANI, GaleriHedefi, GaleriUygulaması, KAB_AİLELERİ,
@@ -45,6 +46,67 @@ fn çizimi_akıt(görsel: &mut gpui::VisualTestContext) {
         pencere.draw(bağlam).clear(bağlam);
     });
     görsel.run_until_parked();
+}
+
+struct YakalananK08Konağı {
+    tutamaç: DurumPlanGörünümTutamacı,
+}
+
+impl Render for YakalananK08Konağı {
+    fn render(&mut self, _: &mut Window, _: &mut gpui::Context<Self>) -> impl IntoElement {
+        durum_planı_elementi(&self.tutamaç)
+    }
+}
+
+fn son_sahne_quadları(görsel: &mut gpui::VisualTestContext) -> (Vec<gpui::Quad>, bool) {
+    görsel.update(|pencere, _| {
+        (
+            pencere.painted_quads(),
+            matches!(
+                pencere.appearance(),
+                WindowAppearance::Dark | WindowAppearance::VibrantDark
+            ),
+        )
+    })
+}
+
+fn renk_yakın(sol: f32, sağ: f32) -> bool {
+    (sol - sağ).abs() < f32::EPSILON * 8.0
+}
+
+fn bilgi_ilerleme_dolgusu(quadlar: &[gpui::Quad], koyu: bool) -> Option<f64> {
+    let ışıklılık = if koyu { 0.62 } else { 0.48 };
+    quadlar
+        .iter()
+        .filter_map(|quad| {
+            let renk = quad.background.as_solid()?;
+            let genişlik = f64::from(quad.bounds.size.width);
+            let yükseklik = f64::from(quad.bounds.size.height);
+            (renk_yakın(renk.h, 0.56)
+                && renk_yakın(renk.s, 0.52)
+                && renk_yakın(renk.l, ışıklılık)
+                && renk_yakın(renk.a, 1.0)
+                && genişlik > yükseklik)
+                .then_some(genişlik)
+        })
+        .max_by(f64::total_cmp)
+}
+
+fn başarı_simgesi_var(quadlar: &[gpui::Quad], koyu: bool) -> bool {
+    let ışıklılık = if koyu { 0.58 } else { 0.42 };
+    quadlar.iter().any(|quad| {
+        let Some(renk) = quad.background.as_solid() else {
+            return false;
+        };
+        let genişlik = f64::from(quad.bounds.size.width);
+        let yükseklik = f64::from(quad.bounds.size.height);
+        renk_yakın(renk.h, 0.36)
+            && renk_yakın(renk.s, 0.52)
+            && renk_yakın(renk.l, ışıklılık)
+            && renk_yakın(renk.a, 1.0)
+            && (genişlik - yükseklik).abs() < 0.01
+            && genişlik >= 8.0
+    })
 }
 
 #[gpui::test]
@@ -101,15 +163,22 @@ fn k08_k09_gercek_plan_gecisi_ve_sicak_soguk_gpui_cizimi(bağlam: &mut TestAppCo
     });
     çizimi_akıt(görsel);
 
-    görsel.update(|_, bağlam| {
-        let uygulama = uygulama.read(bağlam);
-        assert_eq!(
-            uygulama.k08_plan_nesli(),
-            Some(1),
-            "K08 kuruluş tanısı: {:?}",
-            uygulama.k08_plan_hatası()
-        );
-        assert_eq!(uygulama.k08_plan_hatası(), None);
+    let ilk_tutamaç = görsel.update(|_, bağlam| {
+        let tutamaç = {
+            let uygulama = uygulama.read(bağlam);
+            assert_eq!(
+                uygulama.k08_plan_nesli(),
+                Some(1),
+                "K08 kuruluş tanısı: {:?}",
+                uygulama.k08_plan_hatası()
+            );
+            assert_eq!(uygulama.k08_yaşam_nesli(), Some(1));
+            assert_eq!(uygulama.k08_sunum_aşaması(), Some("%25"));
+            assert_eq!(uygulama.k08_plan_hatası(), None);
+            uygulama
+                .k08_görünüm_tutamacı()
+                .expect("ilk K08 entity tutamacı yakalanır")
+        };
         let cache = galeri_simge_cache_gözlemi(bağlam);
         assert!(cache.mantıksal_kaçırma >= 1, "ilk çözüm soğuk olmalı");
         assert!(cache.mantıksal_vuruş >= 1, "ikinci çözüm sıcak olmalı");
@@ -117,11 +186,25 @@ fn k08_k09_gercek_plan_gecisi_ve_sicak_soguk_gpui_cizimi(bağlam: &mut TestAppCo
         assert!(cache.geometri_vuruş >= 1, "ikinci paint sıcak olmalı");
         assert!(cache.mantıksal_payload_baytı > 0);
         assert!(cache.geometri_payload_baytı > 0);
+        tutamaç
     });
+    // Galeri kabuğundaki sibling ilerleme şeridini ve kaydırma konumunu
+    // kanıt yüzeyinden çıkar. Kök artık galerinin kurduğu ilk opak K08
+    // tutamacının kendisidir; aşağıdaki uygulama geçişleri bu clone üzerinde
+    // görünürse entity değişmemiş, yerinde güncellenmiş demektir.
+    görsel.update(|pencere, bağlam| {
+        pencere.replace_root(bağlam, |_, _| YakalananK08Konağı {
+            tutamaç: ilk_tutamaç.clone(),
+        });
+    });
+    çizimi_akıt(görsel);
+    let (yüzde_25_quadları, koyu) = son_sahne_quadları(görsel);
+    let yüzde_25_dolgusu = bilgi_ilerleme_dolgusu(&yüzde_25_quadları, koyu)
+        .expect("kanonik %25 planı gerçek gallery scene dolgusu üretmeli");
 
-    görsel.update(|_, bağlam| {
+    görsel.update(|pencere, bağlam| {
         uygulama.update(bağlam, |uygulama, bağlam| {
-            uygulama.k08_planını_ilerlet(bağlam);
+            uygulama.k08_planını_ilerlet(pencere, bağlam);
         });
     });
     çizimi_akıt(görsel);
@@ -133,8 +216,50 @@ fn k08_k09_gercek_plan_gecisi_ve_sicak_soguk_gpui_cizimi(bağlam: &mut TestAppCo
             "K08 geçiş tanısı: {:?}",
             uygulama.k08_plan_hatası()
         );
+        assert_eq!(uygulama.k08_yaşam_nesli(), Some(2));
+        assert_eq!(uygulama.k08_sunum_aşaması(), Some("%75"));
         assert_eq!(uygulama.k08_plan_hatası(), None);
     });
+    let (yüzde_75_quadları, koyu) = son_sahne_quadları(görsel);
+    let yüzde_75_dolgusu = bilgi_ilerleme_dolgusu(&yüzde_75_quadları, koyu)
+        .expect("kanonik %75 planı gerçek gallery scene dolgusu üretmeli");
+    assert!(
+        (yüzde_75_dolgusu / yüzde_25_dolgusu - 3.0).abs() < 0.01,
+        "sibling gösteri çubuğu değil, kanonik K08 dolgusu exact üç kat değişmeli: {yüzde_25_dolgusu} -> {yüzde_75_dolgusu}",
+    );
+
+    görsel.update(|pencere, bağlam| {
+        uygulama.update(bağlam, |uygulama, bağlam| {
+            uygulama.k08_planını_ilerlet(pencere, bağlam);
+        });
+    });
+    çizimi_akıt(görsel);
+    görsel.update(|_, bağlam| {
+        let uygulama = uygulama.read(bağlam);
+        assert_eq!(uygulama.k08_plan_nesli(), Some(3));
+        assert_eq!(uygulama.k08_yaşam_nesli(), Some(3));
+        assert_eq!(uygulama.k08_sunum_aşaması(), Some("Sonuç"));
+        assert_eq!(uygulama.k08_plan_hatası(), None);
+    });
+    let (sonuç_quadları, koyu) = son_sahne_quadları(görsel);
+    assert_eq!(
+        bilgi_ilerleme_dolgusu(&sonuç_quadları, koyu),
+        None,
+        "terminal sonuç planı stale %75 kanonik dolguyu taşımamalı",
+    );
+    assert!(
+        başarı_simgesi_var(&sonuç_quadları, koyu),
+        "terminal sonuç planı aileye özgü başarı geometrisi üretmeli",
+    );
+
+    // Kök hâlâ ilk epochta yakalanan clone'dur. Burada current sonuç
+    // geometrisini çizmesi galerinin tutamacı değiştirmediğini kanıtlar.
+    let (yakalanan_tutamaç_quadları, koyu) = son_sahne_quadları(görsel);
+    assert_eq!(
+        bilgi_ilerleme_dolgusu(&yakalanan_tutamaç_quadları, koyu),
+        None
+    );
+    assert!(başarı_simgesi_var(&yakalanan_tutamaç_quadları, koyu));
 }
 
 #[gpui::test]

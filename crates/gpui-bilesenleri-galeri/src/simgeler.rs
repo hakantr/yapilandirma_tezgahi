@@ -15,9 +15,9 @@ use gpui_bilesenleri_temel::{
     SimgeKatmanı, SimgeKaynakKaydı, SimgeKimliği, SimgeKümesiTanımı, SimgeLisansKaydı,
     SimgePlatformHizmetKökü, SimgeRolü, SimgeSnapshotDeposu, SimgeSnapshotHazırlamaHatası,
     SimgeSnapshotTemelYapılandırması, SimgeTanımı, SimgeYetkiKökü, SimgeYönPolitikası,
-    SimgeÇizimHizmeti, SimgeÇizimYeri, SimgeÇözümAkıbeti, Simgeİsteği, TanımKimliği,
-    TemaAnlıkGörüntüsü, YerleşikPerformansBütçeRolü, YerleşikPerformansBütçeSağlayıcısı,
-    ÇözülmüşYazıYönü, ÜrünKatalogKuruluşu,
+    SimgeÇizimHizmeti, SimgeÇizimYeri, Simgeİsteği, TanımKimliği, TemaAnlıkGörüntüsü,
+    YerleşikPerformansBütçeRolü, YerleşikPerformansBütçeSağlayıcısı, ÇözülmüşYazıYönü,
+    ÜrünKatalogKuruluşu,
 };
 
 /// `(kanonik simge kimliği, varlık anahtarı, gömülü SVG)`.
@@ -403,9 +403,8 @@ pub(crate) fn galeri_simge_öğesi(
             |_, _, _| {},
             move |sınırlar, _, pencere, bağlam| {
                 let çözülmüş = match hizmet.çöz(&istek) {
-                    Ok(SimgeÇözümAkıbeti::TamÇözüldü(simge))
-                    | Ok(SimgeÇözümAkıbeti::YedekleÇözüldü { simge, .. }) => simge,
-                    Ok(SimgeÇözümAkıbeti::ÇizimYok) | Err(_) => return,
+                    Ok(çözülmüş) if !çözülmüş.çizim_yok_mu() => çözülmüş,
+                    Ok(_) | Err(_) => return,
                 };
                 let Ok(yer) = SimgeÇizimYeri::tema_için_denetimli(
                     sınırlar,
@@ -415,6 +414,9 @@ pub(crate) fn galeri_simge_öğesi(
                 ) else {
                     return;
                 };
+                // Sahipli K09 tutamacı paint tamamlanana kadar bu scope'ta
+                // yaşar; cache atımı public dönüşün dış-sahip muhasebesini
+                // erken bırakamaz.
                 let _ = hizmet.çiz(&çözülmüş, yer, pencere, bağlam);
             },
         )

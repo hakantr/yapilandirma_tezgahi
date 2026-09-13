@@ -20,9 +20,9 @@ use std::{collections::BTreeMap, sync::Arc};
 use gpui_bilesenleri_temel::{
     BağlamSürümü, CanlıBağlamDamgası, DilEtiketi, GüvenliMetin, KayıtBelirteci, MetinDamgası,
     SaatDilimiKimliği, UnicodeVeYerelMetinHizmetleri, YerelMetinBağlamı, YerelleştirmeAnahtarı,
-    ÖrnekKimliği, ÖrnekKimliğiFabrikası, İletiBütçesi, İletiDüğümü, İletiKataloğuKimliği,
-    İletiKataloğuKütüğü, İletiKataloğuPaketi, İletiÇözümHatası, İletiÇözümHizmeti,
-    İletiÇözümleyicisi, İletiİsteği, İletiŞablonu,
+    ÇözülmüşKullanıcıİletisi, ÖrnekKimliği, ÖrnekKimliğiFabrikası, İletiBütçesi, İletiDüğümü,
+    İletiKataloğuKimliği, İletiKataloğuKütüğü, İletiKataloğuPaketi, İletiÇözümHatası,
+    İletiÇözümHizmeti, İletiÇözümleyicisi, İletiİsteği, İletiŞablonu,
 };
 
 /// Tezgâhın `ORT-021` katalog kimliği.
@@ -32,8 +32,9 @@ const TEZGAH_KATALOĞU: &str = "galeri.tezgah";
 ///
 /// Eskiden `tezgah_bölüm_adı` içinde kod olarak duran sözlük artık gerçek
 /// bir `İletiKataloğuPaketi`dir; çözüm mühürlü `İletiÇözümHizmeti`nden
-/// geçer. Diğer bileşen ailelerinin placeholder metinleri (aile adı ve
-/// açıklamaları) bu katalogda değildir — o aileler henüz taşınmadı.
+/// geçer. K08'in görünür `%25`, `%75` ve sonuç iletileri de aynı uygulama
+/// kökü providerından gelir. Diğer ailelerin placeholder ad/açıklamaları bu
+/// katalogda değildir — o aileler henüz taşınmadı.
 const TEZGAH_KAYITLARI: &[(&str, &str)] = &[
     ("galeri.tezgah.başlık", "Yapılandırma Tezgâhı"),
     ("galeri.tezgah.önizleme", "Önizleme ve kabuk denetimleri"),
@@ -74,6 +75,15 @@ const TEZGAH_KAYITLARI: &[(&str, &str)] = &[
     ),
     ("galeri.tezgah.bölüm.otomatik_doldurma", "Otomatik doldurma"),
     ("galeri.tezgah.bölüm.saat_dilimi", "Saat dilimi"),
+    ("galeri.bil140.ilerleme.başlık", "Dosyalar işleniyor"),
+    (
+        "galeri.bil140.ilerleme.açıklama",
+        "Aynı yaşayan kanonik plan",
+    ),
+    ("galeri.bil140.ilerleme.yüzde25", "%25"),
+    ("galeri.bil140.ilerleme.yüzde75", "%75"),
+    ("galeri.bil140.sonuç.başlık", "İşlem tamamlandı"),
+    ("galeri.bil140.sonuç.açıklama", "Dosyalar hazır"),
 ];
 
 /// Verilen dil için tezgâh katalog paketini kurar.
@@ -531,20 +541,42 @@ impl TezgahİletiÇözücüsü {
         }
     }
 
-    /// Verilen canlı snapshot ile tek anahtar çözümü.
-    fn çöz_katalogla(
+    /// Verilen canlı snapshot ile BİL tüketicilerine taşınabilir tam ORT-021
+    /// zarfını çözer. Ham dizeye iniş yalnız aşağıdaki UI adapterındadır.
+    fn çözülmüş_katalogla(
         &self,
         anahtar: &YerelleştirmeAnahtarı,
         katalog: Arc<gpui_bilesenleri_temel::İletiKataloğuSnapshot>,
-    ) -> Result<gpui::SharedString, TezgahÇözümHatası> {
+    ) -> Result<Arc<ÇözülmüşKullanıcıİletisi>, TezgahÇözümHatası> {
         let istek = İletiİsteği {
             anahtar: anahtar.clone(),
             argümanlar: Arc::from(Vec::new()),
         };
         self.hizmet
             .çöz(&istek, &self.yerel_kök, katalog)
-            .map(|çözülen| gpui::SharedString::new(çözülen.metin().metin()))
             .map_err(TezgahÇözümHatası::Çözüm)
+    }
+
+    /// Verilen canlı snapshot ile tek anahtarın UI dizesini çözer.
+    fn çöz_katalogla(
+        &self,
+        anahtar: &YerelleştirmeAnahtarı,
+        katalog: Arc<gpui_bilesenleri_temel::İletiKataloğuSnapshot>,
+    ) -> Result<gpui::SharedString, TezgahÇözümHatası> {
+        self.çözülmüş_katalogla(anahtar, katalog)
+            .map(|çözülen| gpui::SharedString::new(çözülen.metin().metin()))
+    }
+
+    /// BİL tüketicisine ham `String` yerine yaşayan katalog ve yerel kök
+    /// damgalarını taşıyan tam ORT-021 iletisini verir.
+    pub(crate) fn çözülmüş_sonuç(
+        &self,
+        anahtar: &YerelleştirmeAnahtarı,
+    ) -> Result<Arc<ÇözülmüşKullanıcıİletisi>, TezgahÇözümHatası> {
+        match self.hizmet.etkin_katalog(&self.yerel_kök) {
+            Some(katalog) => self.çözülmüş_katalogla(anahtar, katalog),
+            None => Err(self.katalogsuzluk()),
+        }
     }
 
     /// Canlı yolun typed sonucu; UI `çöz` bunun kayıpsız sunumudur.

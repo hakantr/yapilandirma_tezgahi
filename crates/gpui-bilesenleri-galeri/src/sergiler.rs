@@ -6261,16 +6261,11 @@ pub(crate) fn ilerleme_sergisi(
             } else {
                 "İlerlet"
             })
-            .on_click(bağlam.listener(|bu, _, _, bağlam| {
-                // Aynı K08 görünüm entitysi önce öteki doğrulanmış plana
-                // geçirilir; statik yüzde değişimi plan geçişi sayılmaz.
-                bu.k08_planını_ilerlet(bağlam);
-                bu.sergi_ilerleme = if bu.sergi_ilerleme >= 100 {
-                    0
-                } else {
-                    bu.sergi_ilerleme.saturating_add(20).min(100)
-                };
-                bağlam.notify();
+            .on_click(bağlam.listener(|bu, _, pencere, bağlam| {
+                // Aynı K08 görünüm entitysi üretim provider yayını, yaşayan
+                // yetki ve anlamlı hazır planla `%25 -> %75 -> Sonuç`
+                // ilerler. Bu sibling çubuk kanıt kaynağı değildir.
+                bu.k08_planını_ilerlet(pencere, bağlam);
             })),
     )
     .child(
@@ -6290,7 +6285,15 @@ pub(crate) fn ilerleme_sergisi(
                 .border_1()
                 .border_color(rgb(kenarlık()))
                 .p_3()
-                .child(gpui_bilesenleri::durum_planı_elementi(&görünüm))
+                // Kanonik K08 öğesi kapsayıcısının tamamını kullanır. Bu
+                // fiziksel yükseklik olmazsa auto-height ebeveyn relative
+                // çocuğa sıfır alan verir ve doğrulanmış plan çizilemez.
+                .child(
+                    div()
+                        .h(px(88.))
+                        .w_full()
+                        .child(gpui_bilesenleri::durum_planı_elementi(&görünüm)),
+                )
                 .child(
                     div()
                         .mt_2()

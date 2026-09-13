@@ -689,7 +689,7 @@ impl GaleriUygulaması {
             sergi_bildirimi_açık: false,
             sergi_form_gönderildi: false,
             sergi_sürekli_değer: 40,
-            sergi_ilerleme: 35,
+            sergi_ilerleme: 25,
             sergi_takvim_günü: 12,
             sergi_disclosure_açık: true,
             sergi_renk_seçimi: 0,
@@ -717,19 +717,22 @@ impl GaleriUygulaması {
             return;
         }
         let fabrika = self.kimlik_fabrikası.clone();
-        match k08_durum_plani::GaleriDurumPlanKökü::kur(&fabrika, pencere, bağlam) {
+        let çözücü = self.tezgah_çözücüsü();
+        match k08_durum_plani::GaleriDurumPlanKökü::kur(&fabrika, &çözücü, pencere, bağlam) {
             Ok(kök) => self.durum_plan_kökü = Some(kök),
             Err(hata) => self.durum_plan_hatası = Some(hata),
         }
     }
 
-    /// Aynı yaşayan K08 görünüm entitysini önceden doğrulanmış öteki plana geçirir.
-    pub fn k08_planını_ilerlet(&mut self, bağlam: &mut Context<Self>) {
+    /// Aynı yaşayan K08 görünüm entitysini sonraki gerçek sunum epochuna geçirir.
+    pub fn k08_planını_ilerlet(&mut self, pencere: &mut Window, bağlam: &mut Context<Self>) {
+        let çözücü = self.tezgah_çözücüsü();
         let Some(kök) = self.durum_plan_kökü.as_mut() else {
             return;
         };
-        if let Err(hata) = kök.ilerlet(bağlam) {
-            self.durum_plan_hatası = Some(hata);
+        match kök.ilerlet(&çözücü, pencere, bağlam) {
+            Ok(()) => self.sergi_ilerleme = kök.sergi_yüzdesi(),
+            Err(hata) => self.durum_plan_hatası = Some(hata),
         }
         bağlam.notify();
     }
@@ -737,6 +740,25 @@ impl GaleriUygulaması {
     /// Görünür K08 tüketicisinin o anda çizdiği exact plan nesli.
     pub fn k08_plan_nesli(&self) -> Option<u64> {
         self.durum_plan_kökü.as_ref().map(|kök| kök.plan_nesli())
+    }
+
+    /// Görünür K08 tüketicisinin current snapshot yetkisindeki yaşam nesli.
+    pub fn k08_yaşam_nesli(&self) -> Option<u64> {
+        self.durum_plan_kökü.as_ref().map(|kök| kök.yaşam_nesli())
+    }
+
+    /// Current kanonik sunumun kullanıcıya dönük aşaması.
+    pub fn k08_sunum_aşaması(&self) -> Option<&'static str> {
+        self.durum_plan_kökü.as_ref().map(|kök| kök.aşama())
+    }
+
+    /// Test/kanıt tüketicisinin ilk epochta yakalayıp sonraki epochlarda
+    /// yeniden çizdiği aynı opak K08 entity tutamacı.
+    #[doc(hidden)]
+    pub fn k08_görünüm_tutamacı(
+        &self,
+    ) -> Option<gpui_bilesenleri::DurumPlanGörünümTutamacı> {
+        self.durum_plan_kökü.as_ref().map(|kök| kök.görünüm())
     }
 
     pub fn k08_plan_hatası(&self) -> Option<&str> {

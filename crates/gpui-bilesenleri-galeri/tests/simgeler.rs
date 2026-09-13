@@ -4,8 +4,7 @@
 
 use gpui::{AssetSource as _, TestAppContext};
 use gpui_bilesenleri::{
-    SimgeBoyutTercihi, SimgeGerekliliği, SimgeGörselBiçimi, SimgeÇözümAkıbeti, Simgeİsteği,
-    TemaKipi, ÇözülmüşYazıYönü,
+    SimgeBoyutTercihi, SimgeGerekliliği, SimgeGörselBiçimi, Simgeİsteği, TemaKipi, ÇözülmüşYazıYönü,
 };
 use gpui_bilesenleri_galeri::{
     GaleriVarlıkKaynağı, bileşen_tuş_bağlarını_kur, galeri_simge_cache_gözlemi,
@@ -43,10 +42,10 @@ fn yardimci_eylem_simgeleri_yasayan_hizmette_tam_cozulur() {
         ] {
             let kimlik = galeri_simge_kimliği(ad, bağlam)
                 .unwrap_or_else(|| panic!("{ad} yaşayan snapshotta kayıtlı olmalı"));
-            assert!(matches!(
-                hizmet.çöz(&istek(kimlik)),
-                Ok(SimgeÇözümAkıbeti::TamÇözüldü(_))
-            ));
+            let çözüm = hizmet
+                .çöz(&istek(kimlik))
+                .unwrap_or_else(|hata| panic!("{ad} çözülmedi: {hata:?}"));
+            assert!(çözüm.simge().is_some(), "{ad} çizilebilir olmalı");
         }
     });
 }
@@ -92,14 +91,14 @@ fn k09_ayni_mantiksal_istek_once_kacirma_sonra_vurus_uretir() {
             galeri_simge_kimliği("input.product-action", bağlam).expect("ürün simgesi kayıtlıdır");
         let istek = istek(kimlik);
         let önce = galeri_simge_cache_gözlemi(bağlam);
-        assert!(matches!(
-            hizmet.çöz(&istek),
-            Ok(SimgeÇözümAkıbeti::TamÇözüldü(_))
-        ));
-        assert!(matches!(
-            hizmet.çöz(&istek),
-            Ok(SimgeÇözümAkıbeti::TamÇözüldü(_))
-        ));
+        let ilk = hizmet.çöz(&istek).expect("ilk sahipli çözüm");
+        let ikinci = hizmet.çöz(&istek).expect("ikinci sahipli çözüm");
+        assert!(ilk.simge().is_some());
+        assert!(ikinci.simge().is_some());
+        assert!(
+            ilk.test_aynı_allocation(&ikinci),
+            "iki public tutamaç aynı sayılan K09 allocationını paylaşmalı",
+        );
         let sonra = galeri_simge_cache_gözlemi(bağlam);
         assert_eq!(sonra.mantıksal_kaçırma, önce.mantıksal_kaçırma + 1);
         assert_eq!(sonra.mantıksal_vuruş, önce.mantıksal_vuruş + 1);
