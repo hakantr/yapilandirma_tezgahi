@@ -1,5 +1,10 @@
 # RA-AF Paket D gerçek galeri kanıt raporu
 
+> Güncellik notu (14 Eylül 2026): Bu belgedeki tarihsel K08 “iki plan /
+> yalnız nesil” ve K09 çıplak çözüm sonucu değerlendirmeleri,
+> `RA_AF_K08_K09_GALERI_ARTCI_KANIT_RAPORU.md` ile düzeltilmiştir. Aşağıdaki
+> SHA ve ölçümler ilk Paket D tesliminin tarihsel kaydı olarak korunur.
+
 > Tarih: 12 Eylül 2026
 >
 > Galeri kaynak commit'i: `585212dc3d381e90ed971bde041c464f7b7287b5`
