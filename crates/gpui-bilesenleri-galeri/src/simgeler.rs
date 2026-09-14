@@ -341,7 +341,7 @@ fn galeri_simge_hizmetini_kur(
             )),
             telif_bildirimi: "Copyright (c) 2018-present Ant UED".into(),
             dağıtım_akıbeti: SimgeDağıtımLisansAkıbeti::Uyumlu,
-            yon003_borç_kimliği: None,
+            bağımlılık_borç_kimliği: None,
         },
         normalleştirme_manifesti: varlıklar
             .iter()
@@ -365,10 +365,10 @@ fn galeri_simge_hizmetini_kur(
     let hazırlık = hazırlık.cache_yapılandırmasını_denetle(
         temel,
         cache_profili,
-        bütçe(YerleşikPerformansBütçeRolü::Ort016MantıksalCpu),
-        bütçe(YerleşikPerformansBütçeRolü::Ort016MantıksalBellek),
-        bütçe(YerleşikPerformansBütçeRolü::Ort016GeometriCpu),
-        bütçe(YerleşikPerformansBütçeRolü::Ort016GeometriBellek),
+        bütçe(YerleşikPerformansBütçeRolü::SimgeMantıksalCpu),
+        bütçe(YerleşikPerformansBütçeRolü::SimgeMantıksalBellek),
+        bütçe(YerleşikPerformansBütçeRolü::SimgeGeometriCpu),
+        bütçe(YerleşikPerformansBütçeRolü::SimgeGeometriBellek),
         Arc::from([]),
     )?;
     let yayın = depo.yayımla(hazırlık.hazırla()?)?;

@@ -526,7 +526,7 @@ fn yon_006_zengin_girdi_ve_belge_aileleri_canli_durum_sergiler() {
         "DisclosureTetikleyicisi::TümBaşlık",
         "RenkYüzeyi::Kütüphaneİçi",
         "Aktarımİlerlemesi::Belirli",
-        "VurguKaynağı::AramaOturumuBil190",
+        "VurguKaynağı::AramaOturumu",
     ] {
         assert!(sergiler.contains(kanonik_özellik));
     }

@@ -6626,7 +6626,7 @@ fn aktarım_sergisi(ilerleme: u8, bağlam: &mut Context<GaleriUygulaması>) -> S
 }
 
 fn arama_sergisi(etkin: u8, bağlam: &mut Context<GaleriUygulaması>) -> Stateful<Div> {
-    let kaynak = VurguKaynağı::AramaOturumuBil190;
+    let kaynak = VurguKaynağı::AramaOturumu;
     sergi_kartı(
         "bil-190-canlı-sergi",
         "Belge İçi Arama",
@@ -6675,8 +6675,8 @@ fn arama_sergisi(etkin: u8, bağlam: &mut Context<GaleriUygulaması>) -> Statefu
             .text_xs()
             .text_color(rgb(ikincil_metin()))
             .child(match kaynak {
-                VurguKaynağı::AramaOturumuBil190 => "Vurgu sahibi: Arama oturumu",
-                VurguKaynağı::SüzmeAçıklamasıBil020 => "Vurgu sahibi: Süzme",
+                VurguKaynağı::AramaOturumu => "Vurgu sahibi: Arama oturumu",
+                VurguKaynağı::SeçimListesiSüzmesi => "Vurgu sahibi: Süzme",
             }),
     )
 }
@@ -7305,7 +7305,7 @@ fn medya_sergisi(niyet: bool, bağlam: &mut Context<GaleriUygulaması>) -> State
             .text_color(rgb(ikincil_metin()))
             .child(format!(
                 "Port bekleniyor: {} · Oynat denetimi: BİL-040={} · Yerel oynatma iddiası: Yok",
-                teslim.port_sonucu_bekleniyor, denetimler.oynat_bil040
+                teslim.port_sonucu_bekleniyor, denetimler.oynat_düğmesi
             )),
     )
 }
