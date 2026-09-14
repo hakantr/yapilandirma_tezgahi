@@ -1754,7 +1754,7 @@ impl TezgahTercihleri {
             duyarlılık: Some(OndalıkDuyarlılık::Sabit(kesir)),
             yuvarlama: None,
             basamak_gruplama: Some(if gruplama {
-                BasamakGruplama::YerelVarsayılan
+                BasamakGruplama::Yerel
             } else {
                 BasamakGruplama::Yok
             }),
@@ -1774,7 +1774,7 @@ impl TezgahTercihleri {
                 Ok(birim) => BiçimYapılandırması::Açık(BiçimTanımı::Para(ParaBiçimi {
                     sayı: sayı(true, kesir),
                     birim,
-                    birim_gösterimi: Some(ParaBirimiGösterimi::Simge),
+                    birim_gösterimi: Some(ParaBirimiGösterimi::Sembol),
                     birim_konumu: self.işaret_konumu,
                 })),
                 Err(_) => BiçimYapılandırması::Genel,
@@ -1816,7 +1816,7 @@ impl TezgahTercihleri {
                     Ok(birim) => BiçimYapılandırması::Açık(BiçimTanımı::Para(ParaBiçimi {
                         sayı: sayı(true, kesir),
                         birim,
-                        birim_gösterimi: Some(ParaBirimiGösterimi::Simge),
+                        birim_gösterimi: Some(ParaBirimiGösterimi::Sembol),
                         birim_konumu: self.işaret_konumu,
                     })),
                     Err(_) => BiçimYapılandırması::Genel,
@@ -1920,7 +1920,7 @@ impl TezgahTercihleri {
                  sayı: SayıBiçimi {{ duyarlılık: Some(OndalıkDuyarlılık::Sabit({kesir})), \
                  ..SayıBiçimi::default() }},\n        \
                  birim: ParaBirimi::yeni(\"TRY\").expect(\"geçerli birim\"),\n        \
-                 birim_gösterimi: Some(ParaBirimiGösterimi::Simge),\n    }})"
+                 birim_gösterimi: Some(ParaBirimiGösterimi::Sembol),\n    }})"
             ),
             BiçimUygulaması::Yüzde => format!(
                 "BiçimTanımı::Yüzde(YüzdeBiçimi {{\n        \

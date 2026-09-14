@@ -209,3 +209,16 @@ cargo run -p gpui-bilesenleri-galeri-masaustu          # masaüstü
 python3 tools/wasm_galeri_hazirla.py                   # WASM paketi
 python3 tools/wasm_galeri_sunucu.py --port 8000        # tarayıcı
 ```
+
+## RA-AG hizalama atomları (14 Eylül 2026)
+
+Kaynak depodaki RA-AG turunun kamusal ad ve kanonik enum hizaları bu depoya yalnız
+tüketici göçü olarak yansıdı; galeri davranışı değişmedi:
+
+- `d9c5395` — Paket A: `VurguKaynağı::{AramaOturumu, SeçimListesiSüzmesi}`,
+  `YerleşikPerformansBütçeRolü::Simge{Mantıksal,Geometri}{Cpu,Bellek}`,
+  `MedyaDenetimBağdaştırıcıları.oynat_düğmesi`, `SimgeKaynakLisansKaydı.bağımlılık_borç_kimliği`
+  (kaynak atomu `8c91b03`).
+- Paket B: `BasamakGruplama::Yerel`, `ParaBirimiGösterimi::Sembol` (kaynak atomu ORT-008 2.4.0).
+  Test edilen çift: bu deponun ilgili commit'i + kaynak deponun Paket B kaynak atomu; exact
+  SHA'lar kaynak deponun `raporlar/RA_AG_PAKET_B_ORT008_SAYISAL_SAGLAYICI_KANIT_RAPORU.md` dosyasındadır.

@@ -605,7 +605,7 @@ fn bicim_secenegi_yapilandirmaya_gecer() {
         BiçimYapılandırması::Açık(BiçimTanımı::Ondalık(biçim)) => {
             assert_eq!(
                 biçim.basamak_gruplama,
-                Some(gpui_bilesenleri::BasamakGruplama::YerelVarsayılan)
+                Some(gpui_bilesenleri::BasamakGruplama::Yerel)
             );
             assert_eq!(
                 biçim.duyarlılık,
