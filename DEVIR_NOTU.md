@@ -74,6 +74,26 @@ Taşınma uyarlamaları:
 
 ## 5. Kardeş eşitleme sicili
 
+### 14 Eyl 2026 (gece) — ürün `95eb8bb` (BİL-010 `33.7.0`, ORT-008 `3.1.0`)
+
+Kardeş `gpui_bilesenleri` RA-AH turunu aldı: ORT-008 `3.0.0` ayrıştırma
+girdisinin ORT-002 doğrulamalı kaynak bağı (`ca95e2d`), K11 sicil/denetim
+kapısı (`ec79c50`, `49f127d`) ve `3.1.0`/`33.7.0` ile semantik rol katmanı,
+yazım izi makbuzları, erişilebilir değer ve konumsal adım (`95eb8bb`). Bu
+depoda tezgâh kodu değişmedi (galeri `AyrıştırmaGirdisi` kurmaz, `§49`
+tüketimi alanın kendisindedir); yalnız `render_kosumu.rs::
+sayisal_tezgah_gercek_saglayici_zinciriyle_gosterir_duzenler_kabul_eder`
+genişletildi: ara girdinin sessiz korunması, kabul sonrası
+`açık_yazım_izi_makbuzları`, odak dışı gösterimin `semantik_roller` katmanı
+(altı `DeğerRakamı`), ORT-009 erişilebilir değerin rol katmanından türemesi
+ve açık adım yokken caret konumsal adımının (`1.234,5` → `1.234,6`) exact
+düzenleme planıyla yazılması gerçek GPUI penceresinde gözlenir.
+
+Doğrulama (ürün `95eb8bb` ağacıyla, ayrı hedef dizininde): `cargo check
+--workspace --all-targets` temiz, `cargo test -p gpui-bilesenleri-galeri`
+bütün hedefler yeşil (render `14/14`, sayısal tezgâh testi geçti), fmt temiz.
+
+
 ### 1 Eyl 2026 — ürün `708e39e` (BİL-010 `23.0.0`)
 
 Kardeş `gpui_bilesenleri`, BİL-010 yerel bağlam kapanış paketini uzak ana

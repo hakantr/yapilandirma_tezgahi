@@ -9,7 +9,7 @@
 
 use gpui::{IntoElement, Render, TestAppContext, Window, WindowAppearance};
 use gpui_bilesenleri::{
-    AtamaSonucu, DegeriKabulEt, DurumPlanGörünümTutamacı, FormRevealSonucu,
+    AtamaSonucu, DegeriArtir, DegeriKabulEt, DurumPlanGörünümTutamacı, FormRevealSonucu,
     GizliAlıcıHazırlıkReddi, GizliDeğerGörünümü, GizliKabulGözlemi, GizliTeslimRetNedeni,
     HarfDönüşümü, KırpmaPolitikası, MetinDeğişikliği, MetinDüzenlemePortu,
     YardımcıEylemGörünürlüğü, YardımcıEylemTürü, durum_planı_elementi,
@@ -880,5 +880,92 @@ fn sayisal_tezgah_gercek_saglayici_zinciriyle_gosterir_duzenler_kabul_eder(
         olaylar.borrow().contains(&"KabulReddedildi"),
         "ret olayı teslim edilmeli: {:?}",
         olaylar.borrow()
+    );
+
+    // `BİL-010 §49` (33.7.0): ara girdi sessiz korunur; semantik rol katmanı,
+    // yazım izi makbuzları, erişilebilir değer ve konumsal adım gerçek
+    // galeri alanında gözlenir. Galeri hiçbirini kendi kurmaz.
+    metni_yaz(görsel, "12,");
+    let önceki_olay_sayısı = olaylar.borrow().len();
+    görsel.dispatch_action(DegeriKabulEt);
+    görsel.run_until_parked();
+    assert_eq!(gösterim(görsel, true), "12,", "ara girdi korunur");
+    assert_eq!(
+        olaylar.borrow().len(),
+        önceki_olay_sayısı,
+        "ara kabul denemesi olay yaymaz: {:?}",
+        olaylar.borrow()
+    );
+    metni_yaz(görsel, "1.234,5");
+    görsel.dispatch_action(DegeriKabulEt);
+    görsel.run_until_parked();
+    assert_eq!(
+        kabul_edilmiş(görsel),
+        Some(AçıkGirişDeğeriGörünümü::Ondalık(
+            ondalık(12_345, 1)
+        ))
+    );
+    let makbuzlar = görsel.update(|_, bağlam| {
+        alan.read(bağlam)
+            .açık_yazım_izi_makbuzları()
+            .expect("açık tezgâh alanı")
+    });
+    assert!(
+        makbuzlar.kabul.is_some(),
+        "kabul yazım izi makbuzu bağlanır"
+    );
+    let roller = görsel.update(|_, bağlam| {
+        alan.read(bağlam)
+            .açık_gösterim_metni(false)
+            .expect("açık tezgâh alanı")
+            .semantik_roller()
+            .map(<[gpui_bilesenleri::GirişGösterimRolü]>::to_vec)
+    });
+    let roller = roller.expect("sağlayıcı gösterimi semantik rol katmanı taşır");
+    assert_eq!(
+        roller
+            .iter()
+            .filter(|rol| rol.rol == gpui_bilesenleri_temel::BiçimSemantikRolü::DeğerRakamı)
+            .map(|rol| rol.utf8_aralığı.len())
+            .sum::<usize>(),
+        6,
+        "1.234,50 altı değer rakamı taşır: {roller:?}"
+    );
+    let erişilebilir = görsel.update(|_, bağlam| {
+        alan.read(bağlam)
+            .açık_erişilebilir_sunum()
+            .expect("açık tezgâh alanı")
+            .expect("tezgâh alanı erişilebilir ad taşır")
+    });
+    assert_eq!(
+        erişilebilir.değer,
+        Some(gpui_bilesenleri_temel::ErişilebilirDeğer::Metin(
+            "1.234,50".into()
+        )),
+        "erişilebilir değer rol katmanından türetilir"
+    );
+    // Konumsal adım: exact düzenleme planı metni ("1.234,5") yaşayan metne
+    // eşittir; caret sonda → son değer rakamı (kesir) → +0,1.
+    görsel.update(|pencere, bağlam| {
+        alan.update(bağlam, |alan, bağlam| {
+            pencere.focus(alan.odak(), bağlam);
+        });
+    });
+    görsel.run_until_parked();
+    görsel.dispatch_action(gpui_bilesenleri::SatirSonunaGit);
+    görsel.run_until_parked();
+    görsel.dispatch_action(DegeriArtir);
+    görsel.run_until_parked();
+    assert_eq!(
+        gösterim(görsel, true),
+        "1.234,6",
+        "konumsal adım exact düzenleme planıyla yazılır"
+    );
+    assert_eq!(
+        kabul_edilmiş(görsel),
+        Some(AçıkGirişDeğeriGörünümü::Ondalık(
+            ondalık(12_345, 1)
+        )),
+        "adım kabul üretmez"
     );
 }
