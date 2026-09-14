@@ -9,17 +9,21 @@
 
 use gpui::{IntoElement, Render, TestAppContext, Window, WindowAppearance};
 use gpui_bilesenleri::{
-    AtamaSonucu, DegeriKabulEt, DurumPlanGörünümTutamacı, GizliAlıcıHazırlıkReddi,
-    GizliDeğerGörünümü, GizliKabulGözlemi, GizliTeslimRetNedeni, HarfDönüşümü, KırpmaPolitikası,
-    MetinDeğişikliği, MetinDüzenlemePortu, YardımcıEylemGörünürlüğü, YardımcıEylemTürü,
-    durum_planı_elementi,
+    AtamaSonucu, DegeriKabulEt, DurumPlanGörünümTutamacı, FormRevealSonucu,
+    GizliAlıcıHazırlıkReddi, GizliDeğerGörünümü, GizliKabulGözlemi, GizliTeslimRetNedeni,
+    HarfDönüşümü, KırpmaPolitikası, MetinDeğişikliği, MetinDüzenlemePortu,
+    YardımcıEylemGörünürlüğü, YardımcıEylemTürü, durum_planı_elementi,
 };
 use gpui_bilesenleri_galeri::{
     BİL_AİLELERİ, GALERİ_SAHİPLİ_METİN_UTF8_TAVANI, GaleriHedefi, GaleriUygulaması, KAB_AİLELERİ,
     ORT_AİLELERİ, bileşen_tuş_bağlarını_kur, galeri_simge_cache_gözlemi, galeri_simge_kimliği,
 };
 use gpui_bilesenleri_galeri::{K03ProgramatikKanıtGözlemi, TezgahDeğerKipi, olay_özeti};
-use std::{cell::RefCell, rc::Rc};
+use gpui_bilesenleri_temel::{OdakGeçişAkıbeti, OdakGörünürlükSonucu};
+use std::{
+    cell::{Cell, RefCell},
+    rc::Rc,
+};
 
 fn galeri_çiz(bağlam: &mut TestAppContext, hedef: GaleriHedefi, aile: Option<&str>) {
     bağlam.update(bileşen_tuş_bağlarını_kur);
@@ -260,6 +264,79 @@ fn k08_k09_gercek_plan_gecisi_ve_sicak_soguk_gpui_cizimi(bağlam: &mut TestAppCo
         None
     );
     assert!(başarı_simgesi_var(&yakalanan_tutamaç_quadları, koyu));
+}
+
+#[gpui::test]
+fn bil120_k10_galeri_gercek_alani_reveal_eder_ve_provider_commitiyle_odaklar(
+    bağlam: &mut TestAppContext,
+) {
+    bağlam.update(bileşen_tuş_bağlarını_kur);
+    let (uygulama, görsel) =
+        bağlam.add_window_view(|_, _| GaleriUygulaması::hedef(GaleriHedefi::Masaüstü));
+    çizimi_akıt(görsel);
+
+    let (hedef, beklenen_başvuru) = görsel.update(|_, bağlam| {
+        let uygulama = uygulama.read(bağlam);
+        assert_eq!(
+            uygulama.k10_form_hatası(),
+            None,
+            "K10 kuruluş tanısı: {:?}",
+            uygulama.k10_form_hatası()
+        );
+        assert!(!uygulama.k10_form_hedefi_açık_mı());
+        (
+            uygulama
+                .k10_form_hedefi()
+                .expect("galeri gerçek BİL-010 form hedefini kurar"),
+            uygulama
+                .k10_form_hedef_başvurusu()
+                .cloned()
+                .expect("galeri exact ORT-005 hedefini saklar"),
+        )
+    });
+    assert!(görsel.debug_bounds("bil-120-k10-gercek-form").is_some());
+    assert!(görsel.debug_bounds("bil-120-k10-hedef").is_none());
+    let odak_olayları = Rc::new(Cell::new(0usize));
+    let sayaç = Rc::clone(&odak_olayları);
+    let odak = görsel.update(|_, bağlam| hedef.read(bağlam).odak().clone());
+    let _abonelik = görsel.update(|pencere, bağlam| {
+        pencere.on_focus_in(&odak, bağlam, move |_, _| {
+            sayaç.set(sayaç.get().saturating_add(1));
+        })
+    });
+    görsel.run_until_parked();
+
+    let sonuç = görsel.update(|pencere, bağlam| {
+        uygulama.update(bağlam, |uygulama, bağlam| {
+            uygulama.k10_ilk_geçersizi_göster(pencere, bağlam)
+        })
+    });
+    let FormRevealSonucu::Odak(sonuç) = sonuç.expect("K10 reveal zinciri çalışır") else {
+        panic!("başlangıçta mühürlenen geçersiz hedef kaybolmamalı")
+    };
+    assert_eq!(
+        sonuç.görünürlük(),
+        OdakGörünürlükSonucu::AynıÇevrimdeAçığaÇıkarıldı
+    );
+    assert_eq!(sonuç.odak().akıbet(), &OdakGeçişAkıbeti::Taşındı);
+    assert_eq!(sonuç.odak().istenen_hedef(), Some(&beklenen_başvuru));
+    assert_eq!(sonuç.odak().commit_edilen_hedef(), Some(&beklenen_başvuru));
+    assert!(sonuç.odak().commit().is_some());
+    assert!(sonuç.gpui_odağı_uygulandı());
+    assert_eq!(sonuç.odaklanan_alan(), Some(&sonuç.hedef().alan));
+
+    çizimi_akıt(görsel);
+    assert!(görsel.debug_bounds("bil-120-k10-hedef").is_some());
+    görsel.update(|pencere, bağlam| {
+        assert!(hedef.read(bağlam).odak().is_focused(pencere));
+        let uygulama = uygulama.read(bağlam);
+        assert!(uygulama.k10_form_hedefi_açık_mı());
+        assert_eq!(uygulama.k10_form_reveal_sayısı(), 1);
+    });
+    assert!(
+        odak_olayları.get() > 0,
+        "GPUI focus-in olayı teslim edilmeli"
+    );
 }
 
 #[gpui::test]

@@ -28,6 +28,7 @@ mod cjk_dugme_kaniti;
 mod galeri;
 #[path = "durum_plani.rs"]
 mod k08_durum_plani;
+mod k10_formu;
 mod kanit_raporu;
 mod metin_girisi_profili;
 mod metin_girisi_tezgahi;
@@ -532,6 +533,11 @@ pub struct GaleriUygulaması {
     /// eski statik ilerleme kartı başarı kanıtı yerine kullanılmaz.
     durum_plan_kökü: Option<k08_durum_plani::GaleriDurumPlanKökü>,
     durum_plan_hatası: Option<String>,
+    /// Görünür BİL-120 kartının gerçek `BİL-010` → `ORT-009` → `ORT-005`
+    /// zinciri. Kuruluş hatası ayrı ve kalıcı typed tanı olarak çizilir;
+    /// erişilemeyen eski katalog formu başarı kanıtı sayılmaz.
+    k10_form_kökü: Option<k10_formu::GaleriK10FormKökü>,
+    k10_form_hatası: Option<String>,
     /// Pencerenin tamamına uygulanan tema ve kip.
     ///
     /// `ORT-004` renk değerinin sahibi temadır; galeri kendi kabuğunu da
@@ -662,6 +668,8 @@ impl GaleriUygulaması {
             doğrulama_görev_kökü: None,
             durum_plan_kökü: None,
             durum_plan_hatası: None,
+            k10_form_kökü: None,
+            k10_form_hatası: None,
             // İki hedef iki farklı temayla açılır: aynı çekirdeğin farklı
             // temalarla nasıl göründüğü tek bakışta karşılaştırılabilsin.
             tezgah_ekranı: true,
@@ -724,6 +732,72 @@ impl GaleriUygulaması {
         }
     }
 
+    fn k10_form_kökünü_kur(&mut self, pencere: &mut Window, bağlam: &mut Context<Self>) {
+        if self.k10_form_kökü.is_some() || self.k10_form_hatası.is_some() {
+            return;
+        }
+        match k10_formu::GaleriK10FormKökü::kur(
+            &self.metin_hizmetleri,
+            &self.kimlik_fabrikası,
+            pencere,
+            bağlam,
+        ) {
+            Ok(kök) => self.k10_form_kökü = Some(kök),
+            Err(hata) => self.k10_form_hatası = Some(hata),
+        }
+    }
+
+    /// Görünür galeri kartındaki gerçek formun ilk geçersiz alanını açar;
+    /// ön-kapı kararı bu demo için açıkça `Serbest`tir ve fiziksel odağı
+    /// yalnız kanonik K10 zinciri uygular.
+    #[doc(hidden)]
+    pub fn k10_ilk_geçersizi_göster(
+        &self,
+        pencere: &mut Window,
+        bağlam: &mut gpui::App,
+    ) -> Result<gpui_bilesenleri::FormRevealSonucu, gpui_bilesenleri::FormHatası> {
+        self.k10_form_kökü
+            .as_ref()
+            .ok_or(gpui_bilesenleri::FormHatası::OdakBağıEksik)?
+            .ilk_geçersizi_göster(pencere, bağlam)
+    }
+
+    /// K10 gerçek tüketici testinin yaşayan hedef entity erişimi.
+    #[doc(hidden)]
+    pub fn k10_form_hedefi(&self) -> Option<Entity<GirişKutusu>> {
+        self.k10_form_kökü
+            .as_ref()
+            .map(k10_formu::GaleriK10FormKökü::hedef)
+    }
+
+    /// K10 sağlayıcısına gönderilen exact `(bileşen, yuva)` hedefi.
+    #[doc(hidden)]
+    pub fn k10_form_hedef_başvurusu(
+        &self,
+    ) -> Option<&gpui_bilesenleri_temel::OdakHedefiBaşvurusu> {
+        self.k10_form_kökü
+            .as_ref()
+            .map(k10_formu::GaleriK10FormKökü::hedef_başvurusu)
+    }
+
+    #[doc(hidden)]
+    pub fn k10_form_hedefi_açık_mı(&self) -> bool {
+        self.k10_form_kökü
+            .as_ref()
+            .is_some_and(k10_formu::GaleriK10FormKökü::hedef_açık_mı)
+    }
+
+    #[doc(hidden)]
+    pub fn k10_form_reveal_sayısı(&self) -> usize {
+        self.k10_form_kökü
+            .as_ref()
+            .map_or(0, k10_formu::GaleriK10FormKökü::reveal_sayısı)
+    }
+
+    pub fn k10_form_hatası(&self) -> Option<&str> {
+        self.k10_form_hatası.as_deref()
+    }
+
     /// Aynı yaşayan K08 görünüm entitysini sonraki gerçek sunum epochuna geçirir.
     pub fn k08_planını_ilerlet(&mut self, pencere: &mut Window, bağlam: &mut Context<Self>) {
         let çözücü = self.tezgah_çözücüsü();
@@ -778,6 +852,7 @@ impl GaleriUygulaması {
         // ürünün gerçekten açtığı BİL-010 tezgâhında yaşar. Kataloğu yeniden
         // açmak ayrı YÖN-006 bilgi mimarisi kararıdır.
         self.k08_kökünü_kur(pencere, bağlam);
+        self.k10_form_kökünü_kur(pencere, bağlam);
         // Gövde içeriği test erişim noktasıyla **aynı** yoldan üretilir;
         // iki kopya bir süre yan yana yaşadı ve sessizce ayrışıyordu.
         let mut içerik = self.tezgah_profil_içeriği(pencere, bağlam);
@@ -793,6 +868,20 @@ impl GaleriUygulaması {
             )
             .into_any_element(),
         );
+        if let Some(kök) = &self.k10_form_kökü {
+            // K10 gerçek formu tezgâhın sabit önizleme bağlamıdır: reveal
+            // denetimi ve odaklanan alan kaydırılan tanı kartlarının altında
+            // saklanmaz; kullanıcı ilk kareden itibaren zinciri çalıştırır.
+            içerik.önizleme.push(kök.çiz(bağlam));
+        } else if let Some(hata) = &self.k10_form_hatası {
+            içerik.önizleme.push(
+                div()
+                    .id("bil-120-k10-kurulus-hatasi")
+                    .p_3()
+                    .child(format!("K10 gerçek form zinciri kurulamadı: {hata}"))
+                    .into_any_element(),
+            );
+        }
         let kabuk = sergiler::TezgahKabukDurumu {
             tema: self.galeri_teması,
             kip: self.galeri_kipi,
@@ -920,6 +1009,9 @@ impl GaleriUygulaması {
         // saklıyorlar ve kip değişince kendiliğinden yenilenmiyorlar.
         if let Some(alanlar) = self.sergi_girişleri.clone() {
             alanlar.temayı_değiştir(bağlam);
+        }
+        if let Some(kök) = &self.k10_form_kökü {
+            kök.temayı_değiştir(bağlam);
         }
         // Palet ve çözülmüş görünüm kolonun bütün yüzlerini besler.
         self.kolonu_geçersizle(bağlam);
@@ -1145,6 +1237,11 @@ impl GaleriUygulaması {
             if let Some(hata) = alanlar.yerel_bağlamı_değiştir(kök, bağlam) {
                 son_ret = Some(Arc::new(hata));
             }
+        }
+        if let Some(k10) = &self.k10_form_kökü
+            && let Some(hata) = k10.yerel_bağlamı_değiştir(kök, bağlam)
+        {
+            son_ret = Some(Arc::new(hata));
         }
         if self.yerel_uygulama_hatası != son_ret {
             self.yerel_uygulama_hatası = son_ret;
