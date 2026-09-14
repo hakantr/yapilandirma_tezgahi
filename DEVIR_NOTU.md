@@ -222,3 +222,12 @@ tüketici göçü olarak yansıdı; galeri davranışı değişmedi:
 - Paket B: `BasamakGruplama::Yerel`, `ParaBirimiGösterimi::Sembol` (kaynak atomu ORT-008 2.4.0).
   Test edilen çift: bu deponun ilgili commit'i + kaynak deponun Paket B kaynak atomu; exact
   SHA'lar kaynak deponun `raporlar/RA_AG_PAKET_B_ORT008_SAYISAL_SAGLAYICI_KANIT_RAPORU.md` dosyasındadır.
+- Paket C — gerçek sayısal tüketici (BİL-010 33.5.0 / ORT-008 2.4.0): `açık_giriş_kurucusu`
+  artık kurucunun kendi iki isteğini (gösterim planı + exact düzenleme planı, `düzenleme_biçim_planı_isteği`)
+  aynı ORT-008 köküne cold hazırlar; galeri ikinci bir biçim/ayrıştırma algoritması kurmaz
+  (`tests/tezgah_kabul.rs::galeri_ikinci_bicim_algoritmasi_kurmaz` kapı bekçisi). Gerçek zincir
+  `tests/render_kosumu.rs::sayisal_tezgah_gercek_saglayici_zinciriyle_gosterir_duzenler_kabul_eder`:
+  yaşayan tezgâh alanında `1234,5` → Enter → exact `1234,5` kabul, odak dışı `1.234,50`, odaklı ham
+  metin; programatik `98765,4321` → düzenleme metni `98.765,4321`, odak dışı `98.765,43`; `1,2,3`
+  → `KabulReddedildi`, değer/metin korunur. Varsayılan ve `decimal-big` koşumları ayrıdır; exact
+  SHA'lar kaynak deponun Paket C kanıt raporundadır.

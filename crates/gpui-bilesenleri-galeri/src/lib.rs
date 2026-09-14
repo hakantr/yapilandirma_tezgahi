@@ -189,8 +189,11 @@ fn giriş_kısıt_kuruluşu(
 
 /// Açık alan kurucusunu gerçek ORT-001 kısıt kaynağına ve, gerekiyorsa,
 /// cold hazırlanmış gerçek ORT-008 hizmet çiftine bağlar. Plan listesi her
-/// alan için sonludur (0/1); canonical hazırlık baytı galeri tüketicisinin
-/// 64 KiB sahipli metin tavanını aşamaz.
+/// alan için sonludur (0/1/2): gösterim planı ve, tanım exact düzenleme
+/// yazımı değilse, alanın istediği exact düzenleme planı (`BİL-010 §8`).
+/// Galeri ikinci bir biçim/ayrıştırma algoritması kurmaz; her iki plan
+/// aynı kökte alanın kendi isteğinden hazırlanır. Canonical hazırlık baytı
+/// galeri tüketicisinin 64 KiB sahipli metin tavanını aşamaz.
 fn açık_giriş_kurucusu(
     yapılandırma: Arc<GirişYapılandırması>,
     yerel: &gpui_bilesenleri::YerelMetinBağlamı,
@@ -201,13 +204,19 @@ fn açık_giriş_kurucusu(
     let mut kurucu =
         GirişKutusuKurucusu::yeni(Arc::clone(&yapılandırma)).simge_çizim_hizmeti(simge_hizmeti);
     if let Ok(Some(istek)) = kurucu.biçim_planı_isteği(yerel) {
+        let mut istekler = vec![istek];
+        if let Ok(Some(düzenleme)) = kurucu.düzenleme_biçim_planı_isteği(yerel) {
+            istekler.push(düzenleme);
+        }
+        let plan_tavanı =
+            NonZeroU32::new(istekler.len() as u32).expect("en az bir plan isteği var");
         let hazırlık = BiçimHizmetHazırlığı::denetimli(
-            Arc::from([istek]),
-            NonZeroU32::new(1).expect("sabit plan tavanı"),
+            Arc::from(istekler),
+            plan_tavanı,
             NonZeroU64::new(GALERİ_SAHİPLİ_METİN_UTF8_TAVANI as u64)
                 .expect("sabit canonical bayt tavanı"),
         )
-        .expect("galerinin sonlu 0/1 biçim planı hazırlığı geçerli olmalı");
+        .expect("galerinin sonlu 0/1/2 biçim planı hazırlığı geçerli olmalı");
         let kök = BiçimHizmetKökü::yerleşik(hazırlık)
             .expect("galerinin denetlenmiş biçim hazırlığı köke dönüşmeli");
         kurucu = kurucu.biçim_hizmetleri(kök.hizmetleri());

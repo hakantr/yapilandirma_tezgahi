@@ -187,3 +187,48 @@ fn madde_ii12_11_simgeler_svg_ile_gelir() {
         .0;
     assert!(simge.contains("svg()") && simge.contains(".path("));
 }
+
+/// Paket C: galeri ikinci bir sayı biçimleme/ayrıştırma algoritması kurmaz.
+///
+/// Görünür sayısal metin yalnız alanın kendi gösterim yolundan okunur; galeri
+/// ne yerleşik motoru ne de ORT-008 çalıştırıcısını doğrudan çağırır. Bu
+/// test bir kapı bekçisidir: kaynakta böyle bir çağrı belirdiği gün düşer.
+#[test]
+fn galeri_ikinci_bicim_algoritmasi_kurmaz() {
+    for (ad, kaynak) in [
+        ("lib.rs", include_str!("../src/lib.rs")),
+        (
+            "metin_girisi_tezgahi.rs",
+            include_str!("../src/metin_girisi_tezgahi.rs"),
+        ),
+        ("sergiler.rs", include_str!("../src/sergiler.rs")),
+        ("paneller.rs", include_str!("../src/paneller.rs")),
+        ("k10_formu.rs", include_str!("../src/k10_formu.rs")),
+        (
+            "metin_girisi_profili.rs",
+            include_str!("../src/metin_girisi_profili.rs"),
+        ),
+    ] {
+        // Yorum satırları kod değildir: motorun adının açıklamada geçmesi
+        // çağrı sayılmaz; yalnız kod satırları denetlenir.
+        let kod: String = kaynak
+            .lines()
+            .filter(|satır| !satır.trim_start().starts_with("//"))
+            .collect::<Vec<_>>()
+            .join("\n");
+        for çağrı in [
+            "YerelSayıMotoru.",
+            "YerelSayıMotoru::",
+            ".biçimlendir(",
+            ".ondalık_ayrıştır(",
+            ".ayrıştır(",
+            "BiçimlendirmeGirdisi {",
+            "AyrıştırmaGirdisi {",
+        ] {
+            assert!(
+                !kod.contains(çağrı),
+                "{ad} ikinci biçim/ayrıştırma algoritması kuruyor: {çağrı}"
+            );
+        }
+    }
+}

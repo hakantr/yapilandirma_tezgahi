@@ -677,3 +677,208 @@ fn tezgah_erisilebilir_metin_olceginde_cizilir(bağlam: &mut TestAppContext) {
     });
     görsel.run_until_parked();
 }
+
+/// Paket C: gerçek BİL-010 tezgâhının **sayısal** düzenleme zinciri aynı GPUI
+/// penceresinde koşar: galerinin kendi isteğinden cold hazırlanan gösterim ve
+/// exact düzenleme planlarıyla gösterim → düzenleme → Enter kabulü → yeniden
+/// gösterim; programatik atama ve hatalı girdi reddi dâhil. Görünür değer
+/// yalnız alanın kendi gösterim yolundan okunur; galeri sayı biçimlemez.
+#[gpui::test]
+fn sayisal_tezgah_gercek_saglayici_zinciriyle_gosterir_duzenler_kabul_eder(
+    bağlam: &mut TestAppContext,
+) {
+    use gpui_bilesenleri::{
+        AtamaNiyeti, AçıkGirişDeğeriGirdisi, AçıkGirişDeğeriGörünümü, GirişDurumu,
+        GirişDurumuGözlemi, GirişKutusu,
+    };
+    use gpui_bilesenleri_galeri::{BiçimUygulaması, BİÇİM_SEÇENEKLERİ};
+    use gpui_bilesenleri_temel::KesinOndalıkDeğeri;
+
+    bağlam.update(bileşen_tuş_bağlarını_kur);
+    let (uygulama, görsel) =
+        bağlam.add_window_view(move |_, _| GaleriUygulaması::hedef(GaleriHedefi::Masaüstü));
+    let sıra = BİÇİM_SEÇENEKLERİ
+        .iter()
+        .position(|seçenek| seçenek.uygulama == BiçimUygulaması::Sayı { gruplama: true })
+        .expect("binlik ayraçlı sayı seçeneği listede");
+    görsel.update(|_, bağlam| {
+        uygulama.update(bağlam, |uygulama, bağlam| {
+            assert!(uygulama.model.aileyi_aç("BİL-010"), "tezgâh açılamadı");
+            uygulama.tezgahı_değiştir(
+                |tezgah| {
+                    tezgah.değer_türü = TezgahDeğerKipi::Ondalık;
+                    tezgah.türe_uyarla();
+                    tezgah.biçim_seçeneğini_uygula(sıra);
+                },
+                bağlam,
+            );
+        });
+    });
+    görsel.run_until_parked();
+    // Tür değişince alan baştan kurulur; yaşayan alan bir sonraki çizimde doğar.
+    let mut alan = None;
+    for _ in 0..4 {
+        görsel.update(|pencere, _| pencere.refresh());
+        görsel.run_until_parked();
+        alan = görsel.update(|_, bağlam| uygulama.read(bağlam).yaşayan_tezgah_alanı());
+        if alan.is_some() {
+            break;
+        }
+    }
+    let alan = alan.expect("BİL-010 tezgâhı yaşayan sayısal alanı kurar");
+    görsel.update(|_, bağlam| {
+        let alan = alan.read(bağlam);
+        assert!(matches!(
+            alan.yapılandırma().bildirim().biçim,
+            gpui_bilesenleri::BiçimYapılandırması::Açık(
+                gpui_bilesenleri::BiçimTanımı::Ondalık(_)
+            )
+        ));
+    });
+
+    let olaylar = Rc::new(RefCell::new(Vec::<&'static str>::new()));
+    görsel.update(|_, bağlam| {
+        let toplayıcı = Rc::clone(&olaylar);
+        bağlam
+            .subscribe(&alan, move |_, olay, _| {
+                toplayıcı.borrow_mut().push(olay_özeti(olay).ad);
+            })
+            .detach();
+    });
+
+    let gösterim = |görsel: &mut gpui::VisualTestContext, düzenleniyor: bool| -> String {
+        görsel.update(|_, bağlam| {
+            alan.read(bağlam)
+                .açık_gösterim_metni(düzenleniyor)
+                .expect("açık tezgâh alanı")
+                .bütçeli_materyalize_et(GALERİ_SAHİPLİ_METİN_UTF8_TAVANI)
+                .expect("görünür galeri metni bütçeli okunur")
+                .to_string()
+        })
+    };
+    let kabul_edilmiş = |görsel: &mut gpui::VisualTestContext| -> Option<AçıkGirişDeğeriGörünümü> {
+        görsel.update(|_, bağlam| {
+            let GirişDurumuGözlemi::Açık(GirişDurumu::Açık(çekirdek)) =
+                alan.read(bağlam).durum_gözlemi()
+            else {
+                unreachable!("tezgâh sayısal alanı açıktır")
+            };
+            çekirdek
+                .kabul_edilmiş_değer()
+                .map(|değer| değer.değer().clone())
+        })
+    };
+    let metni_yaz = |görsel: &mut gpui::VisualTestContext, metin: &str| {
+        görsel.update(|pencere, bağlam| {
+            alan.update(bağlam, |alan, bağlam| {
+                let yetki = MetinDüzenlemePortu::dış_düzenleme_yetkisi(alan)
+                    .expect("gerçek açık tezgâh dış düzenleme yetkisi verir");
+                let anlık = MetinDüzenlemePortu::anlık_görüntü(alan, &yetki)
+                    .expect("yetkili açık tezgâh snapshotı okunur");
+                let sonuç = MetinDüzenlemePortu::dış_değişikliği_uygula(
+                    alan,
+                    yetki,
+                    gpui_bilesenleri::DışMetinDeğişikliğiİsteği {
+                        değişiklik: MetinDeğişikliği {
+                            utf8_aralığı: 0..anlık.metin.utf8_bayt_uzunluğu(),
+                            yeni_metin: metin.to_owned(),
+                        },
+                        beklenen_değer_sürümü: anlık.değer_sürümü,
+                        beklenen_yapılandırma_sürümü: anlık.yapılandırma_sürümü,
+                    },
+                    bağlam,
+                );
+                assert!(
+                    matches!(sonuç, gpui_bilesenleri::GirişSonucu::Uygulandı { .. }),
+                    "gerçek tezgâh alanına dış düzenleme uygulanır: {sonuç:?}"
+                );
+                pencere.focus(alan.odak(), bağlam);
+            });
+        });
+        görsel.run_until_parked();
+    };
+    let ondalık =
+        |katsayı: i128, ölçek: u32| KesinOndalıkDeğeri::yeni(katsayı, ölçek).expect("ondalık");
+
+    // Gösterim → düzenleme → Enter kabulü → yeniden gösterim.
+    metni_yaz(görsel, "1234,5");
+    görsel.update(|pencere, bağlam| {
+        assert!(
+            alan.read(bağlam).odak().is_focused(pencere),
+            "kabul gerçek odaklı alana dağıtılır"
+        );
+    });
+    assert_eq!(
+        gösterim(görsel, true),
+        "1234,5",
+        "odaklı düzenleme metni ham kalır"
+    );
+    görsel.dispatch_action(DegeriKabulEt);
+    görsel.run_until_parked();
+    assert_eq!(
+        kabul_edilmiş(görsel),
+        Some(AçıkGirişDeğeriGörünümü::Ondalık(
+            ondalık(12_345, 1)
+        )),
+        "kabul exact değeri alanın ORT-008 sağlayıcı yolundan kurar"
+    );
+    assert_eq!(
+        gösterim(görsel, false),
+        "1.234,50",
+        "odak dışı gösterim galerinin cold hazırladığı gösterim planından gelir"
+    );
+    assert_eq!(gösterim(görsel, true), "1234,5");
+    assert!(
+        olaylar.borrow().contains(&"DeğerKabulEdildi"),
+        "kabul olayı teslim edilmeli: {:?}",
+        olaylar.borrow()
+    );
+
+    // Programatik atama: düzenleme metni exact düzenleme planından (bütün
+    // haneler), odak dışı gösterim gösterim planından (yuvarlanmış).
+    let sonuç = görsel.update(|_, bağlam| {
+        alan.update(bağlam, |alan: &mut GirişKutusu, bağlam| {
+            let GirişDurumuGözlemi::Açık(GirişDurumu::Açık(çekirdek)) = alan.durum_gözlemi()
+            else {
+                unreachable!("tezgâh sayısal alanı açıktır")
+            };
+            let değer_sürümü = çekirdek.değer_sürümü();
+            let yapılandırma_sürümü = alan.yapılandırma().yapılandırma_sürümü();
+            alan.değeri_ata(
+                AçıkGirişDeğeriGirdisi::Ondalık(ondalık(987_654_321, 4)),
+                AtamaNiyeti::KabulEdilmişDeğeriDeğiştir,
+                değer_sürümü,
+                yapılandırma_sürümü,
+                bağlam,
+            )
+        })
+    });
+    görsel.run_until_parked();
+    assert!(matches!(sonuç, AtamaSonucu::Uygulandı { .. }), "{sonuç:?}");
+    assert_eq!(gösterim(görsel, true), "98.765,4321");
+    assert_eq!(gösterim(görsel, false), "98.765,43");
+    assert_eq!(
+        kabul_edilmiş(görsel),
+        Some(AçıkGirişDeğeriGörünümü::Ondalık(
+            ondalık(987_654_321, 4)
+        ))
+    );
+
+    // Hatalı girdi: kabul reddedilir, değer ve metin korunur, ret olayı iner.
+    metni_yaz(görsel, "1,2,3");
+    görsel.dispatch_action(DegeriKabulEt);
+    görsel.run_until_parked();
+    assert_eq!(
+        kabul_edilmiş(görsel),
+        Some(AçıkGirişDeğeriGörünümü::Ondalık(
+            ondalık(987_654_321, 4)
+        )),
+        "hatalı girdi kabul edilmiş değeri değiştirmez"
+    );
+    assert_eq!(gösterim(görsel, true), "1,2,3", "hatalı metin silinmez");
+    assert!(
+        olaylar.borrow().contains(&"KabulReddedildi"),
+        "ret olayı teslim edilmeli: {:?}",
+        olaylar.borrow()
+    );
+}
