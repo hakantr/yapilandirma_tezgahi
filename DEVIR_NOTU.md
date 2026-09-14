@@ -74,6 +74,37 @@ Taşınma uyarlamaları:
 
 ## 5. Kardeş eşitleme sicili
 
+### 15 Eyl 2026 (gece) — ürün `b62422c` (BİL-010 `33.8.0`, ORT-008 `3.2.0`)
+
+Kardeş `gpui_bilesenleri` RA-AH artçı turunu aldı: manifest üreticisinde
+beklenti kaybı kapısı ve BİL-120.ACC-018 sicil bağı (`c395f1e`), aile duyarlı
+konumsal adım, typed adım metni akıbeti (`SayısalAdımAkıbeti`) ve gerçek
+korumayı söyleyen yazım izi makbuzları (`b62422c`). Bu depoda tezgâh kodu
+iki noktada değişti:
+
+- `BiçimUygulaması::YüzdeModelYüz` seçeneği ("Yüzde (model 100) · 0,25 ↔ %25"):
+  standart yüzde modeli, kanonik kesir + görünür `%` yazımı; konumsal adım
+  görünür basamağı ters ölçekle kanonik deltaya çevirir.
+- Yerinde yeniden yapılandırma reddedilince (`GirişYapılandırmaGüncellemeAkıbeti::
+  Reddedildi`, ör. yeni biçim seçeneği alanın cold ORT-008 plan kümesinde
+  olmayan bir plan istiyor) tezgâh seçimi sessizce yutmuyor: alan yeni
+  yapılandırmayla yeniden kuruluyor (önce yalnız değer türü değişince
+  yeniden kuruluyordu; biçim seçeneği değişimi görünmez kalıyordu).
+
+Yeni test `render_kosumu.rs::sayisal_tezgah_yuzde_para_bilimsel_konumsal_adim_
+gercek_klavyeyle`: yaşayan tezgâh alanında gerçek odak + tuş vuruşu
+(`simulate_keystrokes`) ile yüzde model `100` (`25` → `26%` kanonik `0,26`,
+PageUp `36%`, kabul `0,36`, kabul makbuzu `Tam`), yüzde model `1` (`26%`
+kanonik `26`), para (`1234,5` ham yazımdan başta Yukarı → `₺2.234,5`, sonda
+Aşağı → `₺2.234,4`; simge/ayraç değer basamağı değil) ve bilimsel (`1250`
+kabul; düz yazımda birler +1 → `1,251E+03`; kanonik metinde caret üs
+rakamlarındayken soldaki son mantis basamağı → `1,252E+03`).
+
+Doğrulama (ürün `b62422c` ağacıyla): `cargo test -p gpui-bilesenleri-galeri
+--all-targets` `267/0` (1 ignored; render `15/15`, tezgah_profil `80/80`,
+tezgah `9/9`), fmt temiz, clippy uyarıları değişen satır aralıklarına işaret
+etmiyor (sınıflar önceki turla aynı).
+
 ### 14 Eyl 2026 (gece) — ürün `95eb8bb` (BİL-010 `33.7.0`, ORT-008 `3.1.0`)
 
 Kardeş `gpui_bilesenleri` RA-AH turunu aldı: ORT-008 `3.0.0` ayrıştırma

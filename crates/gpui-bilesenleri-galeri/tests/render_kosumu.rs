@@ -9,10 +9,10 @@
 
 use gpui::{IntoElement, Render, TestAppContext, Window, WindowAppearance};
 use gpui_bilesenleri::{
-    AtamaSonucu, DegeriArtir, DegeriKabulEt, DurumPlanGörünümTutamacı, FormRevealSonucu,
-    GizliAlıcıHazırlıkReddi, GizliDeğerGörünümü, GizliKabulGözlemi, GizliTeslimRetNedeni,
-    HarfDönüşümü, KırpmaPolitikası, MetinDeğişikliği, MetinDüzenlemePortu,
-    YardımcıEylemGörünürlüğü, YardımcıEylemTürü, durum_planı_elementi,
+    AtamaSonucu, BuyukArtir, DegeriArtir, DegeriAzalt, DegeriKabulEt, DurumPlanGörünümTutamacı,
+    FormRevealSonucu, GizliAlıcıHazırlıkReddi, GizliDeğerGörünümü, GizliKabulGözlemi,
+    GizliTeslimRetNedeni, HarfDönüşümü, KırpmaPolitikası, MetinDeğişikliği, MetinDüzenlemePortu,
+    TumunuSec, YardımcıEylemGörünürlüğü, YardımcıEylemTürü, durum_planı_elementi,
 };
 use gpui_bilesenleri_galeri::{
     BİL_AİLELERİ, GALERİ_SAHİPLİ_METİN_UTF8_TAVANI, GaleriHedefi, GaleriUygulaması, KAB_AİLELERİ,
@@ -967,5 +967,284 @@ fn sayisal_tezgah_gercek_saglayici_zinciriyle_gosterir_duzenler_kabul_eder(
             ondalık(12_345, 1)
         )),
         "adım kabul üretmez"
+    );
+}
+
+/// `BİL-010 33.8.0` galeri karşılığı: yaşayan sayısal tezgâh alanında yüzde
+/// (model `1` ve standart model `100`), para ve bilimsel seçeneklerinde gerçek
+/// odak/klavye/adım/kabul zinciri; ham (gruplamasız) yazımda konumsal adım;
+/// kabul makbuzu kabul edilen metnin kendi ayrıştırmasının gerçek korumasıdır.
+#[gpui::test]
+fn sayisal_tezgah_yuzde_para_bilimsel_konumsal_adim_gercek_klavyeyle(bağlam: &mut TestAppContext) {
+    use gpui_bilesenleri::{
+        AçıkGirişDeğeriGörünümü, GirişDurumu, GirişDurumuGözlemi, GirişKutusu, SatirBasinaGit,
+        SatirSonunaGit,
+    };
+    use gpui_bilesenleri_galeri::{BiçimUygulaması, BİÇİM_SEÇENEKLERİ};
+    use gpui_bilesenleri_temel::{KesinOndalıkDeğeri, YazımİziAkıbeti};
+
+    bağlam.update(bileşen_tuş_bağlarını_kur);
+    let (uygulama, görsel) =
+        bağlam.add_window_view(move |_, _| GaleriUygulaması::hedef(GaleriHedefi::Masaüstü));
+    let sıra = |uygulama_türü: BiçimUygulaması| {
+        BİÇİM_SEÇENEKLERİ
+            .iter()
+            .position(|seçenek| seçenek.uygulama == uygulama_türü)
+            .expect("seçenek listede")
+    };
+    let ondalık =
+        |katsayı: i128, ölçek: u32| KesinOndalıkDeğeri::yeni(katsayı, ölçek).expect("ondalık");
+
+    // Tezgâhı verilen türe/biçime alır ve YENİ yaşayan alanı bulur: seçenek
+    // değişimi alanı yeniden kurar, eski entity ile karıştırılmaz.
+    let alanı_kur = |görsel: &mut gpui::VisualTestContext,
+                     kip: TezgahDeğerKipi,
+                     seçenek: BiçimUygulaması,
+                     önceki: Option<gpui::EntityId>|
+     -> gpui::Entity<GirişKutusu> {
+        let sıra = sıra(seçenek);
+        görsel.update(|_, bağlam| {
+            uygulama.update(bağlam, |uygulama, bağlam| {
+                assert!(uygulama.model.aileyi_aç("BİL-010"), "tezgâh açılamadı");
+                uygulama.tezgahı_değiştir(
+                    |tezgah| {
+                        tezgah.değer_türü = kip;
+                        tezgah.türe_uyarla();
+                        tezgah.biçim_seçeneğini_uygula(sıra);
+                    },
+                    bağlam,
+                );
+            });
+        });
+        görsel.run_until_parked();
+        let biçim_uygun = |biçim: &gpui_bilesenleri::BiçimYapılandırması| match (biçim, seçenek) {
+            (
+                gpui_bilesenleri::BiçimYapılandırması::Açık(
+                    gpui_bilesenleri::BiçimTanımı::Yüzde(y),
+                ),
+                BiçimUygulaması::YüzdeModelYüz,
+            ) => y.model_ölçeği == ondalık(100, 0),
+            (
+                gpui_bilesenleri::BiçimYapılandırması::Açık(
+                    gpui_bilesenleri::BiçimTanımı::Yüzde(y),
+                ),
+                BiçimUygulaması::Yüzde,
+            ) => y.model_ölçeği == ondalık(1, 0),
+            (
+                gpui_bilesenleri::BiçimYapılandırması::Açık(
+                    gpui_bilesenleri::BiçimTanımı::Para(_),
+                ),
+                BiçimUygulaması::Para,
+            ) => true,
+            (
+                gpui_bilesenleri::BiçimYapılandırması::Açık(
+                    gpui_bilesenleri::BiçimTanımı::Bilimsel(_),
+                ),
+                BiçimUygulaması::Bilimsel,
+            ) => true,
+            _ => false,
+        };
+        // Seçenek değişimi aynı entity'yi yeniden yapılandırabilir ya da yeni
+        // alan kurabilir; beklenen biçim tanımı gerçekten uygulanana dek beklenir.
+        let mut son_biçim = None;
+        let mut uygun_alan = None;
+        for _ in 0..8 {
+            görsel.update(|pencere, _| pencere.refresh());
+            görsel.run_until_parked();
+            if let Some(alan) =
+                görsel.update(|_, bağlam| uygulama.read(bağlam).yaşayan_tezgah_alanı())
+            {
+                let biçim = görsel
+                    .update(|_, bağlam| alan.read(bağlam).yapılandırma().bildirim().biçim.clone());
+                if biçim_uygun(&biçim) {
+                    uygun_alan = Some(alan);
+                    break;
+                }
+                son_biçim = Some(biçim);
+            }
+        }
+        uygun_alan.unwrap_or_else(|| {
+            panic!("tezgâh alanı {seçenek:?} için beklenen biçimi taşımalı; önceki={önceki:?}: {son_biçim:?}")
+        })
+    };
+    let gösterim =
+        |görsel: &mut gpui::VisualTestContext, alan: &gpui::Entity<GirişKutusu>| -> String {
+            görsel.update(|_, bağlam| {
+                alan.read(bağlam)
+                    .açık_gösterim_metni(true)
+                    .expect("açık tezgâh alanı")
+                    .bütçeli_materyalize_et(GALERİ_SAHİPLİ_METİN_UTF8_TAVANI)
+                    .expect("görünür galeri metni bütçeli okunur")
+                    .to_string()
+            })
+        };
+    let geçici = |görsel: &mut gpui::VisualTestContext,
+                  alan: &gpui::Entity<GirişKutusu>|
+     -> Option<AçıkGirişDeğeriGörünümü> {
+        görsel.update(|_, bağlam| {
+            let GirişDurumuGözlemi::Açık(GirişDurumu::Açık(çekirdek)) =
+                alan.read(bağlam).durum_gözlemi()
+            else {
+                unreachable!("tezgâh sayısal alanı açıktır")
+            };
+            çekirdek.geçici_değer().map(|değer| değer.değer().clone())
+        })
+    };
+    let kabul_edilmiş = |görsel: &mut gpui::VisualTestContext,
+                         alan: &gpui::Entity<GirişKutusu>|
+     -> Option<AçıkGirişDeğeriGörünümü> {
+        görsel.update(|_, bağlam| {
+            let GirişDurumuGözlemi::Açık(GirişDurumu::Açık(çekirdek)) =
+                alan.read(bağlam).durum_gözlemi()
+            else {
+                unreachable!("tezgâh sayısal alanı açıktır")
+            };
+            çekirdek
+                .kabul_edilmiş_değer()
+                .map(|değer| değer.değer().clone())
+        })
+    };
+    // Gerçek klavye: alan odaklanır, metin tuşlarla yazılır.
+    let yaz =
+        |görsel: &mut gpui::VisualTestContext, alan: &gpui::Entity<GirişKutusu>, metin: &str| {
+            görsel.update(|pencere, bağlam| {
+                alan.update(bağlam, |alan, bağlam| pencere.focus(alan.odak(), bağlam));
+            });
+            görsel.run_until_parked();
+            görsel.dispatch_action(TumunuSec);
+            görsel.run_until_parked();
+            for karakter in metin.chars() {
+                görsel.simulate_keystrokes(&karakter.to_string());
+            }
+            görsel.run_until_parked();
+        };
+
+    // --- Yüzde, standart model 100: `25` → `%25`; birler basamağı +1 kanonik
+    // 0,01; PageUp kanonik 0,1; kabul makbuzu `Tam`.
+    let alan = alanı_kur(
+        görsel,
+        TezgahDeğerKipi::Ondalık,
+        BiçimUygulaması::YüzdeModelYüz,
+        None,
+    );
+    yaz(görsel, &alan, "25");
+    görsel.dispatch_action(SatirSonunaGit);
+    görsel.dispatch_action(DegeriArtir);
+    görsel.run_until_parked();
+    assert_eq!(
+        gösterim(görsel, &alan),
+        "26%",
+        "ham `25` yazımından konumsal adım"
+    );
+    assert_eq!(
+        geçici(görsel, &alan),
+        Some(AçıkGirişDeğeriGörünümü::Ondalık(ondalık(26, 2))),
+        "kanonik delta model ölçeğinin tersidir"
+    );
+    görsel.dispatch_action(BuyukArtir);
+    görsel.run_until_parked();
+    assert_eq!(gösterim(görsel, &alan), "36%");
+    görsel.dispatch_action(DegeriKabulEt);
+    görsel.run_until_parked();
+    assert_eq!(
+        kabul_edilmiş(görsel, &alan),
+        Some(AçıkGirişDeğeriGörünümü::Ondalık(ondalık(36, 2))),
+        "kabul kanonik kesri taşır"
+    );
+    let makbuzlar = görsel.update(|_, bağlam| {
+        alan.read(bağlam)
+            .açık_yazım_izi_makbuzları()
+            .expect("açık tezgâh alanı")
+    });
+    assert_eq!(
+        makbuzlar.kabul.expect("kabul makbuzu").akıbet,
+        YazımİziAkıbeti::Tam,
+        "`36%` exact düzenleme planıyla bayt-eşit geri yazılır"
+    );
+
+    // --- Yüzde, model 1: görünür basamak kanonik basamaktır.
+    let önceki = alan.entity_id();
+    let alan = alanı_kur(
+        görsel,
+        TezgahDeğerKipi::Ondalık,
+        BiçimUygulaması::Yüzde,
+        Some(önceki),
+    );
+    yaz(görsel, &alan, "25");
+    görsel.dispatch_action(SatirSonunaGit);
+    görsel.dispatch_action(DegeriArtir);
+    görsel.run_until_parked();
+    assert_eq!(gösterim(görsel, &alan), "26%");
+    assert_eq!(
+        geçici(görsel, &alan),
+        Some(AçıkGirişDeğeriGörünümü::Ondalık(ondalık(26, 0)))
+    );
+
+    // --- Para: simge ve grup ayracı değer basamağı değildir; ham gruplamasız
+    // yazım da aynı büyüklüğü çözer.
+    let önceki = alan.entity_id();
+    let alan = alanı_kur(
+        görsel,
+        TezgahDeğerKipi::ParaBirimi,
+        BiçimUygulaması::Para,
+        Some(önceki),
+    );
+    yaz(görsel, &alan, "1234,5");
+    görsel.dispatch_action(SatirBasinaGit);
+    görsel.dispatch_action(DegeriArtir);
+    görsel.run_until_parked();
+    let para_metni = gösterim(görsel, &alan);
+    assert!(
+        para_metni.contains("2.234,5") && para_metni.contains('₺'),
+        "binler basamağı simge/ayraçtan bağımsız adımlanır: {para_metni}"
+    );
+    assert_eq!(
+        geçici(görsel, &alan),
+        Some(AçıkGirişDeğeriGörünümü::Ondalık(
+            ondalık(22_345, 1)
+        ))
+    );
+    görsel.dispatch_action(SatirSonunaGit);
+    görsel.dispatch_action(DegeriAzalt);
+    görsel.run_until_parked();
+    let para_sonra = gösterim(görsel, &alan);
+    assert!(para_sonra.contains("2.234,4"), "{para_sonra}");
+
+    // --- Bilimsel: mantis basamağı üs etkisiyle adımlanır; üs rakamları değer
+    // basamağı değildir.
+    let önceki = alan.entity_id();
+    let alan = alanı_kur(
+        görsel,
+        TezgahDeğerKipi::Ondalık,
+        BiçimUygulaması::Bilimsel,
+        Some(önceki),
+    );
+    yaz(görsel, &alan, "1250");
+    görsel.dispatch_action(DegeriKabulEt);
+    görsel.run_until_parked();
+    assert_eq!(
+        kabul_edilmiş(görsel, &alan),
+        Some(AçıkGirişDeğeriGörünümü::Ondalık(ondalık(1_250, 0)))
+    );
+    // Kabul odaklı ham metni korur (`1250`); üssüz düz yazımda rakamlar düz
+    // büyüklüktür: birler +1 → exact planla `1,251E+03` yazılır.
+    assert_eq!(gösterim(görsel, &alan), "1250");
+    görsel.dispatch_action(SatirSonunaGit);
+    görsel.dispatch_action(DegeriArtir);
+    görsel.run_until_parked();
+    assert_eq!(gösterim(görsel, &alan), "1,251E+03");
+    assert_eq!(
+        geçici(görsel, &alan),
+        Some(AçıkGirişDeğeriGörünümü::Ondalık(ondalık(1_251, 0)))
+    );
+    // Kanonik metinde caret üs rakamlarının sonunda: üs rakamı değer basamağı
+    // değildir, soldaki son mantis basamağı (10^-3 × 10^3 = 1) adımlanır.
+    görsel.dispatch_action(SatirSonunaGit);
+    görsel.dispatch_action(DegeriArtir);
+    görsel.run_until_parked();
+    assert_eq!(gösterim(görsel, &alan), "1,252E+03");
+    assert_eq!(
+        geçici(görsel, &alan),
+        Some(AçıkGirişDeğeriGörünümü::Ondalık(ondalık(1_252, 0)))
     );
 }

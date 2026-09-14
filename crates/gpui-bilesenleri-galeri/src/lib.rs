@@ -1392,8 +1392,8 @@ impl GaleriUygulaması {
             );
             let tema = tezgah_teması(&self.tezgah.kutu_teması());
             let önem_zemini = self.tezgah.önem_zemini;
-            alan.update(bağlam, |alan, bağlam| {
-                alan.yapılandırmayı_değiştir(yapılandırma, bağlam);
+            let akıbet = alan.update(bağlam, |alan, bağlam| {
+                let akıbet = alan.yapılandırmayı_değiştir(yapılandırma, bağlam);
                 alan.temayı_değiştir(tema, bağlam);
                 // `§28` durumu ve önemi **kurulamaz**: ikisi de `§16` sorun
                 // kümesinden türetilir ve tek yazarları `sorunları_uygula`dır
@@ -1404,7 +1404,22 @@ impl GaleriUygulaması {
                 // `salt_okunur`/`etkin` yapılandırmasıdır. Senaryo ekseni
                 // aynı sonuca ikinci bir yol açıyordu (`§29.0`).
                 alan.önem_zeminini_değiştir(önem_zemini, bağlam);
+                akıbet
             });
+            // Yerinde yeniden yapılandırma reddedildiyse (ör. yeni biçim
+            // seçeneği alanın cold ORT-008 plan kümesinde olmayan bir plan
+            // istiyor) tezgâh seçimi sessizce yutmaz: alan yeni yapılandırmayla
+            // yeniden kurulur.
+            if matches!(
+                akıbet,
+                gpui_bilesenleri::GirişYapılandırmaGüncellemeAkıbeti::Reddedildi(_)
+            ) {
+                self.tezgah_alanı = None;
+                self.tezgah_yardımcı_kimlikleri = None;
+                self.tezgah_kuruluş_raporu = None;
+                self.tezgah_varsayılan_değer_hatası = None;
+                self.tezgah_kuruluş_hatası = None;
+            }
         }
         self.tercih_alanlarını_eşitle(bağlam);
         // Bölüm listesi, rapor ve kod tercihe bağlıdır: kolon tazelenmeli.

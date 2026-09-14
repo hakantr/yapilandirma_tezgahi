@@ -1273,8 +1273,12 @@ pub enum BiçimUygulaması {
     Sayı { gruplama: bool },
     /// Para birimi gösterimi.
     Para,
-    /// Yüzde gösterimi.
+    /// Yüzde gösterimi; model değeri yüzde birimindedir (`25` ↔ `25%`).
     Yüzde,
+    /// Standart yüzde modeli: kanonik değer kesirdir, görünür değer model
+    /// ölçeği `100` ile yazılır (`0,25` ↔ `25%`); konumsal adım görünür
+    /// basamağı ters ölçekle kanonik deltaya çevirir.
+    YüzdeModelYüz,
     /// Ham metin; biçimlendirme yok.
     Metin,
     /// `ORT-008 §8.1` tarih/saat gösterimi; `açık` alanı parçaları seçer.
@@ -1324,6 +1328,11 @@ pub const BİÇİM_SEÇENEKLERİ: &[BiçimSeçeneği] = &[
         BiçimUygulaması::Eksik("ORT-008 para yerleşimi tanımlamıyor"),
     ),
     seçenek(BiçimÖbeği::Biçim, "Yüzde · %12,50", BiçimUygulaması::Yüzde),
+    seçenek(
+        BiçimÖbeği::Biçim,
+        "Yüzde (model 100) · 0,25 ↔ %25",
+        BiçimUygulaması::YüzdeModelYüz,
+    ),
     seçenek(
         BiçimÖbeği::Biçim,
         "Bilimsel · 1,23E+04",
@@ -1669,7 +1678,9 @@ impl TezgahTercihleri {
             BiçimUygulaması::Para => self.değer_türü == TezgahDeğerKipi::ParaBirimi,
             // `BiçimTanımı::Yüzde` bir ondalık değeri ölçekler; tamsayı ya da
             // para değerinde karşılığı yok.
-            BiçimUygulaması::Yüzde => self.değer_türü == TezgahDeğerKipi::Ondalık,
+            BiçimUygulaması::Yüzde | BiçimUygulaması::YüzdeModelYüz => {
+                self.değer_türü == TezgahDeğerKipi::Ondalık
+            }
             // Tarih ve saat biçimleri kendi değer türünü kurar. Tür satırı
             // tasarımda dört düğme taşır ve tarih türü orada yok; seçimin
             // türü değiştirmesi bu satırların tek erişim yolu.
@@ -1707,7 +1718,8 @@ impl TezgahTercihleri {
                 self.maske = TezgahMaskesi::Yok;
                 self.binler_ayracı = gruplama;
             }
-            BiçimUygulaması::Para | BiçimUygulaması::Yüzde => {
+            BiçimUygulaması::Para | BiçimUygulaması::Yüzde | BiçimUygulaması::YüzdeModelYüz =>
+            {
                 self.maske = TezgahMaskesi::Yok;
             }
             BiçimUygulaması::Bilimsel | BiçimUygulaması::Kesir => {
@@ -1784,6 +1796,15 @@ impl TezgahTercihleri {
                     sayı: sayı(false, kesir),
                     // Model değeri zaten yüzde birimindedir; ölçeklenmez.
                     model_ölçeği: ondalık(1, 0),
+                    işaret_konumu: self.işaret_konumu,
+                }))
+            }
+            BiçimUygulaması::YüzdeModelYüz => {
+                BiçimYapılandırması::Açık(BiçimTanımı::Yüzde(YüzdeBiçimi {
+                    sayı: sayı(false, kesir),
+                    // Standart model: kanonik `0,25` görünür `%25`; konumsal
+                    // adım görünür basamağı ters ölçekle kanonik deltaya çevirir.
+                    model_ölçeği: ondalık(100, 0),
                     işaret_konumu: self.işaret_konumu,
                 }))
             }
@@ -1928,6 +1949,13 @@ impl TezgahTercihleri {
                  ..SayıBiçimi::default() }},\n        \
                  // Model değeri zaten yüzde birimindedir; ölçeklenmez.\n        \
                  model_ölçeği: OndalıkSayı::yeni(1, 0),\n    }})"
+            ),
+            BiçimUygulaması::YüzdeModelYüz => format!(
+                "BiçimTanımı::Yüzde(YüzdeBiçimi {{\n        \
+                 sayı: SayıBiçimi {{ duyarlılık: Some(OndalıkDuyarlılık::Sabit({kesir})), \
+                 ..SayıBiçimi::default() }},\n        \
+                 // Standart model: kanonik `0,25` görünür `%25`.\n        \
+                 model_ölçeği: OndalıkSayı::yeni(100, 0),\n    }})"
             ),
             BiçimUygulaması::Metin => "BiçimTanımı::Metin".to_owned(),
             BiçimUygulaması::Tarih(kip) => {
