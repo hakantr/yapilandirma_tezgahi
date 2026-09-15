@@ -4,7 +4,11 @@
 >
 > Galeri kaynak commit'i: `d2249398fd7a22fb0ec8796391360cd02fd095e4`
 >
-> Exact çekirdek bağı: `ee4357db2316e741c3cca0055ce41693de8d146b`
+> Exact çekirdek bağı: `e0beaaba728fc20cbc4b5e90cb200fca63c818d0`
+>
+> (Galeri koşumu önce `ee4357db2316e741c3cca0055ce41693de8d146b` üzerinde
+> yapıldı; çekirdeğin sonraki iki commit'i yalnız kanıt zinciri ve belge
+> ekledi ve galeri koşumu bu commit'te de `269/0` tekrarlandı.)
 >
 > Galeri başlangıç tabanı: `13e350931f7e9985d9140fc23961718071c8c7f2`
 >
