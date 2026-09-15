@@ -157,12 +157,24 @@ pub(crate) fn paylaşılan_metin_dizeye_eşit_mi(
     sonuç.is_ok() && eşit && ofset == beklenen.len()
 }
 
+gpui::actions!(gpui_bilesenleri_galeri, [SonrakiOdak, ÖncekiOdak]);
+
+/// Galeri kökünün tuş bağlamı; `Tab` dolaşımı bu kapsamda yürür.
+pub const GALERİ_TUŞ_BAĞLAMI: &str = "galeri";
+
 /// Galerinin tükettiği kanonik bileşenlerin tuş bağlarını kaydeder.
 ///
 /// Başlatıcılar pencere açmadan önce çağırır. Galeri kendi tuş yolu
 /// tanımlamaz; yalnız kanonik bileşenin kaydını iletir.
 pub fn bileşen_tuş_bağlarını_kur(bağlam: &mut gpui::App) {
     gpui_bilesenleri::tuş_bağlarını_kur(bağlam);
+    // `ORT-005 §2` odak sırasını yürüten taraf konaktır; GPUI `Tab`'ı
+    // kendiliğinden bağlamaz. Galeri gerçek bir tüketici olduğu için
+    // bitişik eylem bölütü dâhil bütün Tab duraklarına klavyeyle ulaşılır.
+    bağlam.bind_keys([
+        gpui::KeyBinding::new("tab", SonrakiOdak, Some(GALERİ_TUŞ_BAĞLAMI)),
+        gpui::KeyBinding::new("shift-tab", ÖncekiOdak, Some(GALERİ_TUŞ_BAĞLAMI)),
+    ]);
     if gpui_bilesenleri_temel::BileşimKökü::edin(bağlam).is_none() {
         gpui_bilesenleri_temel::BileşimKökü::kur(bağlam)
             .expect("galeri App bileşim kökü kurulmalı");
@@ -2271,7 +2283,23 @@ impl Default for GaleriUygulaması {
 
 impl Render for GaleriUygulaması {
     fn render(&mut self, pencere: &mut Window, bağlam: &mut Context<Self>) -> impl IntoElement {
-        crate::render_ölç(|| self.kök_gövdesi(pencere, bağlam))
+        let gövde = crate::render_ölç(|| self.kök_gövdesi(pencere, bağlam));
+        // Kök kap yalnız odak dolaşımını taşır; yerleşimi değiştirmemek için
+        // pencereyi doldurur ve kendi kutu modelini eklemez.
+        div()
+            .key_context(GALERİ_TUŞ_BAĞLAMI)
+            .size_full()
+            .on_action(
+                bağlam.listener(|_, _: &SonrakiOdak, pencere: &mut Window, bağlam| {
+                    pencere.focus_next(bağlam);
+                }),
+            )
+            .on_action(
+                bağlam.listener(|_, _: &ÖncekiOdak, pencere: &mut Window, bağlam| {
+                    pencere.focus_prev(bağlam);
+                }),
+            )
+            .child(gövde)
     }
 }
 

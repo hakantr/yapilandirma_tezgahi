@@ -1375,6 +1375,169 @@ fn ort003_tezgah_cizimde_dogrulanmis_geometri_ve_kusak_uretir(bağlam: &mut Test
     assert!(kuşak_özeti.contains("ayırıcı çizici ["), "{kuşak_özeti}");
 }
 
+/// `BİL-010.ACC-031` galeri çalışma zamanı kanıtı: görünmez köşede başlayan
+/// basış, görünür bölgede bırakılsa da gönderim üretmez.
+///
+/// Bağımsız inceleme bu karşı örneği üretim yolunda buldu; galeri gerçek
+/// GPUI etkileşimiyle düzeltmeyi tüketici cephesinden ölçer.
+#[gpui::test]
+fn bil010_acc031_gorunmez_koseden_baslayan_basis_gonderim_uretmez(bağlam: &mut TestAppContext) {
+    let (uygulama, görsel, alan, akış) =
+        bölütlü_tezgah_kur(bağlam, gpui_bilesenleri_temel::DüğmeŞekli::Hap);
+    let _ = &uygulama;
+    let gönderim_sayısı = gönderim_sayacı(&akış);
+
+    // Bölütün içerik dikdörtgeninde, görünür kabuğun dışında kalan köşe.
+    let (köşe, merkez) = görsel.update(|_, bağlam| {
+        let kutu = alan.read(bağlam);
+        let kuşak = kutu.kuşak_geometrisi().expect("kuşak geometrisi");
+        let iç = kuşak.bölütler()[1].iç_sınırlar();
+        let köşe = gpui::point(
+            gpui::px(f32::from(iç.origin.x) + f32::from(iç.size.width) - 0.5),
+            gpui::px(f32::from(iç.origin.y) + 0.5),
+        );
+        assert!(
+            iç.contains(&köşe),
+            "ön koşul: köşe bölütün içerik dikdörtgeninde olmalı"
+        );
+        assert!(
+            !kuşak.dış_kabuk().içerir(köşe),
+            "ön koşul: köşe görünür kabuğun dışında olmalı"
+        );
+        let merkez = gpui::point(
+            iç.origin.x + iç.size.width / 2.0,
+            iç.origin.y + iç.size.height / 2.0,
+        );
+        (köşe, merkez)
+    });
+
+    görsel.simulate_mouse_down(köşe, gpui::MouseButton::Left, gpui::Modifiers::none());
+    görsel.run_until_parked();
+    görsel.simulate_mouse_up(merkez, gpui::MouseButton::Left, gpui::Modifiers::none());
+    görsel.run_until_parked();
+    assert_eq!(
+        gönderim_sayısı(görsel),
+        0,
+        "görünmez köşeden başlayan etkileşim gönderim üretmez"
+    );
+
+    // Karşıt kontrol: geçerli basış/geçerli bırakış gerçek gönderim üretir.
+    görsel.simulate_mouse_down(merkez, gpui::MouseButton::Left, gpui::Modifiers::none());
+    görsel.run_until_parked();
+    görsel.simulate_mouse_up(merkez, gpui::MouseButton::Left, gpui::Modifiers::none());
+    görsel.run_until_parked();
+    assert_eq!(
+        gönderim_sayısı(görsel),
+        1,
+        "geçerli etkileşim tek gönderim üretir"
+    );
+}
+
+/// `BİL-010 §23.2`/`ORT-005 §2` galeri çalışma zamanı kanıtı: bitişik eylem
+/// bölütüne gerçek `Tab` ile ulaşılır ve gerçek `Enter` ile etkinleştirilir.
+#[gpui::test]
+fn bil010_acc031_bitisik_bolute_klavyeyle_ulasilir_ve_etkinlesir(bağlam: &mut TestAppContext) {
+    let (uygulama, görsel, alan, akış) =
+        bölütlü_tezgah_kur(bağlam, gpui_bilesenleri_temel::DüğmeŞekli::Yuvarlatılmış);
+    let _ = &uygulama;
+    let gönderim_sayısı = gönderim_sayacı(&akış);
+
+    görsel.update(|pencere, bağlam| {
+        let odak = alan.read(bağlam).odak().clone();
+        odak.focus(pencere, bağlam);
+    });
+    görsel.run_until_parked();
+
+    // Gerçek `tab` tuşu bölüte ulaşır; sentetik odak ataması yapılmaz.
+    let mut adım = 0;
+    let mut odaklı = None;
+    while adım < 6 && odaklı.is_none() {
+        görsel.simulate_keystrokes("tab");
+        görsel.run_until_parked();
+        odaklı =
+            görsel.update(|pencere, bağlam| alan.read(bağlam).odaklı_bitişik_bölüt(pencere));
+        adım += 1;
+    }
+    assert_eq!(odaklı, Some(1), "galeri Tab dolaşımı bitişik bölüte ulaşır");
+    assert_eq!(gönderim_sayısı(görsel), 0, "odaklanmak gönderim üretmez");
+
+    // Gerçek `enter` basış+bırakışı kanonik gönderim hattına iner.
+    görsel.simulate_keystrokes("enter");
+    görsel.simulate_event(gpui::KeyUpEvent {
+        keystroke: gpui::Keystroke::parse("enter").expect("kanonik tuş"),
+    });
+    görsel.run_until_parked();
+    assert_eq!(
+        gönderim_sayısı(görsel),
+        1,
+        "odaklı bölütte Enter tek gönderim üretir"
+    );
+}
+
+/// Bölütlü arama tezgâhını kurar ve yaşayan alan ile olay akışını döndürür.
+fn bölütlü_tezgah_kur<'a>(
+    bağlam: &'a mut TestAppContext,
+    şekil: gpui_bilesenleri_temel::DüğmeŞekli,
+) -> (
+    gpui::Entity<GaleriUygulaması>,
+    &'a mut gpui::VisualTestContext,
+    gpui::Entity<gpui_bilesenleri::GirişKutusu>,
+    gpui::Entity<gpui_bilesenleri_galeri::OlayAkışıPaneli>,
+) {
+    bağlam.update(bileşen_tuş_bağlarını_kur);
+    let (uygulama, görsel) =
+        bağlam.add_window_view(|_, _| GaleriUygulaması::hedef(GaleriHedefi::Masaüstü));
+    görsel.update(|_, bağlam| {
+        uygulama.update(bağlam, |uygulama, bağlam| {
+            assert!(uygulama.model.aileyi_aç("BİL-010"));
+            uygulama.tezgahı_değiştir(
+                |tezgah| {
+                    tezgah.arama = true;
+                    tezgah.arama_enter_gönderir = true;
+                    tezgah.başlangıç_bölütü = None;
+                    tezgah.bitiş_bölütü = Some(TezgahBölütü::Eylem);
+                    tezgah.şekil_oto = false;
+                    tezgah.köşe_pikseli = None;
+                    tezgah.şekil = şekil;
+                },
+                bağlam,
+            );
+        });
+    });
+    çizimi_akıt(görsel);
+    let alan = görsel.update(|_, bağlam| {
+        uygulama
+            .read(bağlam)
+            .yaşayan_tezgah_alanı()
+            .expect("tezgâh alanı kurulmuştur")
+    });
+    let akış = görsel.update(|_, bağlam| {
+        uygulama
+            .read(bağlam)
+            .yaşayan_olay_akışı()
+            .expect("olay akışı paneli kurulmuştur")
+    });
+    (uygulama, görsel, alan, akış)
+}
+
+/// Ekrandaki olay akışından `AramaGönderildi` sayısını okur.
+fn gönderim_sayacı(
+    akış: &gpui::Entity<gpui_bilesenleri_galeri::OlayAkışıPaneli>,
+) -> impl Fn(&mut gpui::VisualTestContext) -> u32 + use<> {
+    let akış = akış.clone();
+    move |görsel: &mut gpui::VisualTestContext| -> u32 {
+        görsel.update(|_, bağlam| {
+            akış
+                .read(bağlam)
+                .olaylar()
+                .iter()
+                .filter(|olay| olay.ad == "AramaGönderildi")
+                .map(|olay| olay.sayı)
+                .sum()
+        })
+    }
+}
+
 /// `BİL-010.ACC-031` galeri **çalışma zamanı** kanıtı: bitişik eylem
 /// bölütüne gerçek GPUI etkileşimiyle basmak tek gönderim üretir.
 ///

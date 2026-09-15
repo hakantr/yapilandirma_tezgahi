@@ -1,14 +1,12 @@
 # ORT-003 galeri kanıt raporu
 
-> Tarih: 15 Eylül 2026
+> Tarih: 16 Eylül 2026
 >
-> Galeri kaynak commit'i: `91635d049a9670ccb79b2fe2a7afa0434278821f`
-> (Ölçülen galeri kaynak ağacı budur; bu belgeyi güncelleyen commit yalnız
-> `raporlar/` altını değiştirir. Önceki kesitte bu satır `d224939…` olarak
-> bayat kalmıştı. Düzeltme yalnız bu kayıttadır; itilmiş geçmiş yeniden
-> yazılmadı.)
+> Galeri kaynak commit'i: `4746e3708f4c2d343eb96410eb8b98e82ebabee6` üzerine
+> bu turda eklenen `Tab` dolaşımı ve iki çalışma zamanı testi; ölçülen ağaç
+> bu belgeyi taşıyan commit'tir.
 >
-> Exact çekirdek bağı: `3ccb0a13175a5a80c0755059616fa2d18bab993d`
+> Exact çekirdek bağı: `edc4fa2d5d55296f3308ea525989df18010fa062`
 >
 > (Önceki kayıtlar: ilk koşum `ee4357d`, sonra `e0beaab`, sonra `d73add3`.
 > Bu kesit çekirdeğin `BitişikBölüt` kanonikleşmesini, bitişik eylem
@@ -19,14 +17,10 @@
 >
 > Ortam: Apple Silicon `arm64`, macOS `26.6.2`, `rustc 1.97.1`
 >
-> **Yeniden koşum kaydı.** `d73add3` üzerindeki ilk ölçümden sonra çekirdek
-> `3612640`, `febf0bb`, `aaada44` ve `3ccb0a1` ile ilerledi. Galerinin
-> bağlandığı `gpui-bilesenleri-uyum` sandığı bu aralıkta `src/parent.rs`
-> değişikliği aldığı için pin varsayımla taşınmadı: bütün galeri koşumu
-> `3ccb0a1` üzerinde **yeniden çalıştırıldı** (`cargo test --workspace`:
-> 270 geçti, 0 başarısız, 1 `ignored`) ve `ACC-031` gerçek etkileşim testi
-> (`bil010_acc031_bitisik_bolut_gercek_etkilesimde_tek_gonderim_uretir`)
-> ayrıca exact adla koşturuldu.
+> **Yeniden koşum kaydı.** Bütün galeri koşumu teslim edilen çekirdek
+> `edc4fa2` üzerinde çalıştırıldı: `cargo test --workspace` 272 geçti,
+> 0 başarısız, 1 `ignored`. Önceki kayıtlar `d73add3` ve `3ccb0a1`
+> üzerindeydi; pin varsayımla taşınmadı.
 
 Bu rapor `ORT-003 1.6.0` kutu şekli sağlayıcısının galeri tüketicisini ve o
 tüketicinin koşum kanıtlarını kaydeder. Sözleşmelerin sahibi
