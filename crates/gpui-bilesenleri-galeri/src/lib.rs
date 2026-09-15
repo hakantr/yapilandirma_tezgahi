@@ -114,7 +114,7 @@ impl std::error::Error for GaleriMetinMateryalizasyonHatası {}
 /// Kalıcı `ORT-002` dilimini yalnız gerçekten sahipli metin isteyen galeri
 /// sınırında ve kesin bütçeyle materyalize eder. Kanonik getter kopyasız
 /// kalır; taşan kaynak için hiçbir sahipli çıktı ayrılmaz.
-pub(crate) fn paylaşılan_metni_materyalize_et(
+pub fn paylaşılan_metni_materyalize_et(
     dilim: &gpui_bilesenleri_temel::PaylaşılanMetinDilimi,
 ) -> Result<String, GaleriMetinMateryalizasyonHatası> {
     let utf8_baytı = dilim.utf8_bayt_uzunluğu();
@@ -1084,6 +1084,16 @@ impl GaleriUygulaması {
                     .is_some()
             }),
         }
+    }
+
+    /// Tezgâhın yaşayan olay akışı paneli.
+    ///
+    /// Kanıt koşumu ekrandaki akışın kendisini okur; ayrı bir gölge sayaç
+    /// tutulmaz.
+    pub fn yaşayan_olay_akışı(&self) -> Option<Entity<paneller::OlayAkışıPaneli>> {
+        self.tezgah_panelleri
+            .as_ref()
+            .map(|paneller| paneller.olay_akışı.clone())
     }
 
     /// BİL-010 tezgâhında gerçekten yaşayan kanonik önizleme alanı.

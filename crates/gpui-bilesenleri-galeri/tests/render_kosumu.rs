@@ -1315,7 +1315,6 @@ fn ort003_tezgah_cizimde_dogrulanmis_geometri_ve_kusak_uretir(bağlam: &mut Test
                 |tezgah| {
                     tezgah.başlangıç_bölütü = Some(TezgahBölütü::SabitMetin);
                     tezgah.bitiş_bölütü = Some(TezgahBölütü::Eylem);
-                    tezgah.bölüt_sınırı = true;
                 },
                 bağlam,
             );
@@ -1374,4 +1373,113 @@ fn ort003_tezgah_cizimde_dogrulanmis_geometri_ve_kusak_uretir(bağlam: &mut Test
         "{kuşak_özeti}"
     );
     assert!(kuşak_özeti.contains("ayırıcı çizici ["), "{kuşak_özeti}");
+}
+
+/// `BİL-010.ACC-031` galeri **çalışma zamanı** kanıtı: bitişik eylem
+/// bölütüne gerçek GPUI etkileşimiyle basmak tek gönderim üretir.
+///
+/// Olay sayısı ve taşınan değer ekrandaki akışın kendisinden okunur; ayrı
+/// bir gölge sayaç yoktur. Bölütün görünür bölgesi kuşak geometrisinden
+/// türetilir, sabit koordinat kullanılmaz.
+#[gpui::test]
+fn bil010_acc031_bitisik_bolut_gercek_etkilesimde_tek_gonderim_uretir(
+    bağlam: &mut TestAppContext
+) {
+    bağlam.update(bileşen_tuş_bağlarını_kur);
+    let (uygulama, görsel) =
+        bağlam.add_window_view(|_, _| GaleriUygulaması::hedef(GaleriHedefi::Masaüstü));
+    görsel.update(|_, bağlam| {
+        uygulama.update(bağlam, |uygulama, bağlam| {
+            assert!(uygulama.model.aileyi_aç("BİL-010"));
+            uygulama.tezgahı_değiştir(
+                |tezgah| {
+                    tezgah.arama = true;
+                    tezgah.arama_enter_gönderir = true;
+                    tezgah.başlangıç_bölütü = None;
+                    tezgah.bitiş_bölütü = Some(TezgahBölütü::Eylem);
+                },
+                bağlam,
+            );
+        });
+    });
+    çizimi_akıt(görsel);
+
+    let alan = görsel.update(|_, bağlam| {
+        uygulama
+            .read(bağlam)
+            .yaşayan_tezgah_alanı()
+            .expect("tezgâh alanı kurulmuştur")
+    });
+    let akış = görsel.update(|_, bağlam| {
+        uygulama
+            .read(bağlam)
+            .yaşayan_olay_akışı()
+            .expect("olay akışı paneli kurulmuştur")
+    });
+
+    // Sorgu metni gerçek klavye yolundan girilir.
+    görsel.update(|pencere, bağlam| {
+        let odak = alan.read(bağlam).odak().clone();
+        odak.focus(pencere, bağlam);
+    });
+    görsel.run_until_parked();
+    görsel.simulate_keystrokes("k e d i");
+    görsel.run_until_parked();
+
+    let gönderim_sayısı = |görsel: &mut gpui::VisualTestContext| -> u32 {
+        görsel.update(|_, bağlam| {
+            akış
+                .read(bağlam)
+                .olaylar()
+                .iter()
+                .filter(|olay| olay.ad == "AramaGönderildi")
+                .map(|olay| olay.sayı)
+                .sum()
+        })
+    };
+    assert_eq!(gönderim_sayısı(görsel), 0, "yazmak gönderim üretmez");
+
+    // Bölütün görünür merkezine gerçek tıklama.
+    let merkez = görsel.update(|_, bağlam| {
+        let kutu = alan.read(bağlam);
+        let kuşak = kutu.kuşak_geometrisi().expect("kuşak geometrisi");
+        assert_eq!(kuşak.bölütler().len(), 2, "alan + sonda eylem bölütü");
+        let iç = kuşak.bölütler()[1].iç_sınırlar();
+        gpui::point(
+            iç.origin.x + iç.size.width / 2.0,
+            iç.origin.y + iç.size.height / 2.0,
+        )
+    });
+    görsel.simulate_click(merkez, gpui::Modifiers::none());
+    görsel.run_until_parked();
+
+    assert_eq!(
+        gönderim_sayısı(görsel),
+        1,
+        "bölüte basmak tek gönderim üretir"
+    );
+    // Taşınan değer: gönderim anındaki düzenleme metni alanda durur.
+    görsel.update(|_, bağlam| {
+        let gpui_bilesenleri::GirişMetniGözlemi::Açık(metin) = alan.read(bağlam).metin_gözlemi()
+        else {
+            panic!("açık alanın metni gözlenebilir");
+        };
+        let sahipli = gpui_bilesenleri_galeri::paylaşılan_metni_materyalize_et(&metin)
+            .expect("tezgâh sorgusu bütçeye sığar");
+        assert_eq!(sahipli, "kedi", "gönderim anındaki sorgu alanda durur");
+    });
+    // Odak ve seçim taşınmaz: bölüt alanın kuşağının parçasıdır.
+    assert!(
+        görsel.update(|pencere, bağlam| alan.read(bağlam).odak().is_focused(pencere)),
+        "bölüte basmak odağı bırakmaz"
+    );
+
+    // Uçuştaki gönderim varken ikinci tıklama yeni gönderim üretmez.
+    görsel.simulate_click(merkez, gpui::Modifiers::none());
+    görsel.run_until_parked();
+    assert_eq!(
+        gönderim_sayısı(görsel),
+        1,
+        "uçuştaki gönderim varken ikinci tıklama yutulur"
+    );
 }

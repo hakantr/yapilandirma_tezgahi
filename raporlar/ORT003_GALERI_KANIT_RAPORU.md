@@ -4,11 +4,11 @@
 >
 > Galeri kaynak commit'i: `d2249398fd7a22fb0ec8796391360cd02fd095e4`
 >
-> Exact çekirdek bağı: `e0beaaba728fc20cbc4b5e90cb200fca63c818d0`
+> Exact çekirdek bağı: `d73add36bea66cf2a14bc4ec1ac1671e760d2f74`
 >
-> (Galeri koşumu önce `ee4357db2316e741c3cca0055ce41693de8d146b` üzerinde
-> yapıldı; çekirdeğin sonraki iki commit'i yalnız kanıt zinciri ve belge
-> ekledi ve galeri koşumu bu commit'te de `269/0` tekrarlandı.)
+> (Önceki kayıtlar: ilk koşum `ee4357d`, ardından `e0beaab`. Bu kesit
+> çekirdeğin `BitişikBölüt` kanonikleşmesini ve bitişik eylem bölütünün
+> gönderim hattına bağlanmasını tüketir.)
 >
 > Galeri başlangıç tabanı: `13e350931f7e9985d9140fc23961718071c8c7f2`
 >
@@ -47,7 +47,7 @@ tüketir. Karar onayı runtime kanıtı sayılmaz.
 
 | Koşum | Sonuç |
 |---|---|
-| `cargo test --workspace` (galeri) | 269 geçti, 0 kaldı |
+| `cargo test --workspace` (galeri) | 270 geçti, 0 kaldı |
 | `rustfmt --edition 2024 --check` | fark yok |
 | `cargo clippy --workspace --all-targets` | değişen dosyalarda yeni bulgu yok |
 
@@ -66,7 +66,32 @@ penceresinde çizim yaptırır ve şunları exact doğrular:
 4. İki paylaşılan sınırın çizicileri ayrıdır: aynı kenarı iki bölüt çizmez.
 5. Panelde görünen özet metni aynı geometriden üretilir.
 
-## 3. Kapsam sınırı
+## 3. `BİL-010 §23.2` bitişik eylem bölütü tüketicisi
+
+- Tezgâhın bölüt ekseni kanonik `BitişikBölüt` enumunu üretir: sabit bölüt
+  `Sabitİçerik`, eylem bölütü `BitişikEylemBölütü` (`AramayıBaşlat`
+  niyeti). Kod paneli de bu kanonik şekli yazar.
+- Sözleşmede karşılığı olmayan iki tezgâh ekseni kaldırıldı: bölüt
+  **kademeli görünürlüğe girmez** (her zaman tam opak) ve iç ayırıcıyı
+  `ORT-003 §13` koşulsuz çizer.
+- Olay akışı paneli `AramaGönderildi` olayını kaynak ve değer sürümüyle
+  gösterir.
+
+### Çalışma zamanı kanıtı
+
+`render_kosumu.rs::bil010_acc031_bitisik_bolut_gercek_etkilesimde_tek_gonderim_uretir`
+gerçek GPUI penceresinde:
+
+1. Sorgu gerçek klavye yolundan girilir; yazmak gönderim üretmez.
+2. Bölütün görünür merkezi **kuşak geometrisinden** türetilir; sabit
+   koordinat kullanılmaz.
+3. Tıklama tam **bir** `AramaGönderildi` üretir — sayı ekrandaki olay
+   akışının kendisinden okunur, ayrı sayaç tutulmaz.
+4. Gönderim anındaki sorgu alanda durur (`"kedi"`).
+5. Bölüte basmak odağı bırakmaz.
+6. Uçuştaki gönderim varken ikinci tıklama yeni gönderim üretmez.
+
+## 4. Kapsam sınırı
 
 - Bu rapor yalnız galeri tüketicisinin kanıtıdır. Sağlayıcının kendi
   ölçüt zinciri ve sandık dışı public yüzey kanıtı çekirdek deposundadır.
@@ -74,4 +99,9 @@ penceresinde çizim yaptırır ve şunları exact doğrular:
   `ORT-003` şekil-duyarlı boya yolunu tüketmez. Bu bilinçli sınırdır:
   sağlayıcının boya yolu bileşen kabuğu içindir, tezgâh çerçevesi değil.
 - `BİL-040` düğme bileşeninin görünür Rust uygulaması henüz yoktur; bu
-  yüzden düğme kuşağı galeride görünür tüketici olarak koşmaz.
+  yüzden düğme kuşağı galeride görünür tüketici olarak koşmaz. Eylem
+  bölütünün `BitişikBölütVurgusu::Açık(DüğmeGörünümü)` dalı da bu yüzden
+  üretimde yoktur; tezgâh yalnız `AlandanÇöz` sunar.
+- Eylem bölütü bugün klavyeyle ulaşılamaz: §23.2 "klavyeyle ulaşıldığında
+  odak olağan Tab sırasıyla bölüte geçer" der, fakat bölütün odak tutamacı
+  ve Tab durağı henüz yok. Pointer yolu kapandı, klavye ekseni açık.

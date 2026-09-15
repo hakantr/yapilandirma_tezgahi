@@ -4106,30 +4106,9 @@ pub(crate) fn bolut_satırı(
         .child(
             div()
                 .mt(px(ölçü::ARALIK))
-                .child(eksen_etiketi_yüzü("Bölüt sunumu"))
-                .child(
-                    div().mt_1().child(
-                        ızgara_dörtlü()
-                            .child(hücre(tercih_düğmesi(
-                                "bolut-kademeli",
-                                "Kademeli",
-                                tercih.bölüt_kademeli,
-                                bağlam,
-                                |t| t.bölüt_kademeli = !t.bölüt_kademeli,
-                            )))
-                            // `ORT-003 §3.1` kuşakta yalnız dış köşeler
-                            // yuvarlanır, iç kenar alanla paylaşılır.
-                            // Bölütün kendi sınırı o paylaşımı görünür
-                            // kılar; tezgâh onu `true` sabitliyordu.
-                            .child(hücre(tercih_düğmesi(
-                                "bolut-sinir",
-                                "Kendi sınırı",
-                                tercih.bölüt_sınırı,
-                                bağlam,
-                                |t| t.bölüt_sınırı = !t.bölüt_sınırı,
-                            ))),
-                    ),
-                )
+                // `§23.2` bölüt her zaman tam opaktır ve kademeli görünürlüğe
+                // girmez; iç ayırıcıyı `ORT-003 §13` koşulsuz çizer. Bu
+                // yüzden ayrı bir "sunum" ekseni yoktur.
                 // Bölütün **içeriği** kanonik olarak ayrı bir
                 // `BitişikEylemBölütü` tipinde ve `GirişYapılandırması`'na
                 // bağlı değil; ekranda örnek olarak yazılır.

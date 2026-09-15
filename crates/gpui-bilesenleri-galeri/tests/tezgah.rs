@@ -1488,7 +1488,6 @@ fn tercih_uzayinda_hicbir_bilesim_gecersiz_yapilandirma_uretmez() {
             &mut t.üzerine_yazma,
             &mut t.arama_enter_gönderir,
             &mut t.arama_temizleme_gönderir,
-            &mut t.bölüt_kademeli,
             &mut t.bölüm_atla,
             &mut t.bölüm_dolunca_ilerle,
             &mut t.bölüm_artır,
@@ -1737,18 +1736,29 @@ fn erisilebilir_ad_eksenleri_uyari_uretir() {
 }
 
 /// `ORT-003 §3.1` bitişik bölütün kendi sınırı seçilebilir.
+/// `§23.2` bölüt kanonik enumdur ve **içeriğini** taşır.
+///
+/// Sabit bölüt niyet üretmez; eylem bölütü `AramayıBaşlat` niyetini taşır ve
+/// alanın mevcut gönderim hattına ulaşır. Tezgâh ayrı bir sınır/kademe
+/// ekseni sunmaz: ikisinin de sözleşmede karşılığı yok.
 #[test]
-fn bolut_kendi_sinirini_tasiyabilir() {
+fn bolut_kanonik_icerigi_ve_niyeti_tasir() {
     let mut t = TezgahTercihleri::default();
     t.başlangıç_bölütü = Some(gpui_bilesenleri_galeri::TezgahBölütü::SabitMetin);
+    t.bitiş_bölütü = Some(gpui_bilesenleri_galeri::TezgahBölütü::Eylem);
     let y = t.yapılandırma(&kimlik_fabrikası(), &motor());
     let kuşak = y.bitişik_bölütler.as_ref().expect("kuşak kuruldu");
-    assert!(kuşak.başlangıç.as_ref().expect("başlangıç").kendi_sınırı);
 
-    t.bölüt_sınırı = false;
-    let y = t.yapılandırma(&kimlik_fabrikası(), &motor());
-    let kuşak = y.bitişik_bölütler.as_ref().expect("kuşak kuruldu");
-    assert!(!kuşak.başlangıç.as_ref().expect("başlangıç").kendi_sınırı);
+    let baş = kuşak.başlangıç.as_ref().expect("başlangıç");
+    assert_eq!(baş.eylem(), None, "sabit bölüt niyet üretmez");
+    assert_eq!(baş.parçalar().len(), 1);
+
+    let son = kuşak.bitiş.as_ref().expect("bitiş");
+    assert_eq!(
+        son.eylem(),
+        Some(&gpui_bilesenleri::YardımcıEylemTürü::AramayıBaşlat),
+        "eylem bölütü gönderim niyetini taşır"
+    );
     assert!(y.doğrula().hatalar.is_empty());
 }
 
@@ -2016,14 +2026,16 @@ fn ic_bosluk_tercihi_temaya_gecer() {
 fn kod_paneli_a_bolumu_eksenlerini_tam_yazar() {
     use gpui_bilesenleri_galeri::TezgahBölütü;
 
-    // `§23` bölüt sınırı: kod sabit `true` basıyordu.
+    // `§23.2` kod paneli kanonik enumu yazar; bölütün içeriği de görünür.
     let mut t = TezgahTercihleri::default();
     t.başlangıç_bölütü = Some(TezgahBölütü::SabitMetin);
-    assert!(t.kod().contains("kendi_sınırı: true"));
-    t.bölüt_sınırı = false;
+    assert!(t.kod().contains("BitişikBölüt::Sabit(Sabitİçerik::metin"));
+    t.bitiş_bölütü = Some(TezgahBölütü::Eylem);
+    let kod = t.kod();
     assert!(
-        t.kod().contains("kendi_sınırı: false"),
-        "bölüt sınırı kapalıyken kod hâlâ true yazıyor"
+        kod.contains("BitişikBölüt::Eylem(BitişikEylemBölütü")
+            && kod.contains("YardımcıEylemTürü::AramayıBaşlat"),
+        "eylem bölütü kodu kanonik niyeti yazmalı: {kod}"
     );
 
     // `§25` otomatik doldurma **bilinçli olarak** yazılmaz: `§13/3` kod
@@ -2127,10 +2139,9 @@ fn a_bolumu_tercihleri_kod_panelini_degistirir() {
             }),
         ),
         (
-            "bölüt_sınırı",
+            "bitişik_bölüt",
             Box::new(|t: &mut TezgahTercihleri| {
                 t.başlangıç_bölütü = Some(gpui_bilesenleri_galeri::TezgahBölütü::SabitMetin);
-                t.bölüt_sınırı = false;
             }),
         ),
         (

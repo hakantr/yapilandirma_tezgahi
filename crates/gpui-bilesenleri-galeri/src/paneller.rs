@@ -311,6 +311,14 @@ impl OlayAkışıPaneli {
         })
     }
 
+    /// Panelde görünen olay akışı.
+    ///
+    /// Kanıt koşumu, ekrandaki akışla aynı kaydı okur: ayrı bir sayaç ya da
+    /// gölge liste tutulmaz.
+    pub fn olaylar(&self) -> &[TezgahOlayı] {
+        &self.olaylar
+    }
+
     /// Akışa bir olay ekler.
     ///
     /// Art arda gelen aynı olay yeni satır açmaz, sayacı artırır: metin

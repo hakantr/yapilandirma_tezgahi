@@ -8,9 +8,9 @@
 #![allow(non_ascii_idents)]
 
 use gpui_bilesenleri::{
-    BitişikBölütTürü, BoşMetinPolitikası, EscapeDavranışı, GeçerlilikTetikleyicisi,
-    GeçerlilikÖnemi, GeçersizOdakDavranışı, HarfDönüşümü, KırpmaPolitikası,
-    MetinYapıştırmaDönüşümü, SeçiciGörünürlüğü, ÖrnekKimliğiFabrikası,
+    BoşMetinPolitikası, EscapeDavranışı, GeçerlilikTetikleyicisi, GeçerlilikÖnemi,
+    GeçersizOdakDavranışı, HarfDönüşümü, KırpmaPolitikası, MetinYapıştırmaDönüşümü,
+    SeçiciGörünürlüğü, ÖrnekKimliğiFabrikası,
 };
 use gpui_bilesenleri_galeri::{
     TezgahBölütü, TezgahDeğerKipi, TezgahTercihleri, TezgahYapıştırması,
@@ -157,8 +157,13 @@ fn bolut_kusagi_bos_kurulmaz() {
         .bitişik_bölütler
         .expect("bölüt seçiliyken kuşak kurulur");
     assert_eq!(
-        kuşak.başlangıç.map(|b| b.tür),
-        Some(BitişikBölütTürü::Sabit)
+        kuşak.başlangıç.as_ref().and_then(|b| b.eylem()),
+        None,
+        "sabit bölüt niyet üretmez"
+    );
+    assert_eq!(
+        kuşak.başlangıç.as_ref().map(|b| b.parçalar().len()),
+        Some(1)
     );
     assert!(kuşak.bitiş.is_none());
 
@@ -166,21 +171,29 @@ fn bolut_kusagi_bos_kurulmaz() {
     assert!(kod.contains("BitişikBölütKuşağı"), "{kod}");
 }
 
-/// `§23` yuva kademesi her iki bölüte birden uygulanır.
+/// `§23.2` iki bölüt birden kurulabilir ve her biri kendi içeriğini taşır.
+///
+/// Bölüt kademeli görünürlüğe girmez ve her zaman tam opaktır; bu yüzden
+/// tezgâhta ayrı bir kademe ekseni yoktur.
 #[test]
-fn bolut_kademesi_her_iki_boluete_uygulanir() {
+fn iki_bolut_birden_kendi_icerigini_tasir() {
     let mut t = TezgahTercihleri::default();
     t.başlangıç_bölütü = Some(TezgahBölütü::SabitMetin);
     t.bitiş_bölütü = Some(TezgahBölütü::Eylem);
-    t.bölüt_kademeli = false;
 
     let kuşak = t
         .yapılandırma(&kimlik_fabrikası(), &motor())
         .bitişik_bölütler
         .expect("kuşak kurulur");
-    assert!(!kuşak.başlangıç.expect("başlangıç").opaklık_kademeli);
-    assert!(!kuşak.bitiş.expect("bitiş").opaklık_kademeli);
-    assert_eq!(kuşak.bitiş.expect("bitiş").tür, BitişikBölütTürü::Eylem);
+    let baş = kuşak.başlangıç.expect("başlangıç");
+    let son = kuşak.bitiş.expect("bitiş");
+    assert_eq!(baş.eylem(), None);
+    assert_eq!(baş.parçalar().len(), 1);
+    assert_eq!(
+        son.eylem(),
+        Some(&gpui_bilesenleri::YardımcıEylemTürü::AramayıBaşlat)
+    );
+    assert_eq!(son.parçalar().len(), 1);
 }
 
 /// `§23.3` arama gönderimi `AramayıBaşlat` yuvasına bağlıdır.

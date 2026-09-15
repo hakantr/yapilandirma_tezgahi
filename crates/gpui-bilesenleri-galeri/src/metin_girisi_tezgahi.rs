@@ -14,20 +14,21 @@ use std::time::Duration;
 use gpui_bilesenleri::{
     AramaGönderimYapılandırması, ArayüzYoğunluğu, AçıkSaatBiçimi, AçıkTarihBiçimi,
     AçıkTarihSaatBiçimi, AçılırYüzeyYapılandırması, BasamakGruplama, BilimselBiçim, BitişikBölüt,
-    BitişikBölütKuşağı, BitişikBölütTürü, BiçimTanımı, BiçimYapılandırması, BoşMetinPolitikası,
-    DurumGöstergesiAçıklamaTercihi, DurumGöstergesiYapılandırması, DurumGöstergesiYerleşimTercihi,
-    DüğmeŞekli, DışHataTemizleme, EnterDavranışı, EscapeDavranışı, GeçerlilikKuralTürü,
-    GeçerlilikKuralı, GeçerlilikKuralıKimliği, GeçerlilikTetikleyicisi, GeçerlilikÖnemi,
-    GeçersizOdakDavranışı, GeçiciGösterimPolitikası, GirişDikeyHizalama, GirişMaskesi, GirişTürü,
-    GirişYapılandırmaHatası, GirişYapılandırmaUyarısı, GirişYapılandırması, GirişYatayHizalama,
-    HareketTercihi, HarfDönüşümü, KabulSeçimi, KesirBiçimi, KesirPaydası, KutuŞekliTercihi,
-    KırpmaPolitikası, MetinYapıştırmaDönüşümü, MetinİçerikTürü, OdakSeçimi, OndalıkDeğer,
-    OndalıkDuyarlılık, ParaBirimiGösterimi, ParaBiçimi, RakamKümesi, SaatDilimiGösterimi,
-    SaatDilimiTercihi, SaatDöngüsü, Sabitİçerik, SabitİçerikSunumRolü, SayaçYapılandırması,
-    SayıBiçimi, SayımBirimi, SeçiciGörünürlüğü, SeçiciUyarlaması, SimgeKimliği, SüreBirimi,
-    SüreBiçimi, TarihParçasıGösterimi, TemaKipi, UzunlukSınırı, UzunlukSınırıDavranışı,
-    YardımcıEylemGörünürlüğü, YardımcıEylemTürü, YardımcıEylemYuvası, YardımcıEylemÇalışması,
-    YüzdeBiçimi, ÇalışırkenEnterPolitikası, İçerikGörünürlüğü, İşaretKonumu,
+    BitişikBölütKuşağı, BitişikBölütVurgusu, BitişikEylemBölütü, BiçimTanımı, BiçimYapılandırması,
+    BoşMetinPolitikası, DurumGöstergesiAçıklamaTercihi, DurumGöstergesiYapılandırması,
+    DurumGöstergesiYerleşimTercihi, DüğmeŞekli, DışHataTemizleme, EnterDavranışı, EscapeDavranışı,
+    GeçerlilikKuralTürü, GeçerlilikKuralı, GeçerlilikKuralıKimliği, GeçerlilikTetikleyicisi,
+    GeçerlilikÖnemi, GeçersizOdakDavranışı, GeçiciGösterimPolitikası, GirişDikeyHizalama,
+    GirişMaskesi, GirişTürü, GirişYapılandırmaHatası, GirişYapılandırmaUyarısı,
+    GirişYapılandırması, GirişYatayHizalama, HareketTercihi, HarfDönüşümü, KabulSeçimi,
+    KesirBiçimi, KesirPaydası, KutuŞekliTercihi, KırpmaPolitikası, MetinYapıştırmaDönüşümü,
+    MetinİçerikTürü, OdakSeçimi, OndalıkDeğer, OndalıkDuyarlılık, ParaBirimiGösterimi, ParaBiçimi,
+    RakamKümesi, SaatDilimiGösterimi, SaatDilimiTercihi, SaatDöngüsü, Sabitİçerik,
+    SabitİçerikSunumRolü, SayaçYapılandırması, SayıBiçimi, SayımBirimi, SeçiciGörünürlüğü,
+    SeçiciUyarlaması, SimgeKimliği, SüreBirimi, SüreBiçimi, TarihParçasıGösterimi, TemaKipi,
+    UzunlukSınırı, UzunlukSınırıDavranışı, YardımcıEylemGörünürlüğü, YardımcıEylemTürü,
+    YardımcıEylemYuvası, YardımcıEylemÇalışması, YüzdeBiçimi, ÇalışırkenEnterPolitikası,
+    İçerikGörünürlüğü, İşaretKonumu,
 };
 
 /// Tezgâhın değer türü kipi — ekrandaki dokuz seçim.
@@ -152,7 +153,6 @@ pub struct TezgahTercihleri {
     ///
     /// Kuşakta yalnız dış köşeler yuvarlanır; iç kenar alanla paylaşılır.
     /// Bölütün kendi sınırı bu paylaşımı görünür kılar ya da gizler.
-    pub bölüt_sınırı: bool,
     /// `ORT-008 §6` para/yüzde işaretinin yeri; yalnız o biçimlerde okunur.
     pub işaret_konumu: İşaretKonumu,
     // §22 içerik görünürlüğü
@@ -184,7 +184,6 @@ pub struct TezgahTercihleri {
     pub başlangıç_bölütü: Option<TezgahBölütü>,
     pub bitiş_bölütü: Option<TezgahBölütü>,
     /// `§23` yardımcı eylem yuvasının sunum kademesi: kademeli mi sabit mi.
-    pub bölüt_kademeli: bool,
     pub çalışırken_enter: ÇalışırkenEnterPolitikası,
     /// `§23.3` arama gönderimi; yalnız `AramayıBaşlat` yuvası varken kurulur.
     pub arama_enter_gönderir: bool,
@@ -796,7 +795,16 @@ pub fn olay_özeti(olay: &gpui_bilesenleri::GirişOlayı) -> TezgahOlayı {
             format!("{atılan} {birim:?} · {politika:?}"),
         ),
         GirişOlayı::YardımcıEylemİstendi(tür) => ("YardımcıEylemİstendi", format!("{tür:?}")),
-        GirişOlayı::AramaGönderildi { kaynak, .. } => ("AramaGönderildi", format!("{kaynak:?}")),
+        // `§23.3` olay yükü kaynak ve değer sürümüdür; ürün sorguyu o
+        // sürümdeki düzenleme metninden okur. Panel ikisini de gösterir ki
+        // hangi gönderimin hangi değere ait olduğu izlenebilsin.
+        GirişOlayı::AramaGönderildi {
+            kaynak,
+            değer_sürümü,
+        } => (
+            "AramaGönderildi",
+            format!("{kaynak:?} · sürüm {değer_sürümü}"),
+        ),
         GirişOlayı::Hata(hata) => ("Hata", format!("{hata:?}")),
     };
     TezgahOlayı {
@@ -877,11 +885,11 @@ pub fn uyarı_metni(uyarı: &GirişYapılandırmaUyarısı) -> &'static str {
     }
 }
 
-/// `§23` bitişik bölütün türü.
+/// `§23.2` bitişik bölütün türü.
 ///
-/// Kanonik `BitişikBölüt` ayrıca `kendi_sınırı` ve `opaklık_kademeli`
-/// taşır; tezgâhta bunlar tek bir kademe ekseninden gelir çünkü ikisini
-/// ayrı ayrı açmak, tasarımda karşılığı olmayan dört kombinasyon üretirdi.
+/// Kanonik `BitişikBölüt` bir enumdur ve bölütün **içeriğini** taşır;
+/// tezgâh iki tasarım örneğini sunar. `Eylem` bölütü `AramayıBaşlat`
+/// niyetini taşır ve alanın mevcut gönderim hattına ulaşır.
 #[derive(Clone, Copy, Debug, Eq, PartialEq)]
 pub enum TezgahBölütü {
     /// Sabit metin; tasarımın örneği `https://` ön ekidir.
@@ -893,12 +901,9 @@ pub enum TezgahBölütü {
 
 impl TezgahBölütü {
     /// Tasarımın sabit metin örneği (`https://`).
-    ///
-    /// Kanonik `BitişikBölütKuşağı` bugün yalnız `başlangıç`/`bitiş`
-    /// taşıyor; bölütün **içeriği** ayrı bir `BitişikEylemBölütü` tipinde ve
-    /// `GirişYapılandırması`'na bağlı değil. Bu yüzden metin ekranda
-    /// örnek olarak yazılır, yapılandırmaya girmez.
     pub const SABİT_METİN: &'static str = "https://";
+    /// Eylem bölütünün etiketi.
+    pub const EYLEM_METNİ: &'static str = "Ara";
 
     pub const fn adı(self) -> &'static str {
         match self {
@@ -907,14 +912,17 @@ impl TezgahBölütü {
         }
     }
 
-    fn kanonik(self, kademeli: bool, kendi_sınırı: bool) -> BitişikBölüt {
-        BitişikBölüt {
-            tür: match self {
-                Self::SabitMetin => BitişikBölütTürü::Sabit,
-                Self::Eylem => BitişikBölütTürü::Eylem,
-            },
-            kendi_sınırı,
-            opaklık_kademeli: kademeli,
+    fn kanonik(self) -> BitişikBölüt {
+        match self {
+            Self::SabitMetin => {
+                BitişikBölüt::Sabit(Sabitİçerik::metin(Self::SABİT_METİN, false))
+            }
+            Self::Eylem => BitişikBölüt::Eylem(BitişikEylemBölütü {
+                eylem: YardımcıEylemTürü::AramayıBaşlat,
+                içerik: Sabitİçerik::metin(Self::EYLEM_METNİ, false).parçalar,
+                vurgu: BitişikBölütVurgusu::AlandanÇöz,
+                çalışma: YardımcıEylemÇalışması::Yok,
+            }),
         }
     }
 }
@@ -1538,7 +1546,6 @@ impl Default for TezgahTercihleri {
             ürün_eylemi: false,
             erişilebilir_ad: true,
             yuva_adları: true,
-            bölüt_sınırı: true,
             görünürlük: TezgahGörünürlüğü::Açık,
             geçici_gösterim: TezgahGeçiciGösterimi::TekrarEtkinleştireneKadar,
             dış_hata_temizleme: DışHataTemizleme::YerelDüzenlemedeTemizle,
@@ -1553,7 +1560,6 @@ impl Default for TezgahTercihleri {
             geçersiz_odak: GeçersizOdakDavranışı::OdakKaybınaİzinVer,
             başlangıç_bölütü: None,
             bitiş_bölütü: None,
-            bölüt_kademeli: true,
             çalışırken_enter: ÇalışırkenEnterPolitikası::Yoksay,
             arama_enter_gönderir: true,
             arama_temizleme_gönderir: false,
@@ -1864,15 +1870,17 @@ impl TezgahTercihleri {
     /// `§23` bölüt kuşağının kod panelindeki karşılığı.
     fn bitişik_bölüt_kodu(&self) -> Option<String> {
         let yaz = |bölüt: Option<TezgahBölütü>| match bölüt {
-            Some(bölüt) => format!(
-                "Some(BitişikBölüt {{\n        tür: BitişikBölütTürü::{},\n        \
-                 kendi_sınırı: {},\n        opaklık_kademeli: {},\n    }})",
-                match bölüt {
-                    TezgahBölütü::SabitMetin => "Sabit",
-                    TezgahBölütü::Eylem => "Eylem",
-                },
-                self.bölüt_sınırı,
-                self.bölüt_kademeli
+            Some(TezgahBölütü::SabitMetin) => format!(
+                "Some(BitişikBölüt::Sabit(Sabitİçerik::metin({:?}, false)))",
+                TezgahBölütü::SABİT_METİN
+            ),
+            Some(TezgahBölütü::Eylem) => format!(
+                "Some(BitişikBölüt::Eylem(BitişikEylemBölütü {{\n        \
+                 eylem: YardımcıEylemTürü::AramayıBaşlat,\n        \
+                 içerik: Sabitİçerik::metin({:?}, false).parçalar,\n        \
+                 vurgu: BitişikBölütVurgusu::AlandanÇöz,\n        \
+                 çalışma: YardımcıEylemÇalışması::Yok,\n    }}))",
+                TezgahBölütü::EYLEM_METNİ
             ),
             None => "None".to_owned(),
         };
@@ -2259,12 +2267,8 @@ impl TezgahTercihleri {
         y.bitişik_bölütler =
             (self.başlangıç_bölütü.is_some() || self.bitiş_bölütü.is_some()).then(|| {
                 BitişikBölütKuşağı {
-                    başlangıç: self
-                        .başlangıç_bölütü
-                        .map(|bölüt| bölüt.kanonik(self.bölüt_kademeli, self.bölüt_sınırı)),
-                    bitiş: self
-                        .bitiş_bölütü
-                        .map(|bölüt| bölüt.kanonik(self.bölüt_kademeli, self.bölüt_sınırı)),
+                    başlangıç: self.başlangıç_bölütü.map(TezgahBölütü::kanonik),
+                    bitiş: self.bitiş_bölütü.map(TezgahBölütü::kanonik),
                 }
             });
         // `§23.3` `AramayıBaşlat` yuvası yokken `arama_gönderimi = Some`
