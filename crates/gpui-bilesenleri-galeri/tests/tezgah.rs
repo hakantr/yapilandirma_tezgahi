@@ -409,14 +409,25 @@ fn kose_pikseli_hazir_kademeyi_gecersiz_kilar() {
         KutuŞekliTercihi::Açık(DüğmeŞekli::Hap)
     );
 
-    // Piksel verildiğinde kademe değil ürünün ölçüsü uygulanır.
+    // Piksel verildiğinde kademe değil ürünün ölçüsü uygulanır; değer
+    // `ORT-003` doğrulanmış yarıçap tipiyle taşınır.
     t.köşe_pikseli = Some(14.0);
     assert_eq!(
         t.yapılandırma(&kimlik_fabrikası(), &motor()).şekil,
-        KutuŞekliTercihi::Yarıçap(gpui::px(14.0))
+        KutuŞekliTercihi::Yarıçap(
+            gpui_bilesenleri::KutuYarıçapı::denetimli(gpui::px(14.0)).unwrap()
+        )
     );
     assert!(t.kod().contains("KutuŞekliTercihi::Yarıçap(px(14.))"));
     assert!(!t.kod().contains("DüğmeŞekli::Hap"));
+
+    // `ORT-003 §2`: geçersiz tezgâh girdisi tercihe hiç giremez; sessizce
+    // negatif yarıçap taşıyan bir yapılandırma üretilmez.
+    t.köşe_pikseli = Some(-3.0);
+    assert_eq!(
+        t.yapılandırma(&kimlik_fabrikası(), &motor()).şekil,
+        KutuŞekliTercihi::GörünümProfilinden
+    );
 }
 
 #[test]

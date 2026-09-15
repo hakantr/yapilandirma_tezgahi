@@ -2204,7 +2204,15 @@ impl TezgahTercihleri {
         y.hizalama.dikey = self.dikey;
         y.şekil = match (self.şekil_oto, self.köşe_pikseli) {
             (true, _) => KutuŞekliTercihi::GörünümProfilinden,
-            (false, Some(piksel)) => KutuŞekliTercihi::Yarıçap(gpui::px(piksel)),
+            // `ORT-003 §2` özel yarıçap yalnız doğrulanmış tiple bildirilir:
+            // negatif ya da sonlu olmayan tezgâh girdisi tercihe hiç giremez,
+            // `GörünümProfilinden` kademesine düşer.
+            (false, Some(piksel)) => {
+                match gpui_bilesenleri::KutuYarıçapı::denetimli(gpui::px(piksel)) {
+                    Ok(yarıçap) => KutuŞekliTercihi::Yarıçap(yarıçap),
+                    Err(_) => KutuŞekliTercihi::GörünümProfilinden,
+                }
+            }
             (false, None) => KutuŞekliTercihi::Açık(self.şekil),
         };
         y.odak.sekme_durağı = self.sekme_durağı;

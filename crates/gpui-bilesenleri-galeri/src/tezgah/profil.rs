@@ -20,7 +20,7 @@ use gpui::{Pixels, Point, TextStyle, px};
 use gpui_bilesenleri::{
     ArayüzYoğunluğu, BağlamSürümü, DüğmeŞekli, GörünümKayıtHatası, GörünümProfiliBaşlığı,
     GörünümProfiliKimliği, KutuŞekliTercihi, KöşeMetrikleri, MantıksalİçBoşluk, TemaAnlıkGörüntüsü,
-    TipografiRolü,
+    TipografiRolü, ÇözülmüşKutuŞekli,
 };
 
 use super::KolonMetriği;
@@ -176,12 +176,18 @@ impl KutuMetriği {
     fn çöz(
         &self, köşeler: KöşeMetrikleri, yoğunluk: DolguÖlçeği
     ) -> ÇözülmüşKutuMetriği {
-        let yarıçap = match self.şekil {
-            KutuŞekliTercihi::Yarıçap(değer) => değer,
-            diğer => match diğer.çöz(Some(DüğmeŞekli::Yuvarlatılmış)) {
+        // `ORT-003 §2` tercih çözümü sağlayıcınındır; burada yalnız çözümün
+        // **tezgâh kromuna** uygulanışı vardır. Bileşenlerin etkin yarıçabı
+        // gerçek sınırlar ve ölçek yakalandıktan sonra sağlayıcıda çözülür;
+        // tezgâh kendi kutularını GPUI `rounded()` ile çizdiği için `Hap`
+        // burada kısa kenara kırpılacak büyük bir değerle temsil edilir.
+        let çözüm = ÇözülmüşKutuŞekli::çöz(self.şekil, Some(DüğmeŞekli::Yuvarlatılmış));
+        let yarıçap = match çözüm.özel_yarıçap() {
+            Some(değer) => değer.değer(),
+            None => match çözüm.semantik_şekil() {
                 DüğmeŞekli::DikKöşeli => px(0.),
-                DüğmeŞekli::Köşeli => köşeler.köşeli,
-                DüğmeŞekli::Yuvarlatılmış => köşeler.yuvarlatılmış,
+                DüğmeŞekli::Köşeli => köşeler.köşeli().değer(),
+                DüğmeŞekli::Yuvarlatılmış => köşeler.yuvarlatılmış().değer(),
                 DüğmeŞekli::Hap => px(9999.),
             },
         };
@@ -249,10 +255,8 @@ impl TezgahGörünümProfili {
                     .expect("tasarım iç boşluğu sonlu ve negatif değildir"),
             },
             kolonlar: KolonMetriği::tasarım(),
-            köşe_metrikleri: KöşeMetrikleri {
-                köşeli: px(3.),
-                yuvarlatılmış: px(8.),
-            },
+            köşe_metrikleri: KöşeMetrikleri::denetimli(px(3.), px(8.))
+                .expect("tasarım köşe metrikleri sonlu ve artan"),
             gövde: TipografiRolü::Gövde,
             bölüm_başlığı: TipografiRolü::Etiket,
             eksen_etiketi: TipografiRolü::KüçükGövde,
@@ -417,14 +421,14 @@ mod testler {
                 .hap
                 .çöz(köşeler, DolguÖlçeği::yoğunluktan(ArayüzYoğunluğu::Normal))
                 .yarıçap
-                > köşeler.yuvarlatılmış
+                > köşeler.yuvarlatılmış().değer()
         );
         assert_eq!(
             profil
                 .kart
                 .çöz(köşeler, DolguÖlçeği::yoğunluktan(ArayüzYoğunluğu::Normal))
                 .yarıçap,
-            köşeler.köşeli
+            köşeler.köşeli().değer()
         );
 
         let dik = KutuMetriği {
@@ -439,7 +443,10 @@ mod testler {
 
         // Açık piksel tercihi kademeyi ezer.
         let açık = KutuMetriği {
-            şekil: KutuŞekliTercihi::Yarıçap(px(11.)),
+            şekil: KutuŞekliTercihi::Yarıçap(
+                gpui_bilesenleri::KutuYarıçapı::denetimli(px(11.))
+                    .expect("11px sonlu ve negatif değil"),
+            ),
             ..profil.kart
         };
         assert_eq!(

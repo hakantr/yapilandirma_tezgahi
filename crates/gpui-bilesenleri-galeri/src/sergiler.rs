@@ -2178,6 +2178,63 @@ pub(crate) fn değer_durumu(
         // `§19` `Escape`'in hedefi. Kabul edilmiş değerden ayrıdır:
         // düzenleme başlangıcı alana **odaklanıldığı andaki** metindir.
         .child(satır("Escape döner", dönülecek))
+        // `ORT-003` son çizim geçişinin doğrulanmış geometrisi. Kabuğun
+        // vaat ettiği şey ancak dışarıdan okunabiliyorsa sınanabilir;
+        // panel onu okunur kılar. Değerler bir kare gerideki geçişindir.
+        // `YÖN-006` kullanıcı metninde sözleşme numarası geçmez; etiket
+        // kullanıcının gördüğü şeyi adlandırır.
+        .child(satır("Kabuk geometrisi", kutu_geometri_özeti(kutu)))
+        .child(satır("Kuşak geometrisi", kutu_kuşak_özeti(kutu)))
+        .child(satır(
+            "Geometri hatası",
+            kutu.kabuk_geometri_hatası()
+                .map_or_else(|| "yok".to_owned(), |hata| format!("{hata:?}")),
+        ))
+}
+
+/// `ORT-003 §4` son çizim geçişinin tek kabuk geometrisi.
+pub fn kutu_geometri_özeti(kutu: &GirişKutusu) -> String {
+    let Some(g) = kutu.kabuk_geometrisi() else {
+        return "‹kuşak kipi ya da kurulmadı›".to_owned();
+    };
+    let dış = g.dış_sınırlar();
+    let iç = g.iç_sınırlar();
+    format!(
+        "dış {:.1}×{:.1} · iç {:.1}×{:.1} · r {:.1} · ölçek {:.2}",
+        f32::from(dış.size.width),
+        f32::from(dış.size.height),
+        f32::from(iç.size.width),
+        f32::from(iç.size.height),
+        f32::from(g.dış_yarıçaplar().üst_sol()),
+        g.yakalanmış_ölçek(),
+    )
+}
+
+/// `ORT-003 §13` son çizim geçişinin fiziksel kuşak geometrisi.
+pub fn kutu_kuşak_özeti(kutu: &GirişKutusu) -> String {
+    let Some(k) = kutu.kuşak_geometrisi() else {
+        return "‹tek bölüt›".to_owned();
+    };
+    let bölütler = k
+        .bölütler()
+        .iter()
+        .map(|b| {
+            format!(
+                "#{} {:.0}→{:.0}",
+                b.mantıksal_sıra(),
+                f32::from(b.sınırlar().origin.x),
+                f32::from(b.sınırlar().origin.x) + f32::from(b.sınırlar().size.width),
+            )
+        })
+        .collect::<Vec<_>>()
+        .join(" · ");
+    let çiziciler = k
+        .paylaşılan_sınırlar()
+        .iter()
+        .map(|s| s.çizici_bölüt().to_string())
+        .collect::<Vec<_>>()
+        .join(",");
+    format!("{bölütler} · ayırıcı çizici [{çiziciler}]")
 }
 
 /// `§26` olay akışı: alanın ürüne söyledikleri.

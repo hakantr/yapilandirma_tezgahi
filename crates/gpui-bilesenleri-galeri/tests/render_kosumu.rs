@@ -18,7 +18,9 @@ use gpui_bilesenleri_galeri::{
     BİL_AİLELERİ, GALERİ_SAHİPLİ_METİN_UTF8_TAVANI, GaleriHedefi, GaleriUygulaması, KAB_AİLELERİ,
     ORT_AİLELERİ, bileşen_tuş_bağlarını_kur, galeri_simge_cache_gözlemi, galeri_simge_kimliği,
 };
-use gpui_bilesenleri_galeri::{K03ProgramatikKanıtGözlemi, TezgahDeğerKipi, olay_özeti};
+use gpui_bilesenleri_galeri::{
+    K03ProgramatikKanıtGözlemi, TezgahBölütü, TezgahDeğerKipi, olay_özeti,
+};
 use gpui_bilesenleri_temel::{OdakGeçişAkıbeti, OdakGörünürlükSonucu};
 use std::{
     cell::{Cell, RefCell},
@@ -1247,4 +1249,129 @@ fn sayisal_tezgah_yuzde_para_bilimsel_konumsal_adim_gercek_klavyeyle(bağlam: &m
         geçici(görsel, &alan),
         Some(AçıkGirişDeğeriGörünümü::Ondalık(ondalık(1_252, 0)))
     );
+}
+
+/// `ORT-003 §4`/`§13` galeri **çalışma zamanı** kanıtı.
+///
+/// Tezgâh gerçek GPUI penceresinde çizildiğinde doğrulanmış kabuk ve kuşak
+/// geometrisi kurulur; bitişik bölüt açılınca sahiplik tek kabuktan kuşağa
+/// geçer. Panelde görünen özetler aynı doğrulanmış sonuçtan türer: metin ile
+/// geometri ayrışamaz.
+#[gpui::test]
+fn ort003_tezgah_cizimde_dogrulanmis_geometri_ve_kusak_uretir(bağlam: &mut TestAppContext) {
+    bağlam.update(bileşen_tuş_bağlarını_kur);
+    let (uygulama, görsel) =
+        bağlam.add_window_view(|_, _| GaleriUygulaması::hedef(GaleriHedefi::Masaüstü));
+    görsel.update(|_, bağlam| {
+        uygulama.update(bağlam, |uygulama, bağlam| {
+            assert!(uygulama.model.aileyi_aç("BİL-010"));
+            uygulama.tezgahı_değiştir(
+                |tezgah| {
+                    tezgah.başlangıç_bölütü = None;
+                    tezgah.bitiş_bölütü = None;
+                },
+                bağlam,
+            );
+        });
+    });
+    çizimi_akıt(görsel);
+
+    // 1) Tek bölütte sahiplik tek kabuktadır; kuşak tutamağı boştur.
+    let tek_kabuk_özeti = görsel.update(|_, bağlam| {
+        let alan = uygulama
+            .read(bağlam)
+            .yaşayan_tezgah_alanı()
+            .expect("tezgâh alanı kurulmuştur");
+        let kutu = alan.read(bağlam);
+        assert_eq!(
+            kutu.kabuk_geometri_hatası(),
+            None,
+            "kabuk hatasız kurulmalı"
+        );
+        let geometri = kutu
+            .kabuk_geometrisi()
+            .expect("tek bölütte kabuk geometrisi kurulur");
+        assert!(
+            kutu.kuşak_geometrisi().is_none(),
+            "kuşak tutamağı boş kalır"
+        );
+        assert!(f32::from(geometri.dış_sınırlar().size.width) > 0.0);
+        assert!(
+            f32::from(geometri.iç_sınırlar().size.width)
+                < f32::from(geometri.dış_sınırlar().size.width),
+            "iç kabuk sınır şeridini dışarıda bırakır"
+        );
+        gpui_bilesenleri_galeri::kutu_geometri_özeti(kutu)
+    });
+    assert!(
+        tek_kabuk_özeti.contains("dış ") && tek_kabuk_özeti.contains("ölçek"),
+        "panel özeti doğrulanmış geometriyi yazar: {tek_kabuk_özeti}"
+    );
+
+    // 2) Bitişik bölüt açılınca sahiplik kuşağa geçer.
+    görsel.update(|_, bağlam| {
+        uygulama.update(bağlam, |uygulama, bağlam| {
+            uygulama.tezgahı_değiştir(
+                |tezgah| {
+                    tezgah.başlangıç_bölütü = Some(TezgahBölütü::SabitMetin);
+                    tezgah.bitiş_bölütü = Some(TezgahBölütü::Eylem);
+                    tezgah.bölüt_sınırı = true;
+                },
+                bağlam,
+            );
+        });
+    });
+    çizimi_akıt(görsel);
+
+    let kuşak_özeti = görsel.update(|_, bağlam| {
+        let alan = uygulama
+            .read(bağlam)
+            .yaşayan_tezgah_alanı()
+            .expect("tezgâh alanı kurulmuştur");
+        let kutu = alan.read(bağlam);
+        assert_eq!(
+            kutu.kabuk_geometri_hatası(),
+            None,
+            "kuşak hatasız kurulmalı"
+        );
+        assert!(
+            kutu.kabuk_geometrisi().is_none(),
+            "kuşakta tek kabuk tutamağı boşalır: iki sahip aynı anda olmaz"
+        );
+        let kuşak = kutu
+            .kuşak_geometrisi()
+            .expect("bitişik bölütte kuşak geometrisi kurulur");
+        assert_eq!(kuşak.bölütler().len(), 3, "baş + alan + son");
+        assert_eq!(kuşak.paylaşılan_sınırlar().len(), 2);
+
+        // Bölütler kuşağı boşluksuz döşer.
+        let dış = kuşak.dış_kabuk().dış_sınırlar();
+        let mut kenar = f32::from(dış.origin.x);
+        for (sıra, b) in kuşak.bölütler().iter().enumerate() {
+            assert_eq!(f32::from(b.sınırlar().origin.x), kenar, "bölüt {sıra}");
+            kenar += f32::from(b.sınırlar().size.width);
+            assert!(
+                f32::from(b.iç_sınırlar().size.width) > 0.0,
+                "bölüt {sıra} içerik bölgesi çökmemeli"
+            );
+        }
+        assert_eq!(kenar, f32::from(dış.origin.x) + f32::from(dış.size.width));
+
+        // Her paylaşılan sınırın tek çizicisi vardır ve ikisi ayrıdır.
+        let çiziciler: Vec<usize> = kuşak
+            .paylaşılan_sınırlar()
+            .iter()
+            .map(|s| s.çizici_bölüt())
+            .collect();
+        assert_ne!(çiziciler[0], çiziciler[1]);
+
+        gpui_bilesenleri_galeri::kutu_kuşak_özeti(kutu)
+    });
+    // Panelde görünen metin geometriden türer: bölüt sayısı ve çizici
+    // listesi aynı kaynaktan gelir.
+    assert!(
+        kuşak_özeti.contains("#0 ") && kuşak_özeti.contains("#2 "),
+        "{kuşak_özeti}"
+    );
+    assert!(kuşak_özeti.contains("ayırıcı çizici ["), "{kuşak_özeti}");
 }

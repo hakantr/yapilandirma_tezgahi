@@ -43,6 +43,9 @@ mod palet;
 // bu paneller dinler (performans mimarisi turu, Ağu 2026).
 mod paneller;
 mod sergiler;
+// `ORT-003` gözlem özetleri: panelde görünen metin ile doğrulanmış
+// geometrinin aynı kaynaktan geldiği kanıt koşumunda sınanır.
+pub use sergiler::{kutu_geometri_özeti, kutu_kuşak_özeti};
 mod simgeler;
 // Bileşen-bağımsız tezgâh kabuğu. `BİL-010` onun ilk profilidir; kabuk
 // hiçbir `BİL-*` tipini tanımaz.
