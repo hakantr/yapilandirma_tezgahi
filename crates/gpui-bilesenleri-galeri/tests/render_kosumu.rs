@@ -1474,6 +1474,171 @@ fn bil010_acc031_bitisik_bolute_klavyeyle_ulasilir_ve_etkinlesir(bağlam: &mut T
     );
 }
 
+/// `BİL-010 §23.2`/`§23.3` galeri çalışma zamanı kanıtı: bitişik eylemin
+/// **yaşam döngüsü** gerçek pencerede kapanır.
+///
+/// Basış sırasında devre dışı bırakma/yeniden etkinleştirme, bölütü kaldırıp
+/// aynı içerikle geri ekleme, odaklı bölütün devre dışı bırakılması ve
+/// kaldırılması, gerçek Tab/Shift-Tab ile Enter/Space, eski etkileşimin
+/// gönderim üretmemesi ve yeni tam etkileşimin çalışması tek koşumda ölçülür.
+#[gpui::test]
+fn bil010_acc031_bitisik_bolut_yasam_dongusu_galeride_kapanir(bağlam: &mut TestAppContext) {
+    let (uygulama, görsel, alan, akış) =
+        bölütlü_tezgah_kur(bağlam, gpui_bilesenleri_temel::DüğmeŞekli::Yuvarlatılmış);
+    let gönderim_sayısı = gönderim_sayacı(&akış);
+    let yetki = |görsel: &mut gpui::VisualTestContext| {
+        görsel.update(|_, bağlam| alan.read(bağlam).kuşak_basış_yetkisinin_bölütü())
+    };
+    let bölüt_odaklı = |görsel: &mut gpui::VisualTestContext| {
+        görsel.update(|pencere, bağlam| alan.read(bağlam).bölüt_odaklı_mı(1, pencere))
+    };
+    let tezgahı_ayarla =
+        |görsel: &mut gpui::VisualTestContext,
+         ayar: fn(&mut gpui_bilesenleri_galeri::TezgahTercihleri)| {
+            görsel.update(|_, bağlam| {
+                uygulama.update(bağlam, |uygulama, bağlam| {
+                    uygulama.tezgahı_değiştir(ayar, bağlam);
+                });
+            });
+            çizimi_akıt(görsel);
+        };
+    let merkez = |görsel: &mut gpui::VisualTestContext| {
+        görsel.update(|_, bağlam| {
+            let kuşak = alan
+                .read(bağlam)
+                .kuşak_geometrisi()
+                .expect("kuşak geometrisi");
+            let iç = kuşak.bölütler()[1].iç_sınırlar();
+            gpui::point(
+                iç.origin.x + iç.size.width / 2.0,
+                iç.origin.y + iç.size.height / 2.0,
+            )
+        })
+    };
+
+    // (a) Basış sırasında devre dışı bırakıp yeniden etkinleştirme.
+    let nokta = merkez(görsel);
+    görsel.simulate_mouse_down(nokta, gpui::MouseButton::Left, gpui::Modifiers::none());
+    görsel.run_until_parked();
+    assert_eq!(yetki(görsel), Some(1), "ön koşul: basış yetki üretmeli");
+    tezgahı_ayarla(görsel, |tezgah| tezgah.etkin = false);
+    tezgahı_ayarla(görsel, |tezgah| tezgah.etkin = true);
+    assert_eq!(
+        yetki(görsel),
+        None,
+        "araya giren devre dışı durum yetkiyi düşürür"
+    );
+    görsel.simulate_mouse_up(nokta, gpui::MouseButton::Left, gpui::Modifiers::none());
+    görsel.run_until_parked();
+    assert_eq!(
+        gönderim_sayısı(görsel),
+        0,
+        "dirilen yetki galeride de gönderim üretemez"
+    );
+
+    // (b) Bölütü kaldırıp aynı içerikle geri ekleme.
+    let nokta = merkez(görsel);
+    görsel.simulate_mouse_down(nokta, gpui::MouseButton::Left, gpui::Modifiers::none());
+    görsel.run_until_parked();
+    assert_eq!(yetki(görsel), Some(1));
+    tezgahı_ayarla(görsel, |tezgah| tezgah.bitiş_bölütü = None);
+    tezgahı_ayarla(görsel, |tezgah| {
+        tezgah.bitiş_bölütü = Some(TezgahBölütü::Eylem)
+    });
+    assert_eq!(
+        yetki(görsel),
+        None,
+        "kaldırılan bölüt yetkiyi geri getirmez"
+    );
+    görsel.simulate_mouse_up(nokta, gpui::MouseButton::Left, gpui::Modifiers::none());
+    görsel.run_until_parked();
+    assert_eq!(gönderim_sayısı(görsel), 0);
+
+    // (c) Odaklı bölütün devre dışı bırakılması ve kaldırılması.
+    for (ad, ayar) in [
+        (
+            "devre dışı",
+            (|tezgah: &mut gpui_bilesenleri_galeri::TezgahTercihleri| tezgah.etkin = false)
+                as fn(&mut gpui_bilesenleri_galeri::TezgahTercihleri),
+        ),
+        ("kaldırma", |tezgah| tezgah.bitiş_bölütü = None),
+    ] {
+        tezgahı_ayarla(görsel, |tezgah| {
+            tezgah.etkin = true;
+            tezgah.bitiş_bölütü = Some(TezgahBölütü::Eylem);
+        });
+        görsel.update(|pencere, bağlam| {
+            let odak = alan.read(bağlam).odak().clone();
+            odak.focus(pencere, bağlam);
+        });
+        görsel.run_until_parked();
+        let mut adım = 0;
+        while adım < 6 && !bölüt_odaklı(görsel) {
+            görsel.simulate_keystrokes("tab");
+            görsel.run_until_parked();
+            adım += 1;
+        }
+        assert!(
+            bölüt_odaklı(görsel),
+            "ön koşul ({ad}): gerçek Tab bölüte ulaşmalı"
+        );
+        tezgahı_ayarla(görsel, ayar);
+        assert!(!bölüt_odaklı(görsel), "{ad} sonrası bölüt odak tutamaz");
+    }
+
+    // (d) Gerçek Tab/Shift-Tab ve Enter: yeni tam etkileşim çalışır.
+    tezgahı_ayarla(görsel, |tezgah| {
+        tezgah.etkin = true;
+        tezgah.bitiş_bölütü = Some(TezgahBölütü::Eylem);
+    });
+    görsel.update(|pencere, bağlam| {
+        let odak = alan.read(bağlam).odak().clone();
+        odak.focus(pencere, bağlam);
+    });
+    görsel.run_until_parked();
+    let mut adım = 0;
+    while adım < 6 && !bölüt_odaklı(görsel) {
+        görsel.simulate_keystrokes("tab");
+        görsel.run_until_parked();
+        adım += 1;
+    }
+    assert!(bölüt_odaklı(görsel), "gerçek Tab bölüte ulaşır");
+    görsel.simulate_keystrokes("shift-tab");
+    görsel.run_until_parked();
+    assert!(!bölüt_odaklı(görsel), "gerçek Shift+Tab bölütten çıkar");
+    görsel.simulate_keystrokes("tab");
+    görsel.run_until_parked();
+    assert!(bölüt_odaklı(görsel), "gerçek Tab yeniden bölüte ulaşır");
+
+    let önce = gönderim_sayısı(görsel);
+    görsel.simulate_keystrokes("enter");
+    görsel.simulate_event(gpui::KeyUpEvent {
+        keystroke: gpui::Keystroke::parse("enter").expect("kanonik tuş"),
+    });
+    görsel.run_until_parked();
+    assert_eq!(
+        gönderim_sayısı(görsel),
+        önce + 1,
+        "odaklı bölütte gerçek Enter tek gönderim üretir"
+    );
+
+    // Yeni tam işaretçi etkileşimi de çalışır.
+    görsel.update(|_, bağlam| {
+        alan.update(bağlam, |kutu, bağlam| kutu.aramayı_tamamla(bağlam));
+    });
+    let nokta = merkez(görsel);
+    let önce = gönderim_sayısı(görsel);
+    görsel.simulate_mouse_down(nokta, gpui::MouseButton::Left, gpui::Modifiers::none());
+    görsel.run_until_parked();
+    görsel.simulate_mouse_up(nokta, gpui::MouseButton::Left, gpui::Modifiers::none());
+    görsel.run_until_parked();
+    assert_eq!(
+        gönderim_sayısı(görsel),
+        önce + 1,
+        "yeni tam etkileşim galeride gönderim üretir"
+    );
+}
+
 /// Bölütlü arama tezgâhını kurar ve yaşayan alan ile olay akışını döndürür.
 fn bölütlü_tezgah_kur<'a>(
     bağlam: &'a mut TestAppContext,

@@ -6,7 +6,7 @@
 > bu turda eklenen `Tab` dolaşımı ve iki çalışma zamanı testi; ölçülen ağaç
 > bu belgeyi taşıyan commit'tir.
 >
-> Exact çekirdek bağı: `edc4fa2d5d55296f3308ea525989df18010fa062`
+> Exact çekirdek bağı: `48aa5cc10f4aca1701db049f883844035fb8f0c9`
 >
 > (Önceki kayıtlar: ilk koşum `ee4357d`, sonra `e0beaab`, sonra `d73add3`.
 > Bu kesit çekirdeğin `BitişikBölüt` kanonikleşmesini, bitişik eylem
@@ -17,10 +17,15 @@
 >
 > Ortam: Apple Silicon `arm64`, macOS `26.6.2`, `rustc 1.97.1`
 >
-> **Yeniden koşum kaydı.** Bütün galeri koşumu teslim edilen çekirdek
-> `edc4fa2` üzerinde çalıştırıldı: `cargo test --workspace` 272 geçti,
-> 0 başarısız, 1 `ignored`. Önceki kayıtlar `d73add3` ve `3ccb0a1`
-> üzerindeydi; pin varsayımla taşınmadı.
+> **Yeniden koşum kaydı.** Bütün galeri koşumu, pushlanmış çekirdek
+> `48aa5cc` üzerinde çalıştırıldı. Bağımlılık yolunun ölçülen çekirdeğe
+> çözüldüğü ayrıca doğrulandı: `../gpui_bilesenleri` →
+> `/Volumes/Taslaklar/tmp/ort003-20260915/core-teslim`, `HEAD = 48aa5cc`.
+> Bu kesitte bitişik eylemin **yaşam döngüsü** galeri penceresinde kapandı:
+> basış sırasında devre dışı bırakma/yeniden etkinleştirme, bölütü kaldırıp
+> aynı içerikle geri ekleme, odaklı bölütün devre dışı bırakılması ve
+> kaldırılması, gerçek Tab/Shift-Tab ile Enter, eski etkileşimin gönderim
+> üretmemesi ve yeni tam etkileşimin çalışması.
 
 Bu rapor `ORT-003 1.6.0` kutu şekli sağlayıcısının galeri tüketicisini ve o
 tüketicinin koşum kanıtlarını kaydeder. Sözleşmelerin sahibi
@@ -110,6 +115,10 @@ gerçek GPUI penceresinde:
   yüzden düğme kuşağı galeride görünür tüketici olarak koşmaz. Eylem
   bölütünün `BitişikBölütVurgusu::Açık(DüğmeGörünümü)` dalı da bu yüzden
   üretimde yoktur; tezgâh yalnız `AlandanÇöz` sunar.
-- Eylem bölütü bugün klavyeyle ulaşılamaz: §23.2 "klavyeyle ulaşıldığında
-  odak olağan Tab sırasıyla bölüte geçer" der, fakat bölütün odak tutamacı
-  ve Tab durağı henüz yok. Pointer yolu kapandı, klavye ekseni açık.
+- **Klavye ekseni kapandı** (önceki kesitte "bölütün odak tutamacı ve Tab
+  durağı henüz yok" yazıyordu; bu kayıt bayattı). Eylem bölütü kendi odak
+  tutamacını taşır, `tab_stop` olarak kaydedilir ve §23.2'nin "klavyeyle
+  ulaşıldığında odak olağan Tab sırasıyla bölüte geçer" hükmü galeride
+  gerçek tuş olaylarıyla ölçülür: `tab` bölüte ulaşır, `shift-tab` çıkar,
+  `enter` mevcut gönderim hattına iner. Galeri kökü `ORT-005 §2` odak
+  dolaşımını yürütür (`tab`/`shift-tab` → `focus_next`/`focus_prev`).
